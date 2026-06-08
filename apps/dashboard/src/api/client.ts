@@ -40,9 +40,11 @@ async function request<T>(
     let code = 'unknown';
     let message = res.statusText;
     try {
-      const body = (await res.json()) as { code?: string; message?: string };
-      code = body.code ?? code;
-      message = body.message ?? message;
+      const body = (await res.json()) as {
+        error?: { type?: string; message?: string };
+      };
+      code = body.error?.type ?? code;
+      message = body.error?.message ?? message;
     } catch {
       // ignore parse error
     }
