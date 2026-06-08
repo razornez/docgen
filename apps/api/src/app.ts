@@ -51,6 +51,7 @@ import {
   registerPaymentRoutes,
   registerPaymentWebhookRoute,
 } from './payments/payment.route.js';
+import { ensureDemoAccount } from './demo/demo-seeder.js';
 
 export function buildApp(config: AppConfig): FastifyInstance {
   const app = Fastify({
@@ -148,7 +149,10 @@ export function buildApp(config: AppConfig): FastifyInstance {
   );
   const paymentService = new PaymentService(
     pool,
-    new MidtransGateway(config.MIDTRANS_SERVER_KEY, config.MIDTRANS_IS_PRODUCTION),
+    new MidtransGateway(
+      config.MIDTRANS_SERVER_KEY,
+      config.MIDTRANS_IS_PRODUCTION,
+    ),
     idGen,
   );
   const batchService = new DefaultBatchService(
@@ -180,7 +184,11 @@ export function buildApp(config: AppConfig): FastifyInstance {
 
   void app.register(
     async (instance) => {
-      registerRegistrationRoutes(instance, registrationService, templateService);
+      registerRegistrationRoutes(
+        instance,
+        registrationService,
+        templateService,
+      );
       registerSessionRoutes(instance, sessionService);
       registerEmailAuthRoutes(instance, pool, userRepo, mailer, config);
       if (fsStorage) registerFileRoutes(instance, fsStorage);
@@ -191,7 +199,10 @@ export function buildApp(config: AppConfig): FastifyInstance {
 
   void app.register(
     async (instance) => {
-      instance.addHook('preHandler', makeAuthHook(apiKeyService, sessionService));
+      instance.addHook(
+        'preHandler',
+        makeAuthHook(apiKeyService, sessionService),
+      );
       instance.addHook('preHandler', async (request) => {
         const ctx = request.authContext;
         if (!ctx) return;
@@ -213,6 +224,10 @@ export function buildApp(config: AppConfig): FastifyInstance {
     },
     { prefix: '/v1' },
   );
+
+  app.addHook('onReady', async () => {
+    await ensureDemoAccount(pool, registrationService, templateService);
+  });
 
   return app;
 }
