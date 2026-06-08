@@ -1,11 +1,11 @@
-—import type { Locale } from '../locale.js';
+import type { Locale } from '../locale.js';
 
 /**
- * Port pengirim email (docs/21 — adapter: SMTP/Resend/Mailgun).
+ * Port pengirim email (docs/21 - adapter: SMTP/Resend/Mailgun).
  * Email transaksional dikirim dalam locale penerima (docs/22).
  */
 export interface EmailMessage {
-    readonly from: string;
+  readonly from: string;
   readonly to: string;
   readonly subject: string;
   readonly html: string;
