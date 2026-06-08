@@ -53,6 +53,8 @@ export interface RateLimitConfig {
 
 const LIVE_LIMIT: RateLimitConfig = { capacity: 60, refillSeconds: 60 };
 const TEST_LIMIT: RateLimitConfig = { capacity: 30, refillSeconds: 60 };
+/** 20 req/menit per IP — cukup untuk user normal, blokir brute force. */
+const AUTH_IP_LIMIT: RateLimitConfig = { capacity: 20, refillSeconds: 60 };
 
 export async function checkRateLimit(
   redis: Redis,
@@ -71,6 +73,38 @@ export async function checkRateLimit(
     String(cfg.refillSeconds),
     String(now),
   )) as [string, string];
+
+  if (allowed !== '1') {
+    throw Errors.rateLimited();
+  }
+}
+
+/**
+ * Rate limit per IP untuk endpoint publik (login/register/oauth).
+ * Gagal-terbuka bila Redis mati — jangan blokir user karena infra down.
+ */
+export async function checkIpRateLimit(
+  redis: Redis,
+  ip: string,
+  action: string,
+): Promise<void> {
+  const cfg = AUTH_IP_LIMIT;
+  const key = `rl:ip:${action}:${ip}`;
+  const now = Math.floor(Date.now() / 1000);
+
+  let allowed: string;
+  try {
+    [, allowed] = (await redis.eval(
+      BUCKET_SCRIPT,
+      1,
+      key,
+      String(cfg.capacity),
+      String(cfg.refillSeconds),
+      String(now),
+    )) as [string, string];
+  } catch {
+    return; // Redis mati → fail open
+  }
 
   if (allowed !== '1') {
     throw Errors.rateLimited();
