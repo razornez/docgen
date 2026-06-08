@@ -23,4 +23,5 @@ jobs:
             pnpm build:all
             pnpm db:migrate
             pm2 reload ecosystem.config.cjs --update-env
+            pnpm demo:reset
             echo "Deploy selesai: $(date)"
