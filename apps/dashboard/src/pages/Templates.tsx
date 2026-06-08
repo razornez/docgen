@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getTemplates,
@@ -68,14 +68,26 @@ export default function TemplatesPage() {
   const [panel, setPanel] = useState<Panel>({ type: 'none' });
 
   // --- Import defaults ---
+  const autoImported = useRef(false);
   const importMut = useMutation({
     mutationFn: importDefaultTemplates,
-    onSuccess: (res) => {
+    onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['templates'] });
       void qc.invalidateQueries({ queryKey: ['template-categories'] });
-      alert(`${res.imported} template berhasil diimpor.`);
     },
   });
+
+  // Auto-import silently when template list is empty after first load
+  useEffect(() => {
+    if (
+      templates.data?.data.length === 0 &&
+      !autoImported.current &&
+      !importMut.isPending
+    ) {
+      autoImported.current = true;
+      importMut.mutate();
+    }
+  }, [templates.data, importMut]);
 
   // --- Create ---
   const [createName, setCreateName] = useState('');
@@ -473,16 +485,12 @@ export default function TemplatesPage() {
       )}
 
       {templates.data?.data.length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 px-5 py-12 text-center space-y-4">
-          <p className="text-gray-400">Belum ada template.</p>
-          <button
-            type="button"
-            onClick={() => importMut.mutate()}
-            disabled={importMut.isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-40 transition-colors"
-          >
-            {importMut.isPending ? 'Mengimpor…' : 'Impor 15 template default'}
-          </button>
+        <div className="bg-white rounded-xl border border-gray-200 px-5 py-12 text-center">
+          <p className="text-sm text-gray-400">
+            {importMut.isPending
+              ? 'Memuat template default…'
+              : 'Belum ada template.'}
+          </p>
         </div>
       )}
 
