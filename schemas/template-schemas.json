@@ -1,0 +1,1248 @@
+{
+  "_meta": {
+    "spec": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Registry JSON Schema per template. Setiap entri berdiri sendiri dan bisa langsung disimpan ke kolom template.schema. Validasi payload `data` klien terhadap schema sebelum render. Field umum (party/company, items, money) sengaja di-inline per template agar tiap schema standalone.",
+    "conventions": {
+      "currency": "Default IDR; nilai uang sebagai number (rupiah penuh, bukan sen).",
+      "date": "Format date = YYYY-MM-DD, date-time = ISO 8601 UTC.",
+      "money_calc": "Field *_amount/total bersifat opsional; jika tidak dikirim, render engine boleh menghitung dari qty x unit_price."
+    }
+  },
+
+  "invoice": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Invoice / Faktur",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["invoice_number", "issue_date", "issuer", "bill_to", "items"],
+    "properties": {
+      "invoice_number": { "type": "string" },
+      "issue_date": { "type": "string", "format": "date" },
+      "due_date": { "type": "string", "format": "date" },
+      "currency": { "type": "string", "default": "IDR" },
+      "po_number": { "type": "string", "description": "Nomor PO terkait (opsional)" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "npwp": { "type": "string" },
+          "address": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "bill_to": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "npwp": { "type": "string" },
+          "address": { "type": "string" },
+          "email": { "type": "string", "format": "email" }
+        }
+      },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["description", "qty", "unit_price"],
+          "properties": {
+            "description": { "type": "string" },
+            "qty": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "type": "string" },
+            "unit_price": { "type": "number", "minimum": 0 },
+            "amount": { "type": "number", "minimum": 0 }
+          }
+        }
+      },
+      "discount": { "type": "number", "minimum": 0 },
+      "tax_rate": { "type": "number", "minimum": 0, "description": "Persentase, mis. 11 untuk PPN 11%" },
+      "tax_amount": { "type": "number", "minimum": 0 },
+      "total": { "type": "number", "minimum": 0 },
+      "amount_in_words": { "type": "string", "description": "Terbilang" },
+      "payment_instructions": { "type": "string" },
+      "notes": { "type": "string" }
+    }
+  },
+
+  "faktur-pajak": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Faktur Pajak",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["faktur_number", "issue_date", "seller", "buyer", "items"],
+    "properties": {
+      "faktur_number": { "type": "string", "description": "Nomor Seri Faktur Pajak" },
+      "issue_date": { "type": "string", "format": "date" },
+      "transaction_code": { "type": "string" },
+      "seller": {
+        "type": "object",
+        "required": ["name", "npwp", "address"],
+        "properties": {
+          "name": { "type": "string" },
+          "npwp": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "buyer": {
+        "type": "object",
+        "required": ["name", "npwp", "address"],
+        "properties": {
+          "name": { "type": "string" },
+          "npwp": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["description", "qty", "unit_price"],
+          "properties": {
+            "description": { "type": "string" },
+            "qty": { "type": "number", "exclusiveMinimum": 0 },
+            "unit_price": { "type": "number", "minimum": 0 },
+            "discount": { "type": "number", "minimum": 0 },
+            "dpp": { "type": "number", "minimum": 0, "description": "Dasar Pengenaan Pajak" }
+          }
+        }
+      },
+      "dpp_total": { "type": "number", "minimum": 0 },
+      "ppn": { "type": "number", "minimum": 0 },
+      "ppnbm": { "type": "number", "minimum": 0 },
+      "signed_by": { "type": "string" },
+      "signed_place": { "type": "string" }
+    }
+  },
+
+  "kwitansi": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Kwitansi / Bukti Pembayaran",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["receipt_number", "date", "received_from", "amount", "for_payment"],
+    "properties": {
+      "receipt_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "received_from": { "type": "string" },
+      "amount": { "type": "number", "exclusiveMinimum": 0 },
+      "amount_in_words": { "type": "string", "description": "Terbilang" },
+      "for_payment": { "type": "string", "description": "Untuk pembayaran" },
+      "payment_method": { "type": "string", "enum": ["cash", "transfer", "card", "other"] },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "title": { "type": "string" },
+          "company": { "type": "string" },
+          "signature_url": { "type": "string", "format": "uri" }
+        }
+      }
+    }
+  },
+
+  "quotation": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Quotation / Surat Penawaran Harga",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["quotation_number", "issue_date", "issuer", "customer", "items"],
+    "properties": {
+      "quotation_number": { "type": "string" },
+      "issue_date": { "type": "string", "format": "date" },
+      "valid_until": { "type": "string", "format": "date" },
+      "currency": { "type": "string", "default": "IDR" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "customer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "contact_person": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["description", "qty", "unit_price"],
+          "properties": {
+            "description": { "type": "string" },
+            "qty": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "type": "string" },
+            "unit_price": { "type": "number", "minimum": 0 },
+            "amount": { "type": "number", "minimum": 0 }
+          }
+        }
+      },
+      "subtotal": { "type": "number", "minimum": 0 },
+      "discount": { "type": "number", "minimum": 0 },
+      "tax_rate": { "type": "number", "minimum": 0 },
+      "total": { "type": "number", "minimum": 0 },
+      "terms": { "type": "string" },
+      "notes": { "type": "string" }
+    }
+  },
+
+  "proforma-invoice": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Proforma Invoice",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["proforma_number", "issue_date", "issuer", "bill_to", "items"],
+    "properties": {
+      "proforma_number": { "type": "string" },
+      "issue_date": { "type": "string", "format": "date" },
+      "valid_until": { "type": "string", "format": "date" },
+      "currency": { "type": "string", "default": "IDR" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "bill_to": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["description", "qty", "unit_price"],
+          "properties": {
+            "description": { "type": "string" },
+            "qty": { "type": "number", "exclusiveMinimum": 0 },
+            "unit_price": { "type": "number", "minimum": 0 },
+            "amount": { "type": "number", "minimum": 0 }
+          }
+        }
+      },
+      "estimated_total": { "type": "number", "minimum": 0 },
+      "payment_terms": { "type": "string" },
+      "notes": { "type": "string" }
+    }
+  },
+
+  "purchase-order": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Purchase Order",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["po_number", "issue_date", "buyer", "vendor", "items"],
+    "properties": {
+      "po_number": { "type": "string" },
+      "issue_date": { "type": "string", "format": "date" },
+      "required_date": { "type": "string", "format": "date" },
+      "currency": { "type": "string", "default": "IDR" },
+      "buyer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "contact_person": { "type": "string" }
+        }
+      },
+      "vendor": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "ship_to": { "type": "string" },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["description", "qty", "unit_price"],
+          "properties": {
+            "description": { "type": "string" },
+            "qty": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "type": "string" },
+            "unit_price": { "type": "number", "minimum": 0 },
+            "amount": { "type": "number", "minimum": 0 }
+          }
+        }
+      },
+      "total": { "type": "number", "minimum": 0 },
+      "terms": { "type": "string" },
+      "approved_by": { "type": "string" }
+    }
+  },
+
+  "credit-debit-note": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Nota Kredit / Nota Debit",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["type", "note_number", "issue_date", "issuer", "party", "items"],
+    "properties": {
+      "type": { "type": "string", "enum": ["credit", "debit"] },
+      "note_number": { "type": "string" },
+      "issue_date": { "type": "string", "format": "date" },
+      "reference_invoice": { "type": "string", "description": "Invoice yang dikoreksi" },
+      "reason": { "type": "string" },
+      "currency": { "type": "string", "default": "IDR" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "party": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["description", "amount"],
+          "properties": {
+            "description": { "type": "string" },
+            "qty": { "type": "number" },
+            "unit_price": { "type": "number" },
+            "amount": { "type": "number" }
+          }
+        }
+      },
+      "total": { "type": "number" }
+    }
+  },
+
+  "account-statement": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Statement / Rekening Tagihan",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["statement_number", "period_start", "period_end", "issuer", "customer", "transactions"],
+    "properties": {
+      "statement_number": { "type": "string" },
+      "period_start": { "type": "string", "format": "date" },
+      "period_end": { "type": "string", "format": "date" },
+      "currency": { "type": "string", "default": "IDR" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "customer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "account_number": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "opening_balance": { "type": "number" },
+      "transactions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["date", "description", "amount"],
+          "properties": {
+            "date": { "type": "string", "format": "date" },
+            "description": { "type": "string" },
+            "reference": { "type": "string" },
+            "debit": { "type": "number" },
+            "credit": { "type": "number" },
+            "amount": { "type": "number" },
+            "balance": { "type": "number" }
+          }
+        }
+      },
+      "closing_balance": { "type": "number" },
+      "amount_due": { "type": "number" }
+    }
+  },
+
+  "payment-reminder": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Surat Tagihan / Payment Reminder",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["date", "issuer", "customer", "invoices", "total_due"],
+    "properties": {
+      "date": { "type": "string", "format": "date" },
+      "reminder_level": { "type": "string", "enum": ["first", "second", "final"] },
+      "currency": { "type": "string", "default": "IDR" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "customer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "invoices": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["invoice_number", "amount", "due_date"],
+          "properties": {
+            "invoice_number": { "type": "string" },
+            "amount": { "type": "number" },
+            "due_date": { "type": "string", "format": "date" },
+            "days_overdue": { "type": "integer" }
+          }
+        }
+      },
+      "total_due": { "type": "number" },
+      "payment_instructions": { "type": "string" }
+    }
+  },
+
+  "slip-gaji": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Slip Gaji / Payslip",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["period", "company", "employee", "earnings", "net_pay"],
+    "properties": {
+      "period": { "type": "string", "description": "Mis. 2026-05" },
+      "pay_date": { "type": "string", "format": "date" },
+      "currency": { "type": "string", "default": "IDR" },
+      "company": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "employee": {
+        "type": "object",
+        "required": ["name", "employee_id"],
+        "properties": {
+          "name": { "type": "string" },
+          "employee_id": { "type": "string" },
+          "position": { "type": "string" },
+          "department": { "type": "string" },
+          "npwp": { "type": "string" },
+          "bank_account": { "type": "string" },
+          "join_date": { "type": "string", "format": "date" }
+        }
+      },
+      "earnings": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["label", "amount"],
+          "properties": {
+            "label": { "type": "string", "description": "Mis. Gaji Pokok, Tunjangan Transport" },
+            "amount": { "type": "number" }
+          }
+        }
+      },
+      "deductions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["label", "amount"],
+          "properties": {
+            "label": { "type": "string", "description": "Mis. BPJS, PPh 21, Pinjaman" },
+            "amount": { "type": "number" }
+          }
+        }
+      },
+      "gross_pay": { "type": "number" },
+      "total_deductions": { "type": "number" },
+      "net_pay": { "type": "number" },
+      "net_pay_in_words": { "type": "string" }
+    }
+  },
+
+  "bukti-potong-1721a1": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Bukti Potong PPh 21 (1721-A1)",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["form_number", "tax_year", "withholder", "employee", "gross_income", "pph21_total"],
+    "properties": {
+      "form_number": { "type": "string" },
+      "tax_year": { "type": "integer" },
+      "period_from": { "type": "string", "format": "date" },
+      "period_to": { "type": "string", "format": "date" },
+      "withholder": {
+        "type": "object",
+        "required": ["name", "npwp"],
+        "properties": {
+          "name": { "type": "string" },
+          "npwp": { "type": "string" },
+          "signer_name": { "type": "string" }
+        }
+      },
+      "employee": {
+        "type": "object",
+        "required": ["name", "npwp"],
+        "properties": {
+          "name": { "type": "string" },
+          "npwp": { "type": "string" },
+          "position": { "type": "string" },
+          "ptkp_status": { "type": "string", "description": "Mis. K/1, TK/0" }
+        }
+      },
+      "gross_income": { "type": "number" },
+      "deductions": { "type": "number" },
+      "net_income": { "type": "number" },
+      "ptkp": { "type": "number" },
+      "taxable_income": { "type": "number" },
+      "pph21_total": { "type": "number" }
+    }
+  },
+
+  "kontrak-kerja": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Kontrak Kerja (PKWT/PKWTT)",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["contract_number", "contract_type", "date", "company", "employee", "position", "start_date"],
+    "properties": {
+      "contract_number": { "type": "string" },
+      "contract_type": { "type": "string", "enum": ["PKWT", "PKWTT"] },
+      "date": { "type": "string", "format": "date" },
+      "company": {
+        "type": "object",
+        "required": ["name", "represented_by"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "represented_by": { "type": "string" },
+          "representative_title": { "type": "string" }
+        }
+      },
+      "employee": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "nik": { "type": "string", "description": "NIK KTP" },
+          "address": { "type": "string" },
+          "place_of_birth": { "type": "string" },
+          "date_of_birth": { "type": "string", "format": "date" }
+        }
+      },
+      "position": { "type": "string" },
+      "department": { "type": "string" },
+      "start_date": { "type": "string", "format": "date" },
+      "end_date": { "type": "string", "format": "date", "description": "Untuk PKWT" },
+      "salary": { "type": "number" },
+      "salary_in_words": { "type": "string" },
+      "working_hours": { "type": "string" },
+      "probation_period": { "type": "string" },
+      "clauses": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["title", "content"],
+          "properties": {
+            "title": { "type": "string" },
+            "content": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+
+  "offer-letter": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Offer Letter / Surat Penawaran Kerja",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["date", "company", "candidate", "position", "start_date", "salary"],
+    "properties": {
+      "date": { "type": "string", "format": "date" },
+      "company": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "candidate": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "email": { "type": "string", "format": "email" }
+        }
+      },
+      "position": { "type": "string" },
+      "department": { "type": "string" },
+      "employment_type": { "type": "string" },
+      "start_date": { "type": "string", "format": "date" },
+      "salary": { "type": "number" },
+      "benefits": { "type": "array", "items": { "type": "string" } },
+      "response_deadline": { "type": "string", "format": "date" },
+      "signed_by": { "type": "string" },
+      "signer_title": { "type": "string" }
+    }
+  },
+
+  "surat-keterangan-kerja": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Surat Keterangan Kerja / Paklaring",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["letter_number", "date", "company", "employee", "type"],
+    "properties": {
+      "letter_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "type": { "type": "string", "enum": ["aktif", "paklaring"], "description": "aktif = masih bekerja, paklaring = sudah berhenti" },
+      "company": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "employee": {
+        "type": "object",
+        "required": ["name", "position"],
+        "properties": {
+          "name": { "type": "string" },
+          "employee_id": { "type": "string" },
+          "position": { "type": "string" },
+          "join_date": { "type": "string", "format": "date" },
+          "end_date": { "type": "string", "format": "date" }
+        }
+      },
+      "purpose": { "type": "string" },
+      "signed_by": { "type": "string" },
+      "signer_title": { "type": "string" }
+    }
+  },
+
+  "surat-keputusan": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Surat Keputusan (SK)",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["sk_number", "date", "subject_type", "issuer", "employee"],
+    "properties": {
+      "sk_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "subject_type": { "type": "string", "enum": ["pengangkatan", "mutasi", "promosi", "pemberhentian"] },
+      "issuer": {
+        "type": "object",
+        "required": ["name", "signer_name"],
+        "properties": {
+          "name": { "type": "string" },
+          "signer_name": { "type": "string" },
+          "signer_title": { "type": "string" }
+        }
+      },
+      "employee": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "employee_id": { "type": "string" },
+          "old_position": { "type": "string" },
+          "new_position": { "type": "string" }
+        }
+      },
+      "considerations": { "type": "array", "items": { "type": "string" }, "description": "Menimbang" },
+      "decisions": { "type": "array", "items": { "type": "string" }, "description": "Memutuskan" },
+      "effective_date": { "type": "string", "format": "date" }
+    }
+  },
+
+  "surat-peringatan": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Surat Peringatan (SP)",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["letter_number", "date", "level", "company", "employee", "violation"],
+    "properties": {
+      "letter_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "level": { "type": "string", "enum": ["SP1", "SP2", "SP3"] },
+      "company": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string" }, "logo_url": { "type": "string", "format": "uri" } }
+      },
+      "employee": {
+        "type": "object",
+        "required": ["name", "position"],
+        "properties": {
+          "name": { "type": "string" },
+          "employee_id": { "type": "string" },
+          "position": { "type": "string" }
+        }
+      },
+      "violation": { "type": "string" },
+      "violation_date": { "type": "string", "format": "date" },
+      "consequences": { "type": "string" },
+      "valid_until": { "type": "string", "format": "date" },
+      "signed_by": { "type": "string" }
+    }
+  },
+
+  "id-card-karyawan": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "ID Card / Kartu Karyawan",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["company_name", "employee_name", "employee_id"],
+    "properties": {
+      "company_name": { "type": "string" },
+      "company_logo_url": { "type": "string", "format": "uri" },
+      "employee_name": { "type": "string" },
+      "employee_id": { "type": "string" },
+      "position": { "type": "string" },
+      "department": { "type": "string" },
+      "photo_url": { "type": "string", "format": "uri" },
+      "blood_type": { "type": "string" },
+      "valid_until": { "type": "string", "format": "date" },
+      "barcode_value": { "type": "string" },
+      "emergency_contact": { "type": "string" }
+    }
+  },
+
+  "agreement": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Perjanjian / NDA / MoU",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["agreement_type", "title", "date", "parties", "clauses"],
+    "properties": {
+      "agreement_type": { "type": "string", "enum": ["nda", "mou", "service", "vendor", "other"] },
+      "title": { "type": "string" },
+      "agreement_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "effective_date": { "type": "string", "format": "date" },
+      "expiry_date": { "type": "string", "format": "date" },
+      "parties": {
+        "type": "array",
+        "minItems": 2,
+        "items": {
+          "type": "object",
+          "required": ["name", "represented_by"],
+          "properties": {
+            "name": { "type": "string" },
+            "address": { "type": "string" },
+            "represented_by": { "type": "string" },
+            "representative_title": { "type": "string" },
+            "role": { "type": "string", "description": "Mis. Pihak Pertama" }
+          }
+        }
+      },
+      "recitals": { "type": "string", "description": "Pembukaan/menimbang" },
+      "clauses": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["title", "content"],
+          "properties": {
+            "title": { "type": "string" },
+            "content": { "type": "string" }
+          }
+        }
+      },
+      "governing_law": { "type": "string" }
+    }
+  },
+
+  "addendum": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Addendum Kontrak",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["addendum_number", "date", "original_contract", "parties", "amendments"],
+    "properties": {
+      "addendum_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "original_contract": {
+        "type": "object",
+        "required": ["number", "date"],
+        "properties": {
+          "number": { "type": "string" },
+          "date": { "type": "string", "format": "date" },
+          "title": { "type": "string" }
+        }
+      },
+      "parties": {
+        "type": "array",
+        "minItems": 2,
+        "items": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" },
+            "represented_by": { "type": "string" },
+            "role": { "type": "string" }
+          }
+        }
+      },
+      "amendments": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["clause", "new_content"],
+          "properties": {
+            "clause": { "type": "string", "description": "Pasal yang diubah" },
+            "old_content": { "type": "string" },
+            "new_content": { "type": "string" }
+          }
+        }
+      },
+      "effective_date": { "type": "string", "format": "date" }
+    }
+  },
+
+  "surat-kuasa": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Surat Kuasa",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["date", "grantor", "grantee", "authority"],
+    "properties": {
+      "letter_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "grantor": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "nik": { "type": "string" },
+          "address": { "type": "string" },
+          "title": { "type": "string" }
+        }
+      },
+      "grantee": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "nik": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "authority": { "type": "string", "description": "Hal yang dikuasakan" },
+      "valid_until": { "type": "string", "format": "date" },
+      "place": { "type": "string" }
+    }
+  },
+
+  "surat-pernyataan": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Surat Pernyataan",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["date", "declarant", "statements"],
+    "properties": {
+      "letter_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "declarant": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "nik": { "type": "string" },
+          "address": { "type": "string" },
+          "position": { "type": "string" }
+        }
+      },
+      "statements": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+      "place": { "type": "string" },
+      "with_stamp": { "type": "boolean", "description": "Materai" }
+    }
+  },
+
+  "surat-jalan": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Surat Jalan / Delivery Order",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["do_number", "date", "issuer", "recipient", "items"],
+    "properties": {
+      "do_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "po_reference": { "type": "string" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "recipient": {
+        "type": "object",
+        "required": ["name", "address"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "contact": { "type": "string" }
+        }
+      },
+      "vehicle": { "type": "string" },
+      "driver": { "type": "string" },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["description", "qty"],
+          "properties": {
+            "description": { "type": "string" },
+            "qty": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "type": "string" },
+            "notes": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+
+  "packing-list": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Packing List",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["packing_number", "date", "shipper", "consignee", "packages"],
+    "properties": {
+      "packing_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "invoice_reference": { "type": "string" },
+      "shipper": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string" }, "address": { "type": "string" } }
+      },
+      "consignee": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string" }, "address": { "type": "string" } }
+      },
+      "packages": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["description", "qty"],
+          "properties": {
+            "package_no": { "type": "string" },
+            "description": { "type": "string" },
+            "qty": { "type": "number" },
+            "unit": { "type": "string" },
+            "net_weight": { "type": "number" },
+            "gross_weight": { "type": "number" },
+            "dimensions": { "type": "string" }
+          }
+        }
+      },
+      "total_packages": { "type": "integer" },
+      "total_gross_weight": { "type": "number" }
+    }
+  },
+
+  "work-order": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Work Order / Job Order",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["wo_number", "date", "issuer", "customer", "tasks"],
+    "properties": {
+      "wo_number": { "type": "string" },
+      "date": { "type": "string", "format": "date" },
+      "scheduled_date": { "type": "string", "format": "date" },
+      "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string" }, "logo_url": { "type": "string", "format": "uri" } }
+      },
+      "customer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "contact": { "type": "string" }
+        }
+      },
+      "assigned_to": { "type": "string" },
+      "tasks": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["description"],
+          "properties": {
+            "description": { "type": "string" },
+            "qty": { "type": "number" },
+            "estimated_hours": { "type": "number" }
+          }
+        }
+      },
+      "materials": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "qty": { "type": "number" },
+            "unit": { "type": "string" }
+          }
+        }
+      },
+      "notes": { "type": "string" }
+    }
+  },
+
+  "kartu-garansi": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Kartu Garansi / Warranty Card",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["product_name", "purchase_date", "warranty_period", "issuer"],
+    "properties": {
+      "warranty_number": { "type": "string" },
+      "product_name": { "type": "string" },
+      "model": { "type": "string" },
+      "serial_number": { "type": "string" },
+      "purchase_date": { "type": "string", "format": "date" },
+      "warranty_period": { "type": "string", "description": "Mis. 12 bulan" },
+      "warranty_expiry": { "type": "string", "format": "date" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string" }, "logo_url": { "type": "string", "format": "uri" } }
+      },
+      "customer": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "phone": { "type": "string" }
+        }
+      },
+      "terms": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+
+  "sertifikat": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Sertifikat (Pelatihan / Kehadiran / Penghargaan)",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["type", "certificate_number", "recipient_name", "title", "issue_date", "issuer"],
+    "properties": {
+      "type": { "type": "string", "enum": ["completion", "attendance", "award", "achievement"] },
+      "certificate_number": { "type": "string" },
+      "recipient_name": { "type": "string" },
+      "title": { "type": "string", "description": "Mis. Sertifikat Penyelesaian Pelatihan" },
+      "program_name": { "type": "string" },
+      "description": { "type": "string" },
+      "issue_date": { "type": "string", "format": "date" },
+      "event_date": { "type": "string", "format": "date" },
+      "duration": { "type": "string", "description": "Mis. 16 jam" },
+      "grade": { "type": "string" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "signatories": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["name", "title"],
+          "properties": {
+            "name": { "type": "string" },
+            "title": { "type": "string" },
+            "signature_url": { "type": "string", "format": "uri" }
+          }
+        }
+      },
+      "verification_url": { "type": "string", "format": "uri" },
+      "qr_value": { "type": "string" }
+    }
+  },
+
+  "id-badge": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "ID Badge / Name Tag Peserta",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["event_name", "attendee_name"],
+    "properties": {
+      "event_name": { "type": "string" },
+      "event_logo_url": { "type": "string", "format": "uri" },
+      "attendee_name": { "type": "string" },
+      "organization": { "type": "string" },
+      "role": { "type": "string", "description": "Mis. Speaker, Peserta, Panitia" },
+      "category_color": { "type": "string", "description": "Hex color untuk pita/kategori" },
+      "photo_url": { "type": "string", "format": "uri" },
+      "qr_value": { "type": "string", "description": "Untuk check-in" }
+    }
+  },
+
+  "tiket-event": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Tiket Event",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["event_name", "ticket_number", "holder_name", "event_date"],
+    "properties": {
+      "event_name": { "type": "string" },
+      "event_logo_url": { "type": "string", "format": "uri" },
+      "ticket_number": { "type": "string" },
+      "ticket_type": { "type": "string", "description": "Mis. VIP, Regular, Early Bird" },
+      "holder_name": { "type": "string" },
+      "event_date": { "type": "string", "format": "date-time" },
+      "venue": { "type": "string" },
+      "seat": { "type": "string" },
+      "price": { "type": "number" },
+      "qr_value": { "type": "string" },
+      "terms": { "type": "string" }
+    }
+  },
+
+  "kartu-member": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Kartu Member",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["organization_name", "member_name", "member_id"],
+    "properties": {
+      "organization_name": { "type": "string" },
+      "organization_logo_url": { "type": "string", "format": "uri" },
+      "member_name": { "type": "string" },
+      "member_id": { "type": "string" },
+      "tier": { "type": "string", "description": "Mis. Silver, Gold, Platinum" },
+      "join_date": { "type": "string", "format": "date" },
+      "valid_until": { "type": "string", "format": "date" },
+      "photo_url": { "type": "string", "format": "uri" },
+      "barcode_value": { "type": "string" }
+    }
+  },
+
+  "welcome-letter": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Welcome Letter",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["date", "issuer", "recipient_name", "body"],
+    "properties": {
+      "date": { "type": "string", "format": "date" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "recipient_name": { "type": "string" },
+      "membership_id": { "type": "string" },
+      "tier": { "type": "string" },
+      "body": { "type": "string" },
+      "benefits": { "type": "array", "items": { "type": "string" } },
+      "signed_by": { "type": "string" },
+      "signer_title": { "type": "string" }
+    }
+  },
+
+  "renewal-notice": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Renewal Notice",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["date", "issuer", "customer", "subscription", "renewal_amount"],
+    "properties": {
+      "date": { "type": "string", "format": "date" },
+      "currency": { "type": "string", "default": "IDR" },
+      "issuer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "logo_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "customer": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" }
+        }
+      },
+      "subscription": {
+        "type": "object",
+        "required": ["plan", "expiry_date"],
+        "properties": {
+          "plan": { "type": "string" },
+          "expiry_date": { "type": "string", "format": "date" },
+          "renewal_date": { "type": "string", "format": "date" }
+        }
+      },
+      "renewal_amount": { "type": "number" },
+      "payment_url": { "type": "string", "format": "uri" }
+    }
+  }
+}

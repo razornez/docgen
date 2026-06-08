@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --ink: #1b2a3a;
+    --muted: #6b7785;
+    --line: #e3e8ee;
+    --accent: #14635c;
+    --soft: #f6f8f9;
+  }
+  body {
+    font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .page { padding: 28mm 20mm; }
+
+  /* ---- header ---- */
+  .top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .brand { display: flex; gap: 12px; align-items: center; }
+  .logo {
+    width: 46px; height: 46px; border-radius: 10px;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700; letter-spacing: .5px;
+  }
+  .brand .name { font-size: 15px; font-weight: 700; }
+  .brand .meta { color: var(--muted); font-size: 10px; }
+  .doc-title { text-align: right; }
+  .doc-title h1 {
+    font-size: 26px; font-weight: 700; letter-spacing: 2px;
+    color: var(--accent); text-transform: uppercase;
+  }
+  .doc-title .num { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+  /* ---- meta row ---- */
+  .meta-grid {
+    margin-top: 26px; display: flex; justify-content: space-between; gap: 24px;
+  }
+  .block .label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin-bottom: 5px;
+  }
+  .block .strong { font-weight: 600; }
+  .dates { text-align: right; }
+  .dates div { margin-bottom: 4px; }
+
+  /* ---- items ---- */
+  table { width: 100%; border-collapse: collapse; margin-top: 28px; }
+  thead th {
+    background: var(--accent); color: #fff; font-weight: 600;
+    font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+    padding: 9px 12px; text-align: left;
+  }
+  thead th.r, tbody td.r { text-align: right; }
+  thead th.c, tbody td.c { text-align: center; }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:nth-child(even) td { background: var(--soft); }
+  .desc { font-weight: 600; }
+
+  /* ---- totals ---- */
+  .totals { margin-top: 18px; display: flex; justify-content: flex-end; }
+  .totals table { width: 280px; margin: 0; }
+  .totals td { padding: 6px 4px; border: none; }
+  .totals td.r { text-align: right; }
+  .totals .grand td {
+    border-top: 2px solid var(--ink); font-size: 14px; font-weight: 700;
+    padding-top: 10px; color: var(--accent);
+  }
+  .words {
+    margin-top: 14px; padding: 10px 14px; background: var(--soft);
+    border-left: 3px solid var(--accent); font-style: italic; color: var(--ink);
+  }
+
+  /* ---- footer ---- */
+  .pay { margin-top: 30px; display: flex; justify-content: space-between; gap: 30px; }
+  .pay .block { flex: 1; }
+  .pay .box { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .note { margin-top: 24px; color: var(--muted); font-size: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="top">
+      <div class="brand">
+        <div class="logo">{{issuer.initials}}</div>
+        <div>
+          <div class="name">{{issuer.name}}</div>
+          <div class="meta">{{issuer.address}}</div>
+          {{#if issuer.npwp}}<div class="meta">NPWP: {{issuer.npwp}}</div>{{/if}}
+        </div>
+      </div>
+      <div class="doc-title">
+        <h1>Invoice</h1>
+        <div class="num">{{invoice_number}}</div>
+      </div>
+    </div>
+
+    <div class="meta-grid">
+      <div class="block">
+        <div class="label">Ditagihkan kepada</div>
+        <div class="strong">{{bill_to.name}}</div>
+        <div class="meta">{{bill_to.address}}</div>
+        {{#if bill_to.npwp}}<div class="meta">NPWP: {{bill_to.npwp}}</div>{{/if}}
+      </div>
+      <div class="block dates">
+        <div><span class="label">Tanggal</span><br><span class="strong">{{issue_date}}</span></div>
+        <div><span class="label">Jatuh tempo</span><br><span class="strong">{{due_date}}</span></div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:42px" class="c">No</th>
+          <th>Deskripsi</th>
+          <th class="r" style="width:60px">Qty</th>
+          <th class="r" style="width:110px">Harga</th>
+          <th class="r" style="width:120px">Jumlah</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each items}}
+        <tr>
+          <td class="c">{{inc @index}}</td>
+          <td class="desc">{{description}}</td>
+          <td class="r">{{qty}}{{#if unit}} {{unit}}{{/if}}</td>
+          <td class="r">{{rupiah unit_price}}</td>
+          <td class="r">{{rupiah amount}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+
+    <div class="totals">
+      <table>
+        <tr><td>Subtotal</td><td class="r">{{rupiah subtotal}}</td></tr>
+        {{#if discount}}<tr><td>Diskon</td><td class="r">- {{rupiah discount}}</td></tr>{{/if}}
+        <tr><td>PPN ({{tax_rate}}%)</td><td class="r">{{rupiah tax_amount}}</td></tr>
+        <tr class="grand"><td>Total</td><td class="r">{{rupiah total}}</td></tr>
+      </table>
+    </div>
+
+    {{#if amount_in_words}}
+    <div class="words">Terbilang: {{amount_in_words}}</div>
+    {{/if}}
+
+    <div class="pay">
+      {{#if payment_instructions}}
+      <div class="block">
+        <div class="label">Instruksi pembayaran</div>
+        <div class="box">{{payment_instructions}}</div>
+      </div>
+      {{/if}}
+    </div>
+
+    {{#if notes}}<div class="note">{{notes}}</div>{{/if}}
+
+  </div>
+</body>
+</html>

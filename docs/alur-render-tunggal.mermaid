@@ -1,0 +1,27 @@
+sequenceDiagram
+    autonumber
+    participant C as Klien
+    participant API as API
+    participant DB as Database
+    participant R as Renderer
+    participant S as Storage
+    C->>API: POST /v1/documents (template, data)
+    API->>API: Cek API key + rate limit
+    API->>DB: Reserve kredit (atomik, saldo >= n)
+    alt Saldo tidak cukup
+        DB-->>API: gagal
+        API-->>C: 402 saldo kurang
+    else Saldo cukup
+        DB-->>API: kredit dipesan
+        API->>R: Isi template, render HTML ke PDF
+        alt Render sukses
+            R-->>API: PDF + jumlah halaman
+            API->>S: Simpan PDF
+            API->>DB: Potong kredit sesuai halaman
+            API-->>C: 201 + tautan unduh
+        else Render gagal
+            R-->>API: error
+            API->>DB: Kembalikan kredit (refund)
+            API-->>C: error (saldo tidak dipotong)
+        end
+    end
