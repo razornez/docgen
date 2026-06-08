@@ -3,6 +3,7 @@ import { PrefixedIdGenerator, SystemClock, randomBase62 } from '@docgen/shared';
 import { FilesystemStorage, S3Storage } from '@docgen/storage';
 import type { StoragePort } from '@docgen/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
+import helmet from '@fastify/helmet';
 import type { AppConfig } from '@docgen/config';
 import { ApiKeyService } from './api-keys/api-key.service.js';
 import { PgApiKeyRepository } from './api-keys/api-key.repository.js';
@@ -64,6 +65,12 @@ export function buildApp(config: AppConfig): FastifyInstance {
 
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id);
+  });
+
+  // Security headers (HSTS, nosniff, frameguard, dsb.) — docs/13.
+  void app.register(helmet, {
+    contentSecurityPolicy: false, // API server, bukan HTML app
+    crossOriginResourcePolicy: false, // PDF harus bisa diakses lintas asal
   });
 
   registerErrorHandler(app);
