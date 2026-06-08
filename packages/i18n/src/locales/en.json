@@ -1,0 +1,19 @@
+{
+  "common.appName": "DocGen",
+  "common.languageName": "English",
+  "common.switchLanguage": "Language",
+
+  "health.ok": "Service is healthy",
+  "health.degraded": "Service is degraded",
+
+  "auth.login.title": "Sign in",
+  "auth.login.email": "Email",
+  "auth.login.password": "Password",
+  "auth.login.submit": "Sign in",
+  "auth.register.title": "Create an account",
+
+  "error.fallback": "Something went wrong",
+  "error.unauthorized": "Authentication required",
+  "error.insufficientCredit": "Insufficient credit balance",
+  "error.rateLimited": "Too many requests"
+}

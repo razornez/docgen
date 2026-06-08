@@ -1,0 +1,19 @@
+{
+  "common.appName": "DocGen",
+  "common.languageName": "Bahasa Indonesia",
+  "common.switchLanguage": "Bahasa",
+
+  "health.ok": "Layanan sehat",
+  "health.degraded": "Layanan terganggu",
+
+  "auth.login.title": "Masuk",
+  "auth.login.email": "Email",
+  "auth.login.password": "Kata sandi",
+  "auth.login.submit": "Masuk",
+  "auth.register.title": "Buat akun",
+
+  "error.fallback": "Terjadi kesalahan",
+  "error.unauthorized": "Perlu autentikasi",
+  "error.insufficientCredit": "Saldo kredit tidak mencukupi",
+  "error.rateLimited": "Terlalu banyak permintaan"
+}
