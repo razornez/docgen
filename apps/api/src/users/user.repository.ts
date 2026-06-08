@@ -24,6 +24,8 @@ export interface UserRepository {
   findForAuth(email: string): Promise<AuthUserRow | null>;
   findForAuthByGoogleId(googleId: string): Promise<AuthUserRow | null>;
   updateGoogleId(userId: UserId, googleId: string): Promise<void>;
+  markEmailVerified(userId: string): Promise<void>;
+  updatePassword(userId: string, passwordHash: string): Promise<void>;
 }
 
 interface UserRow {
@@ -94,5 +96,19 @@ export class PgUserRepository implements UserRepository {
       userId,
       googleId,
     ]);
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.db.query(
+      `UPDATE users SET email_verified_at = NOW() WHERE id = $1`,
+      [userId],
+    );
+  }
+
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    await this.db.query(
+      `UPDATE users SET password_hash = $2 WHERE id = $1`,
+      [userId, passwordHash],
+    );
   }
 }
