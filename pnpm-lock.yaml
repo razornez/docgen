@@ -11,15 +11,24 @@ importers:
 
   .:
     devDependencies:
+      '@types/bcryptjs':
+        specifier: ^2.4.6
+        version: 2.4.6
       '@types/node':
         specifier: ^20.16.5
         version: 20.19.41
+      '@types/pg':
+        specifier: ^8.11.6
+        version: 8.20.0
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.8.0
         version: 8.60.1(@typescript-eslint/parser@8.60.1(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1)(typescript@5.9.3)
       '@typescript-eslint/parser':
         specifier: ^8.8.0
         version: 8.60.1(eslint@8.57.1)(typescript@5.9.3)
+      bcryptjs:
+        specifier: ^2.4.3
+        version: 2.4.3
       eslint:
         specifier: ^8.57.1
         version: 8.57.1
@@ -32,6 +41,9 @@ importers:
       lint-staged:
         specifier: ^15.2.10
         version: 15.5.2
+      pg:
+        specifier: ^8.11.0
+        version: 8.21.0
       prettier:
         specifier: ^3.3.3
         version: 3.8.3

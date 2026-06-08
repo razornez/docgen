@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:migrate": "pnpm --filter @docgen/db run migrate",
+    "demo:reset": "tsx scripts/reset-demo.ts",
     "qa:smoke": "tsx scripts/qa-smoke.ts",
     "qa:render": "tsx scripts/qa-render.ts",
     "dev:api": "pnpm --filter @docgen/api run dev",
@@ -25,13 +26,17 @@
     "prepare": "husky"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.16.5",
+    "@types/pg": "^8.11.6",
     "@typescript-eslint/eslint-plugin": "^8.8.0",
     "@typescript-eslint/parser": "^8.8.0",
+    "bcryptjs": "^2.4.3",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
+    "pg": "^8.11.0",
     "prettier": "^3.3.3",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"

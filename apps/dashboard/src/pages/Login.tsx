@@ -5,6 +5,9 @@ import { authLogin, authRegister } from '../api/client.js';
 
 type Tab = 'login' | 'register';
 
+const DEMO_EMAIL = 'demo@docgen.razornez.net';
+const DEMO_PASSWORD = 'demo1234';
+
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -17,6 +20,13 @@ export default function LoginPage() {
 
   function switchTab(t: Tab) {
     setTab(t);
+    setError('');
+  }
+
+  function fillDemo() {
+    setTab('login');
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
     setError('');
   }
 
@@ -65,6 +75,37 @@ export default function LoginPage() {
             {tab === 'login'
               ? 'Masuk ke akun Anda'
               : 'Buat akun baru — 100 kredit gratis'}
+          </p>
+        </div>
+
+        {/* Demo credentials banner */}
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-semibold text-amber-800 mb-1.5">
+            Akun Demo — coba tanpa daftar
+          </p>
+          <div className="space-y-0.5 font-mono text-xs text-amber-900">
+            <div>
+              Email:{' '}
+              <span className="rounded bg-amber-100 px-1 py-0.5">
+                {DEMO_EMAIL}
+              </span>
+            </div>
+            <div>
+              Password:{' '}
+              <span className="rounded bg-amber-100 px-1 py-0.5">
+                {DEMO_PASSWORD}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={fillDemo}
+            className="mt-2 text-xs font-medium text-amber-700 underline hover:text-amber-900"
+          >
+            Isi otomatis &darr;
+          </button>
+          <p className="mt-1 text-xs text-amber-500">
+            Data di-reset setiap 24 jam
           </p>
         </div>
 
