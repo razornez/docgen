@@ -3,8 +3,9 @@ import jwt, { type JwtPayload } from 'jsonwebtoken';
 
 const { compare, hash } = bcrypt;
 const { sign, verify } = jwt;
-import { Errors } from '@docgen/shared';
+import { Errors, randomBase62 } from '@docgen/shared';
 import type { ApiKeyId, ApiKeyMode, TenantId, UserId } from '@docgen/shared';
+import { getRedis } from '../infra/redis.js';
 import type { AuthContext } from './auth-context.js';
 import type { RegistrationService } from '../registration/registration.service.js';
 import type { PgUserRepository } from '../users/user.repository.js';
@@ -112,8 +113,22 @@ export class AuthSessionService {
   async handleGoogleCallback(code: string): Promise<{ redirectUrl: string }> {
     const userInfo = await this.exchangeGoogleCode(code);
     const token = await this.loginOrRegisterGoogle(userInfo);
-    const redirectUrl = `${this.dashboardUrl}/auth/callback?token=${encodeURIComponent(token)}`;
+    // Simpan JWT di Redis dengan kode tukar sekali-pakai (TTL 60 detik).
+    // URL hanya membawa kode opaque — bukan JWT itu sendiri.
+    const exCode = randomBase62(32);
+    await getRedis().set(`oauth:ex:${exCode}`, token, 'EX', 60);
+    const redirectUrl = `${this.dashboardUrl}/auth/callback?code=${encodeURIComponent(exCode)}`;
     return { redirectUrl };
+  }
+
+  async redeemExchangeCode(code: string): Promise<string> {
+    const key = `oauth:ex:${code}`;
+    const token = await getRedis().getdel(key);
+    if (!token)
+      throw Errors.unauthorized(
+        'Kode OAuth tidak valid atau sudah kedaluwarsa',
+      );
+    return token;
   }
 
   private async exchangeGoogleCode(code: string): Promise<GoogleUserInfo> {

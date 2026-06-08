@@ -88,6 +88,13 @@ export function getGoogleAuthUrl(): string {
   return '/v1/auth/google';
 }
 
+export function exchangeOAuthCode(code: string): Promise<{ token: string }> {
+  return request('/auth/google/exchange', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
 // ---- Account ----
 
 export interface MeResult {
@@ -281,9 +288,7 @@ export function getBatchDocuments(
   return request(`/batches/${batchId}/documents`);
 }
 
-export function getTemplateBody(
-  id: string,
-): Promise<{
+export function getTemplateBody(id: string): Promise<{
   template: TemplateItem;
   version: { body: string; version: number };
 }> {
