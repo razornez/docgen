@@ -12,11 +12,13 @@ import { ApiKeyHasher } from './auth/api-key-hasher.js';
 import { makeAuthHook } from './auth/auth.hook.js';
 import { AuthSessionService } from './auth/session.service.js';
 import { registerSessionRoutes } from './auth/session.route.js';
+import { registerEmailAuthRoutes } from './auth/email-auth.route.js';
 import { PgDocumentRepository } from './documents/document.repository.js';
 import { RenderService } from './documents/render.service.js';
 import { registerDocumentRoutes } from './documents/document.route.js';
 import { registerFileRoutes } from './files/file.route.js';
 import { RenderQueue } from './infra/render-queue.js';
+import { createBrevoMailer } from './infra/brevo-mailer.js';
 import { HealthRepository } from './health/health.repository.js';
 import { HealthService } from './health/health.service.js';
 import { registerHealthRoutes } from './health/health.route.js';
@@ -50,16 +52,10 @@ import {
   registerPaymentWebhookRoute,
 } from './payments/payment.route.js';
 
-/**
- * Composition root (docs/21 — Ports & Adapters / Dependency Injection).
- * Adapter konkret di-instansiasi dan disuntikkan ke service, lalu rute
- * didaftarkan. Rute publik dan terproteksi dipisah lewat dua plugin Fastify.
- */
 export function buildApp(config: AppConfig): FastifyInstance {
   const app = Fastify({
     logger: { level: config.LOG_LEVEL },
     genReqId: () => `req_${randomBase62(20)}`,
-    // Percaya X-Forwarded-For / X-Forwarded-Proto dari reverse proxy (nginx/Cloudflare).
     trustProxy: config.NODE_ENV === 'production',
   });
 
@@ -67,30 +63,26 @@ export function buildApp(config: AppConfig): FastifyInstance {
     reply.header('x-request-id', request.id);
   });
 
-  // Security headers (HSTS, nosniff, frameguard, dsb.) — docs/13.
   void app.register(helmet, {
-    contentSecurityPolicy: false, // API server, bukan HTML app
-    crossOriginResourcePolicy: false, // PDF harus bisa diakses lintas asal
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: false,
   });
 
   registerErrorHandler(app);
 
-  // --- Adapter & infra ---
   const pool = getPool();
   const clock = new SystemClock();
   const idGen = new PrefixedIdGenerator();
   const hasher = new ApiKeyHasher(config.APIKEY_HASH_PEPPER);
 
-  // --- Repository ---
   const tenantRepo = new PgTenantRepository(pool);
   const walletRepo = new PgWalletRepository(pool);
   const apiKeyRepo = new PgApiKeyRepository(pool);
   const templateRepo = new PgTemplateRepository(pool);
   const templateVersionRepo = new PgTemplateVersionRepository(pool);
   const documentRepo = new PgDocumentRepository(pool);
+  const userRepo = new PgUserRepository(pool);
 
-  // Storage (docs/10): filesystem untuk dev, s3 untuk prod (R2/S3/MinIO).
-  // fsStorage hanya diisi saat driver=filesystem — dipakai oleh /v1/files.
   let storage: StoragePort;
   let fsStorage: FilesystemStorage | null = null;
   if (config.STORAGE_DRIVER === 's3') {
@@ -111,12 +103,21 @@ export function buildApp(config: AppConfig): FastifyInstance {
     storage = fsStorage;
   }
 
+  // Buat mailer Brevo jika SMTP dikonfigurasi, null jika tidak (dev mode)
+  const mailer = config.EMAIL_SMTP_USER
+    ? createBrevoMailer({
+        host: config.EMAIL_SMTP_HOST,
+        port: config.EMAIL_SMTP_PORT,
+        user: config.EMAIL_SMTP_USER,
+        pass: config.EMAIL_SMTP_PASS,
+      })
+    : null;
+
   const renderQueue = new RenderQueue(config.REDIS_URL);
   app.addHook('onClose', async () => {
     await renderQueue.close();
   });
 
-  // --- Service ---
   const healthService = new HealthService(new HealthRepository(clock));
   const apiKeyService = new ApiKeyService(apiKeyRepo, hasher, idGen, clock);
   const registrationService = new RegistrationService(
@@ -135,20 +136,19 @@ export function buildApp(config: AppConfig): FastifyInstance {
   const sessionService = new AuthSessionService(
     config.SESSION_SECRET,
     registrationService,
-    new PgUserRepository(pool),
+    userRepo,
     new PgApiKeyRepository(pool),
     config.DASHBOARD_URL,
     config.GOOGLE_CLIENT_ID,
     config.GOOGLE_CLIENT_SECRET,
     config.PUBLIC_BASE_URL,
     templateService,
+    mailer,
+    config,
   );
   const paymentService = new PaymentService(
     pool,
-    new MidtransGateway(
-      config.MIDTRANS_SERVER_KEY,
-      config.MIDTRANS_IS_PRODUCTION,
-    ),
+    new MidtransGateway(config.MIDTRANS_SERVER_KEY, config.MIDTRANS_IS_PRODUCTION),
     idGen,
   );
   const batchService = new DefaultBatchService(
@@ -176,18 +176,13 @@ export function buildApp(config: AppConfig): FastifyInstance {
     },
   );
 
-  // --- Rute ---
   registerHealthRoutes(app, healthService);
 
   void app.register(
     async (instance) => {
-      registerRegistrationRoutes(
-        instance,
-        registrationService,
-        templateService,
-      );
+      registerRegistrationRoutes(instance, registrationService, templateService);
       registerSessionRoutes(instance, sessionService);
-      // /v1/files hanya diperlukan saat driver=filesystem; S3/R2 punya signed URL sendiri.
+      registerEmailAuthRoutes(instance, pool, userRepo, mailer, config);
       if (fsStorage) registerFileRoutes(instance, fsStorage);
       registerPaymentWebhookRoute(instance, paymentService, idGen);
     },
@@ -196,20 +191,13 @@ export function buildApp(config: AppConfig): FastifyInstance {
 
   void app.register(
     async (instance) => {
-      instance.addHook(
-        'preHandler',
-        makeAuthHook(apiKeyService, sessionService),
-      );
-      // Rate limiting per API key (docs/01 — token bucket Redis). Jalan setelah
-      // auth agar apiKeyId tersedia di context. Gagal ringan bila Redis mati.
+      instance.addHook('preHandler', makeAuthHook(apiKeyService, sessionService));
       instance.addHook('preHandler', async (request) => {
         const ctx = request.authContext;
         if (!ctx) return;
         try {
           await checkRateLimit(getRedis(), ctx.apiKeyId, ctx.mode);
         } catch (err) {
-          // Bila error Redis (bukan 429), biarkan request lewat — jangan blokir
-          // karena infrastruktur mati (prinsip graceful degradation).
           const e = err as { type?: string };
           if (e.type === 'rate_limited') throw err;
         }
