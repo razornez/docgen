@@ -1,0 +1,77 @@
+# Layanan infrastruktur untuk development lokal (docs/07, docs/20).
+# Postgres + Redis + MinIO. Volume dipasang agar data PERSIST antar restart.
+# Port hanya diekspos ke localhost (127.0.0.1) — jangan terbuka ke publik (docs/07).
+name: docgen
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: docgen
+      POSTGRES_PASSWORD: docgen
+      POSTGRES_DB: docgen
+    ports:
+      # Host 5433 → container 5432, agar tidak bentrok dengan Postgres lain di :5432.
+      # Role/DB 'docgen' dibuat DI DALAM container (env di atas), bukan di Postgres host.
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U docgen -d docgen']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # appendonly agar antrian/state Redis ikut persist di volume.
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Object storage lokal — pengganti S3/R2 saat dev (docs/20).
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: docgen
+      MINIO_ROOT_PASSWORD: docgen-secret
+    ports:
+      - '127.0.0.1:9000:9000' # S3 API
+      - '127.0.0.1:9001:9001' # Console web
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Job sekali-jalan: membuat bucket default begitu MinIO sehat.
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 docgen docgen-secret &&
+      mc mb --ignore-existing local/docgen-files &&
+      echo 'Bucket docgen-files siap.'
+      "
+    restart: 'no'
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "comment": "Root tsconfig untuk editor saja. Typecheck nyata dijalankan per-paket via `pnpm -r run typecheck`.",
+  "extends": "./tsconfig.base.json",
+  "include": [],
+  "exclude": ["node_modules", "**/dist"]
+}
