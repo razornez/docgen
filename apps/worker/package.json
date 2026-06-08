@@ -1,0 +1,21 @@
+{
+  "name": "@docgen/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@docgen/config": "workspace:*",
+    "@docgen/db": "workspace:*",
+    "@docgen/renderer": "workspace:*",
+    "@docgen/shared": "workspace:*",
+    "@docgen/storage": "workspace:*",
+    "bullmq": "^5.21.0",
+    "ioredis": "^5.4.1"
+  }
+}
