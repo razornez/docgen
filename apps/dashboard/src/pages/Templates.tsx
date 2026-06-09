@@ -30,11 +30,11 @@ const PLACEHOLDER_HTML = `<!DOCTYPE html>
 </html>`;
 
 const CATEGORY_LABELS: Record<string, string> = {
-  HR: 'HR — Sumber Daya Manusia',
-  Legal: 'Legal — Hukum & Kepatuhan',
-  Keuangan: 'Keuangan — Finance',
+  HR: 'HR',
+  Legal: 'Legal',
+  Keuangan: 'Keuangan',
   Operasional: 'Operasional',
-  Marketing: 'Marketing & Sales',
+  Marketing: 'Marketing',
   Umum: 'Umum',
 };
 
@@ -47,6 +47,24 @@ const CATEGORY_CHIP: Record<string, string> = {
   Umum: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
 };
 
+const CATEGORY_ACCENT: Record<string, string> = {
+  HR: 'from-blue-400 to-sky-400',
+  Legal: 'from-violet-400 to-purple-500',
+  Keuangan: 'from-emerald-400 to-teal-400',
+  Operasional: 'from-orange-400 to-amber-400',
+  Marketing: 'from-pink-400 to-rose-400',
+  Umum: 'from-slate-300 to-slate-400',
+};
+
+const CATEGORY_ICON: Record<string, string> = {
+  HR: 'bg-blue-100 text-blue-500',
+  Legal: 'bg-violet-100 text-violet-500',
+  Keuangan: 'bg-emerald-100 text-emerald-500',
+  Operasional: 'bg-orange-100 text-orange-500',
+  Marketing: 'bg-pink-100 text-pink-500',
+  Umum: 'bg-slate-100 text-slate-400',
+};
+
 const inputCls =
   'w-full bg-white ring-1 ring-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all placeholder:text-slate-300';
 
@@ -55,6 +73,48 @@ type Panel =
   | { type: 'create' }
   | { type: 'edit'; template: TemplateItem }
   | { type: 'preview'; template: TemplateItem };
+
+function DocIcon({ cls }: { cls?: string }) {
+  return (
+    <svg
+      className={cls ?? 'w-5 h-5'}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+      />
+    </svg>
+  );
+}
+
+function CloseBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-8 h-8 rounded-xl bg-white/70 hover:bg-white flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.5}
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M6 18L18 6M6 6l12 12"
+        />
+      </svg>
+    </button>
+  );
+}
 
 export default function TemplatesPage() {
   const qc = useQueryClient();
@@ -69,8 +129,8 @@ export default function TemplatesPage() {
   const categories: string[] = categoriesQ.data ?? [...TEMPLATE_CATEGORIES];
 
   const [panel, setPanel] = useState<Panel>({ type: 'none' });
+  const [filterCat, setFilterCat] = useState<string | null>(null);
 
-  // Auto-import silently when list is empty
   const autoImported = useRef(false);
   const importMut = useMutation({
     mutationFn: importDefaultTemplates,
@@ -192,10 +252,15 @@ export default function TemplatesPage() {
     setPreviewHtml('');
   }
 
-  // Group by category
   const allTemplates = templates.data?.data ?? [];
+  const activeCats = [...new Set(allTemplates.map((t) => t.category))];
+
+  const filtered = filterCat
+    ? allTemplates.filter((t) => t.category === filterCat)
+    : allTemplates;
+
   const groupMap: Record<string, TemplateItem[]> = {};
-  for (const t of allTemplates) {
+  for (const t of filtered) {
     if (!groupMap[t.category]) groupMap[t.category] = [];
     groupMap[t.category]!.push(t);
   }
@@ -210,84 +275,108 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-end gap-3">
-        {allTemplates.length > 0 && (
+      {/* ── Top bar ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        {/* Category filter chips */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            type="button"
-            onClick={() => importMut.mutate()}
-            disabled={importMut.isPending}
-            title="Impor template default (skip yang sudah ada)"
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-2xl text-slate-600 ring-1 ring-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all"
+            onClick={() => setFilterCat(null)}
+            className={`px-3.5 py-1.5 rounded-xl text-[12px] font-semibold transition-all ${
+              filterCat === null
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'
+            }`}
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            {importMut.isPending ? 'Mengimpor…' : 'Impor default'}
+            Semua
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            closePanel();
-            setPanel({ type: 'create' });
-          }}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-2xl text-white transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
-          style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          Template baru
-        </button>
-      </div>
+          {activeCats.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilterCat(filterCat === cat ? null : cat)}
+              className={`px-3.5 py-1.5 rounded-xl text-[12px] font-semibold transition-all ${
+                filterCat === cat
+                  ? (CATEGORY_CHIP[cat] ?? 'bg-slate-100 text-slate-600')
+                  : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {CATEGORY_LABELS[cat] ?? cat}
+            </button>
+          ))}
+        </div>
 
-      {/* ---- Panel: Create ---- */}
-      {panel.type === 'create' && (
-        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-[14.5px] font-semibold text-slate-800">
-              Buat template baru
-            </h2>
+        {/* Action buttons */}
+        <div className="flex items-center gap-2">
+          {allTemplates.length > 0 && (
             <button
               type="button"
-              onClick={closePanel}
-              className="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+              onClick={() => importMut.mutate()}
+              disabled={importMut.isPending}
+              title="Impor template default (skip yang sudah ada)"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-2xl text-slate-600 ring-1 ring-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all"
             >
               <svg
-                className="w-3.5 h-3.5"
+                className="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth={2.5}
+                strokeWidth={2}
                 viewBox="0 0 24 24"
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
+              {importMut.isPending ? 'Mengimpor…' : 'Impor default'}
             </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              closePanel();
+              setPanel({ type: 'create' });
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-2xl text-white transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Template baru
+          </button>
+        </div>
+      </div>
+
+      {/* ── Panel: Create ──────────────────────────────────────────── */}
+      {panel.type === 'create' && (
+        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden">
+          <div
+            className="flex items-center justify-between px-6 py-4"
+            style={{ background: 'linear-gradient(135deg, #eef2ff, #faf5ff)' }}
+          >
+            <div>
+              <h2 className="text-[14.5px] font-semibold text-slate-800">
+                Buat template baru
+              </h2>
+              <p className="text-[12px] text-slate-400 mt-0.5">
+                Gunakan{' '}
+                <code className="bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-md text-[11px]">
+                  {'{{variabel}}'}
+                </code>{' '}
+                untuk data dinamis
+              </p>
+            </div>
+            <CloseBtn onClick={closePanel} />
           </div>
           <form
             onSubmit={(e) => {
@@ -303,7 +392,7 @@ export default function TemplatesPage() {
                 body: createBody.trim(),
               });
             }}
-            className="space-y-5"
+            className="p-6 space-y-5"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -403,65 +492,188 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {/* ---- Panel: Edit ---- */}
+      {/* ── Panel: Edit ────────────────────────────────────────────── */}
       {panel.type === 'edit' && (
-        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] p-6">
-          <div className="flex items-start justify-between mb-5">
-            <div>
-              <h2 className="text-[14.5px] font-semibold text-slate-800">
-                Edit — {panel.template.name}
-              </h2>
-              <p className="text-[12px] text-slate-400 mt-0.5">
-                Versi baru akan disimpan (v{panel.template.current_version} → v
-                {panel.template.current_version + 1})
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={closePanel}
-              className="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                viewBox="0 0 24 24"
+        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden">
+          {/* Colored header */}
+          <div
+            className="flex items-center justify-between px-6 py-4"
+            style={{ background: 'linear-gradient(135deg, #f5f3ff, #eef2ff)' }}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${CATEGORY_ICON[panel.template.category] ?? 'bg-slate-100 text-slate-400'}`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-          {editLoading ? (
-            <div className="flex justify-center py-8">
-              <div className="w-5 h-5 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
+                <DocIcon cls="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-[14.5px] font-semibold text-slate-800 truncate">
+                  {panel.template.name}
+                </h2>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[11.5px] font-mono font-semibold text-slate-400 bg-white/70 px-2 py-0.5 rounded-lg ring-1 ring-slate-200">
+                    v{panel.template.current_version}
+                  </span>
+                  <svg
+                    className="w-3.5 h-3.5 text-slate-300"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                  <span className="text-[11.5px] font-mono font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg ring-1 ring-indigo-200">
+                    v{panel.template.current_version + 1}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    versi baru akan disimpan
+                  </span>
+                </div>
+              </div>
             </div>
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setEditError('');
-                editMut.mutate({
-                  id: panel.template.id,
-                  body: editBody.trim(),
-                });
+            <CloseBtn onClick={closePanel} />
+          </div>
+
+          <div className="p-6">
+            {editLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <div className="w-8 h-8 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
+                <p className="text-sm text-slate-400">
+                  Memuat konten template…
+                </p>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setEditError('');
+                  editMut.mutate({
+                    id: panel.template.id,
+                    body: editBody.trim(),
+                  });
+                }}
+                className="space-y-5"
+              >
+                <RichEditor value={editBody} onChange={setEditBody} />
+                {editError && (
+                  <div className="flex items-center gap-2 text-sm text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-2xl px-4 py-3">
+                    <svg
+                      className="w-4 h-4 flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    {editError}
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={editMut.isPending}
+                    className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
+                    style={{
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    }}
+                  >
+                    {editMut.isPending ? 'Menyimpan…' : 'Simpan versi baru'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closePanel}
+                    className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-slate-600 ring-1 ring-slate-200 bg-white hover:bg-slate-50 transition-all"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Panel: Preview ─────────────────────────────────────────── */}
+      {panel.type === 'preview' && (
+        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden">
+          {/* Browser-chrome header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-rose-400" />
+                <div className="w-3 h-3 rounded-full bg-amber-400" />
+                <div className="w-3 h-3 rounded-full bg-emerald-400" />
+              </div>
+              <div className="flex items-center gap-2 bg-white ring-1 ring-slate-200 rounded-lg px-3 py-1.5">
+                <svg
+                  className="w-3.5 h-3.5 text-slate-300"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                <span className="text-[12px] text-slate-500 font-medium max-w-[240px] truncate">
+                  {panel.template.name}
+                </span>
+                <span
+                  className={`ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${CATEGORY_CHIP[panel.template.category] ?? 'bg-slate-100 text-slate-500'}`}
+                >
+                  {panel.template.category}
+                </span>
+              </div>
+            </div>
+            <CloseBtn onClick={closePanel} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] min-h-[560px]">
+            {/* Left: dark input panel */}
+            <div
+              className="flex flex-col gap-4 p-5 border-r border-white/5"
+              style={{
+                background: 'linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%)',
               }}
-              className="space-y-5"
             >
               <div>
-                <label className="block text-[12.5px] font-semibold text-slate-600 mb-2">
-                  Konten dokumen
-                </label>
-                <RichEditor value={editBody} onChange={setEditBody} />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 mb-2">
+                  Data Variabel
+                </p>
+                <p className="text-[11px] text-slate-500 mb-3">
+                  Format JSON — cocokkan dengan{' '}
+                  <code className="text-indigo-400">{`{{variabel}}`}</code> di
+                  template
+                </p>
+                <textarea
+                  value={previewData}
+                  onChange={(e) => setPreviewData(e.target.value)}
+                  rows={14}
+                  spellCheck={false}
+                  placeholder={
+                    '{\n  "nama": "Budi Santoso",\n  "jabatan": "Manager"\n}'
+                  }
+                  className="w-full bg-white/5 ring-1 ring-white/10 rounded-2xl px-4 py-3 text-sm font-mono text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all placeholder:text-slate-600 resize-none leading-relaxed"
+                />
               </div>
-              {editError && (
-                <div className="flex items-center gap-2 text-sm text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-2xl px-4 py-3">
+
+              {previewError && (
+                <div className="flex items-start gap-2 text-[12px] text-rose-300 bg-rose-500/10 ring-1 ring-rose-500/20 rounded-xl px-3 py-2.5">
                   <svg
-                    className="w-4 h-4 flex-shrink-0"
+                    className="w-3.5 h-3.5 flex-shrink-0 mt-0.5"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={2}
@@ -473,119 +685,109 @@ export default function TemplatesPage() {
                       d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  {editError}
+                  {previewError}
                 </div>
               )}
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={editMut.isPending}
-                  className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
-                  style={{
-                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  }}
-                >
-                  {editMut.isPending ? 'Menyimpan…' : 'Simpan versi baru'}
-                </button>
-                <button
-                  type="button"
-                  onClick={closePanel}
-                  className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-slate-600 ring-1 ring-slate-200 bg-white hover:bg-slate-50 transition-all"
-                >
-                  Batal
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
 
-      {/* ---- Panel: Preview ---- */}
-      {panel.type === 'preview' && (
-        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] p-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[14.5px] font-semibold text-slate-800">
-              Preview — {panel.template.name}
-            </h2>
-            <button
-              type="button"
-              onClick={closePanel}
-              className="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
-                Data (JSON)
-              </label>
-              <textarea
-                value={previewData}
-                onChange={(e) => setPreviewData(e.target.value)}
-                rows={8}
-                placeholder={'{ "nama": "Budi", "total": "Rp 500.000" }'}
-                className="w-full bg-white ring-1 ring-slate-200 rounded-2xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
-              />
-              {previewError && (
-                <p className="text-sm text-rose-600 mt-1.5">{previewError}</p>
-              )}
               <button
                 type="button"
                 onClick={() => void runPreview(panel.template.id)}
                 disabled={previewLoading}
-                className="mt-3 px-5 py-2.5 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
+                className="w-full py-3 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/40"
                 style={{
                   background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
                 }}
               >
-                {previewLoading ? 'Memuat…' : 'Render preview'}
+                {previewLoading ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Merender dokumen…
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Render preview
+                  </>
+                )}
               </button>
+
+              <div className="mt-auto pt-2 border-t border-white/5">
+                <p className="text-[11px] text-slate-600">
+                  v{panel.template.current_version} · Diperbarui{' '}
+                  {new Date(panel.template.updated_at).toLocaleDateString(
+                    'id-ID',
+                    { day: 'numeric', month: 'short', year: 'numeric' },
+                  )}
+                </p>
+              </div>
             </div>
-            <div>
-              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
-                Hasil render
-              </label>
+
+            {/* Right: document viewer */}
+            <div className="flex flex-col p-5 bg-slate-50/40">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+                Hasil render dokumen
+              </p>
               {previewHtml ? (
-                <iframe
-                  srcDoc={previewHtml}
-                  className="w-full h-80 rounded-2xl border-0 ring-1 ring-slate-200 bg-white"
-                  sandbox="allow-same-origin"
-                  title="Template preview"
-                />
+                <div className="flex-1 rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.09)] ring-1 ring-slate-200 bg-white">
+                  <iframe
+                    srcDoc={previewHtml}
+                    className="w-full h-full min-h-[500px] border-0"
+                    sandbox="allow-same-origin"
+                    title="Template preview"
+                  />
+                </div>
               ) : (
-                <div className="w-full h-80 rounded-2xl ring-1 ring-dashed ring-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-2 text-sm text-slate-400">
-                  <svg
-                    className="w-8 h-8 text-slate-300"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                    viewBox="0 0 24 24"
+                <div className="flex-1 min-h-[500px] rounded-2xl ring-2 ring-dashed ring-slate-200 bg-white flex flex-col items-center justify-center gap-4">
+                  <div
+                    className="w-16 h-16 rounded-3xl flex items-center justify-center shadow-sm"
+                    style={{
+                      background: 'linear-gradient(135deg, #eef2ff, #faf5ff)',
+                    }}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  Klik "Render preview" untuk melihat hasil
+                    <svg
+                      className="w-8 h-8 text-indigo-300"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[14px] font-semibold text-slate-500">
+                      Dokumen belum dirender
+                    </p>
+                    <p className="text-[12.5px] text-slate-400 mt-1">
+                      Isi data variabel di kiri, lalu klik "Render preview"
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -593,122 +795,157 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {/* Loading state */}
+      {/* ── Loading ─────────────────────────────────────────────────── */}
       {templates.isLoading && (
-        <div className="flex justify-center py-12">
-          <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <div className="w-8 h-8 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
+          <p className="text-sm text-slate-400">Memuat template…</p>
         </div>
       )}
 
-      {/* Empty state */}
-      {templates.data?.data.length === 0 && (
-        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] px-6 py-14 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-            <svg
-              className="w-6 h-6 text-slate-300"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.5}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
+      {/* ── Empty state ─────────────────────────────────────────────── */}
+      {!templates.isLoading && allTemplates.length === 0 && (
+        <div
+          className="rounded-3xl ring-1 ring-dashed ring-indigo-200 px-6 py-20 text-center"
+          style={{ background: 'linear-gradient(135deg, #f8f7fc, #f5f3ff)' }}
+        >
+          <div className="w-16 h-16 rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 flex items-center justify-center mx-auto mb-4">
+            <DocIcon cls="w-8 h-8 text-slate-300" />
           </div>
-          <p className="text-sm text-slate-400">
+          <p className="text-[14px] font-semibold text-slate-500">
             {importMut.isPending
               ? 'Memuat template default…'
-              : 'Belum ada template.'}
+              : 'Belum ada template'}
           </p>
+          {!importMut.isPending && (
+            <p className="text-[12.5px] text-slate-400 mt-1">
+              Klik "Template baru" atau impor template default untuk memulai
+            </p>
+          )}
         </div>
       )}
 
-      {/* Grouped template list */}
+      {/* ── Template cards grouped by category ──────────────────────── */}
       {allGrouped.map(([cat, items]) => (
-        <div
-          key={cat}
-          className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden"
-        >
-          {/* Category header */}
-          <div className="flex items-center gap-3 px-6 py-3.5 border-b border-slate-100">
+        <div key={cat} className="space-y-3">
+          {/* Category section header */}
+          <div className="flex items-center gap-3">
             <span
-              className={`px-2.5 py-1 rounded-xl text-[12px] font-semibold ${CATEGORY_CHIP[cat] ?? 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'}`}
+              className={`px-3 py-1 rounded-xl text-[12px] font-semibold ${CATEGORY_CHIP[cat] ?? 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'}`}
             >
               {CATEGORY_LABELS[cat] ?? cat}
             </span>
             <span className="text-[12px] text-slate-400">
               {items.length} template
             </span>
+            <div className="flex-1 h-px bg-slate-100" />
           </div>
 
-          {/* Templates */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[11px] text-slate-400 uppercase tracking-wider text-left border-b border-slate-50">
-                  <th className="px-6 py-3 font-semibold">Nama</th>
-                  <th className="px-6 py-3 font-semibold">Versi</th>
-                  <th className="px-6 py-3 font-semibold">Dibuat</th>
-                  <th className="px-6 py-3 font-semibold">Diperbarui</th>
-                  <th className="px-6 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {items.map((t) => (
-                  <tr
-                    key={t.id}
-                    className="hover:bg-slate-50/60 transition-colors"
-                  >
-                    <td className="px-6 py-3.5">
-                      <p className="font-semibold text-slate-800">{t.name}</p>
-                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                        {t.id}
-                      </p>
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <span className="text-[12px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
+          {/* Card grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {items.map((t) => {
+              const accent =
+                CATEGORY_ACCENT[t.category] ?? 'from-slate-300 to-slate-400';
+              const iconCls =
+                CATEGORY_ICON[t.category] ?? 'bg-slate-100 text-slate-400';
+              return (
+                <div
+                  key={t.id}
+                  className="group bg-white rounded-2xl ring-1 ring-slate-200/70 shadow-[0_2px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+                >
+                  {/* Category accent bar */}
+                  <div className={`h-[3px] bg-gradient-to-r ${accent}`} />
+
+                  <div className="p-5">
+                    {/* Icon + version */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconCls}`}
+                      >
+                        <DocIcon cls="w-5 h-5" />
+                      </div>
+                      <span className="text-[11px] font-mono font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">
                         v{t.current_version}
                       </span>
-                    </td>
-                    <td className="px-6 py-3.5 text-slate-400">
-                      {new Date(t.created_at).toLocaleDateString('id-ID')}
-                    </td>
-                    <td className="px-6 py-3.5 text-slate-400">
-                      {new Date(t.updated_at).toLocaleDateString('id-ID')}
-                    </td>
-                    <td className="px-6 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            closePanel();
-                            void openEdit(t);
-                          }}
-                          className="text-[12px] font-semibold text-indigo-500 hover:text-indigo-700 px-3 py-1.5 rounded-xl hover:bg-indigo-50 transition-colors"
+                    </div>
+
+                    {/* Name */}
+                    <p className="font-semibold text-slate-800 text-[14px] leading-snug mb-1 line-clamp-2">
+                      {t.name}
+                    </p>
+                    <p className="text-[11.5px] text-slate-400 mb-5">
+                      Diperbarui{' '}
+                      {new Date(t.updated_at).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closePanel();
+                          void openEdit(t);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold rounded-xl text-white transition-all hover:opacity-90 active:scale-[0.98]"
+                        style={{
+                          background:
+                            'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                        }}
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          viewBox="0 0 24 24"
                         >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            closePanel();
-                            setPreviewData('{}');
-                            setPreviewHtml('');
-                            setPanel({ type: 'preview', template: t });
-                          }}
-                          className="text-[12px] font-semibold text-slate-400 hover:text-slate-600 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closePanel();
+                          setPreviewData('{}');
+                          setPreviewHtml('');
+                          setPanel({ type: 'preview', template: t });
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold rounded-xl text-slate-600 ring-1 ring-slate-200 bg-slate-50 hover:bg-slate-100 transition-all"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          viewBox="0 0 24 24"
                         >
-                          Preview
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        Preview
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}
