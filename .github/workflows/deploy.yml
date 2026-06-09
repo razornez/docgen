@@ -23,22 +23,4 @@ jobs:
             pnpm build:all
             pnpm db:migrate
             pm2 reload ecosystem.config.cjs --update-env
-
-            # Force browser reload index.html dengan timestamp header via nginx snippet
-            mkdir -p /etc/nginx/snippets
-            cat > /etc/nginx/snippets/no-cache-html.conf << 'NGINX_EOF'
-            location ~* /index\.html$ {
-                add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-                add_header Pragma "no-cache" always;
-                add_header Expires "0" always;
-            }
-            NGINX_EOF
-
-            # Include snippet ke nginx config jika belum ada
-            SITE_CONF=$(find /etc/nginx/sites-enabled/ -type f | head -1)
-            if [ -n "$SITE_CONF" ] && ! grep -q "no-cache-html" "$SITE_CONF"; then
-              sed -i 's|location / {|include /etc/nginx/snippets/no-cache-html.conf;\n\n    location / {|' "$SITE_CONF"
-            fi
-
-            nginx -t && nginx -s reload
             echo "Deploy selesai: $(date)"
