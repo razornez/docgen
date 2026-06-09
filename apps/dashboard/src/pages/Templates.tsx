@@ -826,8 +826,14 @@ export default function TemplatesPage() {
         await new Promise((r) => setTimeout(r, 2000));
         b = await getBatch(b.id);
       }
-      if (b.status !== 'completed')
-        throw new Error('Gagal atau timeout generate PDF');
+      if (b.status !== 'completed') {
+        if (b.status === 'failed' || b.status === 'partially_failed') {
+          const failDocs = await getBatchDocuments(b.id).catch(() => null);
+          const errDoc = failDocs?.data.find((d) => d.error);
+          throw new Error(errDoc?.error ?? 'Batch gagal diproses oleh worker');
+        }
+        throw new Error('Timeout: PDF belum selesai dalam 60 detik');
+      }
       const docs = await getBatchDocuments(b.id);
       const doc = docs.data[0];
       if (!doc) throw new Error('Dokumen tidak ditemukan');
@@ -1345,7 +1351,7 @@ export default function TemplatesPage() {
               <CloseBtn onClick={closePanel} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr]">
+            <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr]">
               {/* Left: controls */}
               <div
                 className="flex flex-col gap-3 p-4"
