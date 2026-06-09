@@ -23,6 +23,5 @@ jobs:
             pnpm install --frozen-lockfile
             pnpm build:all
             pnpm db:migrate
-            pnpm exec playwright install chromium
             pm2 reload ecosystem.config.cjs --update-env
             echo "Deploy selesai: $(date)"
