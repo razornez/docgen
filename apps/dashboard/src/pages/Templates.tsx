@@ -80,10 +80,91 @@ function extractVars(html: string): string[] {
   ];
 }
 
-function buildDefaultJson(vars: string[]): string {
+const DUMMY_VALUES: Record<string, string> = {
+  nama: 'Budi Santoso',
+  nama_lengkap: 'Budi Santoso',
+  nama_karyawan: 'Budi Santoso',
+  nama_pegawai: 'Budi Santoso',
+  nama_penerima: 'Siti Rahayu',
+  nama_direktur: 'Ahmad Fauzi, S.E.',
+  nama_manager: 'Dian Pertiwi',
+  nama_hrd: 'Rina Wulandari',
+  nama_penjual: 'PT Maju Bersama',
+  nama_pembeli: 'PT Karya Sejahtera',
+  nama_perusahaan: 'PT Maju Bersama Indonesia',
+  nama_pengirim: 'Arief Budiman',
+  jabatan: 'Senior Software Engineer',
+  jabatan_baru: 'Lead Engineer',
+  jabatan_lama: 'Software Engineer',
+  posisi: 'Senior Software Engineer',
+  divisi: 'Teknologi Informasi',
+  departemen: 'Engineering',
+  tanggal: '09 Juni 2026',
+  tanggal_mulai: '01 Juli 2026',
+  tanggal_selesai: '31 Desember 2026',
+  tanggal_lahir: '15 Maret 1990',
+  tanggal_bergabung: '01 Januari 2020',
+  tanggal_keluar: '31 Desember 2025',
+  tanggal_kontrak: '09 Juni 2026',
+  tanggal_ttd: '09 Juni 2026',
+  periode: 'Januari – Juni 2026',
+  tahun: '2026',
+  bulan: 'Juni',
+  gaji: 'Rp 15.000.000',
+  gaji_pokok: 'Rp 12.000.000',
+  tunjangan: 'Rp 3.000.000',
+  total_gaji: 'Rp 15.000.000',
+  gaji_bersih: 'Rp 13.500.000',
+  potongan: 'Rp 1.500.000',
+  bonus: 'Rp 5.000.000',
+  harga: 'Rp 50.000.000',
+  total: 'Rp 50.000.000',
+  subtotal: 'Rp 45.000.000',
+  pajak: 'Rp 5.000.000',
+  nominal: 'Rp 10.000.000',
+  jumlah: '5 unit',
+  alamat: 'Jl. Sudirman No. 123, Jakarta Pusat 10220',
+  alamat_perusahaan: 'Jl. Sudirman No. 123, Jakarta Pusat 10220',
+  kota: 'Jakarta',
+  tempat: 'Jakarta',
+  lokasi: 'Jakarta',
+  nomor: 'DOC/2026/001',
+  no_surat: 'SK/HRD/2026/001',
+  nip: '19900315 202001 1 001',
+  nik: '3171015503900001',
+  no_kontrak: 'KTR/2026/001',
+  no_po: 'PO/2026/001',
+  no_referensi: 'REF/2026/001',
+  judul: 'Surat Keterangan Kerja',
+  perihal: 'Permohonan Keterangan Kerja',
+  keperluan: 'Pengajuan KPR',
+  tujuan: 'Keperluan administrasi perbankan',
+  isi: 'Dengan ini kami menerangkan bahwa yang bersangkutan benar merupakan karyawan aktif di perusahaan kami.',
+  deskripsi: 'Layanan pengembangan perangkat lunak sesuai kebutuhan klien',
+  keterangan: 'Dokumen ini diterbitkan untuk keperluan administrasi.',
+  alasan: 'Berdasarkan kebutuhan operasional perusahaan.',
+  sanksi: 'Peringatan tertulis pertama.',
+  pelanggaran: 'Keterlambatan berulang tanpa pemberitahuan.',
+  ttd: 'Ahmad Fauzi, S.E.',
+  lama_bekerja: '6 tahun',
+  status_karyawan: 'Karyawan Tetap',
+  jenis_kontrak: 'Kontrak Kerja Tetap',
+};
+
+function buildDummyJson(vars: string[]): string {
   if (vars.length === 0) return '{}';
   const obj: Record<string, string> = {};
-  for (const v of vars) obj[v] = '';
+  for (const v of vars) {
+    const lower = v.toLowerCase();
+    if (DUMMY_VALUES[lower]) {
+      obj[v] = DUMMY_VALUES[lower];
+    } else {
+      const key = Object.keys(DUMMY_VALUES).find(
+        (k) => lower.includes(k) || k.includes(lower),
+      );
+      obj[v] = key ? DUMMY_VALUES[key]! : `[${v}]`;
+    }
+  }
   return JSON.stringify(obj, null, 2);
 }
 
@@ -687,11 +768,10 @@ export default function TemplatesPage() {
       const res = await getTemplateBody(t.id);
       const vars = extractVars(res.version.body);
       setPreviewVars(vars);
-      const defaultJson = buildDefaultJson(vars);
-      setPreviewData(defaultJson);
-      const defaultData: Record<string, string> = {};
-      for (const v of vars) defaultData[v] = '';
-      const html = await previewTemplate(t.id, defaultData);
+      const dummyJson = buildDummyJson(vars);
+      setPreviewData(dummyJson);
+      const dummyData = JSON.parse(dummyJson) as Record<string, string>;
+      const html = await previewTemplate(t.id, dummyData);
       setPreviewHtml(html);
     } catch {
       setPreviewError('Gagal memuat template');
@@ -1232,7 +1312,7 @@ export default function TemplatesPage() {
 
       {/* Preview */}
       {panel.type === 'preview' && (
-        <Modal onClose={closePanel} maxWidth="max-w-5xl">
+        <Modal onClose={closePanel} maxWidth="max-w-7xl">
           <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
             {/* Browser chrome bar */}
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50">
@@ -1269,7 +1349,7 @@ export default function TemplatesPage() {
               <CloseBtn onClick={closePanel} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[210px_1fr]">
+            <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr]">
               {/* Left: controls */}
               <div
                 className="flex flex-col gap-3 p-4"
@@ -1406,14 +1486,14 @@ export default function TemplatesPage() {
                   Hasil render
                 </p>
                 {previewLoading && !previewHtml ? (
-                  <div className="flex-1 rounded-xl bg-white ring-1 ring-slate-200 flex flex-col items-center justify-center gap-3 min-h-[400px]">
+                  <div className="flex-1 rounded-xl bg-white ring-1 ring-slate-200 flex flex-col items-center justify-center gap-3 min-h-[560px]">
                     <div className="w-7 h-7 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
                     <p className="text-sm text-slate-400">Merender…</p>
                   </div>
                 ) : previewHtml ? (
                   <div
                     className="rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.09)] ring-1 ring-slate-200 bg-white"
-                    style={{ height: '440px', position: 'relative' }}
+                    style={{ height: '600px', position: 'relative' }}
                   >
                     <iframe
                       srcDoc={previewHtml}
@@ -1423,16 +1503,16 @@ export default function TemplatesPage() {
                         position: 'absolute',
                         top: 0,
                         left: 0,
-                        width: '154%',
-                        height: '154%',
-                        transform: 'scale(0.65)',
+                        width: '133%',
+                        height: '133%',
+                        transform: 'scale(0.75)',
                         transformOrigin: 'top left',
                         border: 'none',
                       }}
                     />
                   </div>
                 ) : (
-                  <div className="flex-1 rounded-xl ring-2 ring-dashed ring-slate-200 bg-white flex flex-col items-center justify-center gap-3 min-h-[400px]">
+                  <div className="flex-1 rounded-xl ring-2 ring-dashed ring-slate-200 bg-white flex flex-col items-center justify-center gap-3 min-h-[560px]">
                     <div
                       className="w-12 h-12 rounded-2xl flex items-center justify-center"
                       style={{
