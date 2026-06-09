@@ -94,6 +94,7 @@ async function updateBatchProgress(
               ELSE NULL
             END
       WHERE id = $3 AND tenant_id = $4
+        AND status NOT IN ('completed', 'failed', 'partially_failed')
       RETURNING completed, failed, total,
                 ((completed + $1 + failed + $2) >= total) AS done`,
     [completedDelta, failedDelta, batchId, tenantId],
