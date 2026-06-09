@@ -10,6 +10,10 @@ import {
   createTemplateVersion,
   previewTemplate,
   getApiKeys,
+  createBatch,
+  getBatch,
+  getBatchDocuments,
+  getStoredToken,
   TEMPLATE_CATEGORIES,
   type TemplateItem,
 } from '../api/client.js';
@@ -120,7 +124,7 @@ function Modal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-start justify-center p-4 pt-8 pb-12">
+      <div className="flex min-h-full items-center justify-center p-4 py-6">
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm"
           onClick={onClose}
@@ -311,8 +315,8 @@ print(batch['id'])`;
           className="fixed inset-0 bg-black/50 backdrop-blur-sm"
           onClick={onClose}
         />
-        <div className="relative w-full max-w-3xl z-10">
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+        <div className="relative w-full max-w-2xl z-10">
+          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[88vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
@@ -366,7 +370,7 @@ print(batch['id'])`;
               </button>
             </div>
 
-            <div className="p-6 space-y-7">
+            <div className="p-5 space-y-5">
               {/* Step 1: Template ID */}
               <div>
                 <Step n={1} label="Catat Template ID" />
@@ -489,7 +493,7 @@ print(batch['id'])`;
                     <CopyButton text={currentCode} />
                   </div>
                   {/* Code block */}
-                  <pre className="bg-slate-900 px-5 py-4 text-[12px] font-mono text-slate-200 overflow-x-auto leading-relaxed whitespace-pre">
+                  <pre className="bg-slate-900 px-4 py-3 text-[11.5px] font-mono text-slate-200 overflow-x-auto overflow-y-auto leading-relaxed whitespace-pre max-h-[180px]">
                     {currentCode}
                   </pre>
                 </div>
@@ -670,6 +674,8 @@ export default function TemplatesPage() {
   const [previewError, setPreviewError] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewVars, setPreviewVars] = useState<string[]>([]);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState('');
 
   async function openPreview(t: TemplateItem) {
     setPreviewError('');
@@ -715,6 +721,60 @@ export default function TemplatesPage() {
     }
   }
 
+  async function downloadPdf(templateId: string, templateName: string) {
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(previewData) as Record<string, unknown>;
+    } catch {
+      setPdfError('Data harus berupa JSON object yang valid');
+      return;
+    }
+    setPdfLoading(true);
+    setPdfError('');
+    try {
+      const { batch } = await createBatch({
+        template: templateId,
+        items: [{ ref: 'preview-dl', data }],
+      });
+      let b = batch;
+      for (
+        let i = 0;
+        i < 30 &&
+        b.status !== 'completed' &&
+        b.status !== 'failed' &&
+        b.status !== 'partially_failed';
+        i++
+      ) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const res = await getBatch(b.id);
+        b = res.batch;
+      }
+      if (b.status !== 'completed')
+        throw new Error('Gagal atau timeout generate PDF');
+      const docs = await getBatchDocuments(b.id);
+      const doc = docs.data[0];
+      if (!doc) throw new Error('Dokumen tidak ditemukan');
+      const token = getStoredToken();
+      const resp = await fetch(`/v1/batches/${b.id}/documents/${doc.id}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!resp.ok) throw new Error('Gagal mengunduh PDF');
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${templateName}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : 'Gagal mengunduh PDF');
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
   const closePanel = useCallback(() => {
     setPanel({ type: 'none' });
     setCreateError('');
@@ -722,6 +782,7 @@ export default function TemplatesPage() {
     setPreviewError('');
     setPreviewHtml('');
     setPreviewVars([]);
+    setPdfError('');
   }, []);
 
   async function openApiGuide(t: TemplateItem) {
@@ -922,8 +983,8 @@ export default function TemplatesPage() {
 
       {/* Create */}
       {panel.type === 'create' && (
-        <Modal onClose={closePanel} maxWidth="max-w-4xl">
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+        <Modal onClose={closePanel} maxWidth="max-w-3xl">
+          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[88vh] overflow-y-auto">
             <div
               className="flex items-center justify-between px-6 py-4"
               style={{
@@ -1061,8 +1122,8 @@ export default function TemplatesPage() {
 
       {/* Edit */}
       {panel.type === 'edit' && (
-        <Modal onClose={closePanel} maxWidth="max-w-4xl">
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+        <Modal onClose={closePanel} maxWidth="max-w-3xl">
+          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[88vh] overflow-y-auto">
             <div
               className="flex items-center justify-between px-6 py-4"
               style={{
@@ -1171,18 +1232,19 @@ export default function TemplatesPage() {
 
       {/* Preview */}
       {panel.type === 'preview' && (
-        <Modal onClose={closePanel} maxWidth="max-w-6xl">
+        <Modal onClose={closePanel} maxWidth="max-w-5xl">
           <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+            {/* Browser chrome bar */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50">
               <div className="flex items-center gap-3">
                 <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-rose-400" />
-                  <div className="w-3 h-3 rounded-full bg-amber-400" />
-                  <div className="w-3 h-3 rounded-full bg-emerald-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                 </div>
-                <div className="flex items-center gap-2 bg-white ring-1 ring-slate-200 rounded-lg px-3 py-1.5">
+                <div className="flex items-center gap-2 bg-white ring-1 ring-slate-200 rounded-md px-2.5 py-1">
                   <svg
-                    className="w-3.5 h-3.5 text-slate-300"
+                    className="w-3 h-3 text-slate-300"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={2}
@@ -1194,11 +1256,11 @@ export default function TemplatesPage() {
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <span className="text-[12px] text-slate-500 font-medium max-w-[260px] truncate">
+                  <span className="text-[11.5px] text-slate-500 font-medium max-w-[220px] truncate">
                     {panel.template.name}
                   </span>
                   <span
-                    className={`ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${CATEGORY_CHIP[panel.template.category] ?? 'bg-slate-100 text-slate-500'}`}
+                    className={`ml-0.5 text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md ${CATEGORY_CHIP[panel.template.category] ?? 'bg-slate-100 text-slate-500'}`}
                   >
                     {panel.template.category}
                   </span>
@@ -1207,24 +1269,25 @@ export default function TemplatesPage() {
               <CloseBtn onClick={closePanel} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr]">
+            <div className="grid grid-cols-1 lg:grid-cols-[210px_1fr]">
+              {/* Left: controls */}
               <div
-                className="flex flex-col gap-4 p-5"
+                className="flex flex-col gap-3 p-4"
                 style={{
                   background:
                     'linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%)',
                 }}
               >
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 mb-1">
+                  <p className="text-[9.5px] font-bold uppercase tracking-widest text-indigo-400 mb-1.5">
                     Data Variabel
                   </p>
                   {previewVars.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-3">
+                    <div className="flex flex-wrap gap-1 mb-2">
                       {previewVars.map((v) => (
                         <span
                           key={v}
-                          className="text-[10px] font-mono text-indigo-300 bg-indigo-500/15 ring-1 ring-indigo-500/20 px-2 py-0.5 rounded-md"
+                          className="text-[9.5px] font-mono text-indigo-300 bg-indigo-500/15 ring-1 ring-indigo-500/20 px-1.5 py-0.5 rounded"
                         >
                           {`{{${v}}}`}
                         </span>
@@ -1234,15 +1297,15 @@ export default function TemplatesPage() {
                   <textarea
                     value={previewData}
                     onChange={(e) => setPreviewData(e.target.value)}
-                    rows={14}
+                    rows={8}
                     spellCheck={false}
-                    className="w-full bg-white/5 ring-1 ring-white/10 rounded-2xl px-4 py-3 text-sm font-mono text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none leading-relaxed"
+                    className="w-full bg-white/5 ring-1 ring-white/10 rounded-xl px-3 py-2.5 text-[12px] font-mono text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none leading-relaxed"
                   />
                 </div>
-                {previewError && (
-                  <div className="flex items-start gap-2 text-[12px] text-rose-300 bg-rose-500/10 ring-1 ring-rose-500/20 rounded-xl px-3 py-2.5">
+                {(previewError || pdfError) && (
+                  <div className="flex items-start gap-1.5 text-[11px] text-rose-300 bg-rose-500/10 ring-1 ring-rose-500/20 rounded-lg px-2.5 py-2">
                     <svg
-                      className="w-3.5 h-3.5 flex-shrink-0 mt-0.5"
+                      className="w-3 h-3 flex-shrink-0 mt-0.5"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth={2}
@@ -1254,27 +1317,27 @@ export default function TemplatesPage() {
                         d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    {previewError}
+                    {previewError || pdfError}
                   </div>
                 )}
                 <button
                   type="button"
                   onClick={() => void runPreview(panel.template.id)}
-                  disabled={previewLoading}
-                  className="w-full py-3 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/40"
+                  disabled={previewLoading || pdfLoading}
+                  className="w-full py-2 text-[12.5px] font-semibold rounded-xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-900/40"
                   style={{
                     background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
                   }}
                 >
                   {previewLoading ? (
                     <>
-                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       Merender…
                     </>
                   ) : (
                     <>
                       <svg
-                        className="w-4 h-4"
+                        className="w-3.5 h-3.5"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth={2}
@@ -1295,40 +1358,89 @@ export default function TemplatesPage() {
                     </>
                   )}
                 </button>
-                <p className="text-[11px] text-slate-600">
+                {/* Download PDF */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    void downloadPdf(panel.template.id, panel.template.name)
+                  }
+                  disabled={pdfLoading || previewLoading}
+                  className="w-full py-2 text-[12.5px] font-semibold rounded-xl disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/15 text-white ring-1 ring-white/20"
+                >
+                  {pdfLoading ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
+                      </svg>
+                      Download PDF
+                      <span className="text-[10px] opacity-60 font-normal">
+                        −1 kredit
+                      </span>
+                    </>
+                  )}
+                </button>
+                <p className="text-[10px] text-slate-600">
                   v{panel.template.current_version} ·{' '}
                   {formatDate(panel.template.updated_at)}
                 </p>
               </div>
 
-              <div className="flex flex-col p-5 bg-slate-50/40 min-h-[560px]">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">
+              {/* Right: preview */}
+              <div className="flex flex-col p-4 bg-slate-50/40">
+                <p className="text-[9.5px] font-bold uppercase tracking-widest text-slate-400 mb-2">
                   Hasil render
                 </p>
                 {previewLoading && !previewHtml ? (
-                  <div className="flex-1 rounded-2xl bg-white ring-1 ring-slate-200 flex flex-col items-center justify-center gap-3">
-                    <div className="w-8 h-8 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
-                    <p className="text-sm text-slate-400">Merender dokumen…</p>
+                  <div className="flex-1 rounded-xl bg-white ring-1 ring-slate-200 flex flex-col items-center justify-center gap-3 min-h-[400px]">
+                    <div className="w-7 h-7 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
+                    <p className="text-sm text-slate-400">Merender…</p>
                   </div>
                 ) : previewHtml ? (
-                  <div className="flex-1 rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.09)] ring-1 ring-slate-200 bg-white">
+                  <div
+                    className="rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.09)] ring-1 ring-slate-200 bg-white"
+                    style={{ height: '440px', position: 'relative' }}
+                  >
                     <iframe
                       srcDoc={previewHtml}
-                      className="w-full h-full min-h-[520px] border-0"
                       sandbox="allow-same-origin"
                       title="Template preview"
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '154%',
+                        height: '154%',
+                        transform: 'scale(0.65)',
+                        transformOrigin: 'top left',
+                        border: 'none',
+                      }}
                     />
                   </div>
                 ) : (
-                  <div className="flex-1 rounded-2xl ring-2 ring-dashed ring-slate-200 bg-white flex flex-col items-center justify-center gap-4">
+                  <div className="flex-1 rounded-xl ring-2 ring-dashed ring-slate-200 bg-white flex flex-col items-center justify-center gap-3 min-h-[400px]">
                     <div
-                      className="w-16 h-16 rounded-3xl flex items-center justify-center"
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center"
                       style={{
                         background: 'linear-gradient(135deg, #eef2ff, #faf5ff)',
                       }}
                     >
                       <svg
-                        className="w-8 h-8 text-indigo-300"
+                        className="w-6 h-6 text-indigo-300"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth={1.5}
