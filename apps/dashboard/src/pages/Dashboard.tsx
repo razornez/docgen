@@ -5,9 +5,9 @@ import { getMe, getTransactions, getBatches } from '../api/client.js';
 const TX_LABELS: Record<string, string> = {
   signup_bonus: 'Signup bonus',
   topup: 'Top-up',
-  debit: 'Document generated',
+  debit: 'Dokumen dibuat',
   refund: 'Refund',
-  adjustment: 'Adjustment',
+  adjustment: 'Penyesuaian',
 };
 
 function StatCard({
@@ -15,25 +15,37 @@ function StatCard({
   value,
   sub,
   icon,
-  accent,
+  from,
+  to,
+  ring,
 }: {
   label: string;
   value: string;
   sub?: string;
   icon: React.ReactNode;
-  accent: string;
+  from: string;
+  to: string;
+  ring: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200/80 p-5 flex items-start gap-4 shadow-sm">
-      <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${accent}`}
-      >
+    <div
+      className="rounded-3xl p-6 flex flex-col gap-4 ring-1 shadow-[0_4px_24px_rgba(0,0,0,0.07)] transition-transform duration-200 hover:-translate-y-0.5"
+      style={
+        {
+          background: `linear-gradient(145deg, ${from}, ${to})`,
+          '--tw-ring-color': ring,
+        } as React.CSSProperties
+      }
+    >
+      <div className="w-10 h-10 rounded-2xl bg-white/50 backdrop-blur-sm flex items-center justify-center shadow-sm">
         {icon}
       </div>
-      <div className="min-w-0">
-        <p className="text-[12.5px] text-slate-500 font-medium">{label}</p>
-        <p className="mt-0.5 text-2xl font-bold text-slate-900 leading-tight">
+      <div>
+        <p className="text-[28px] font-bold text-slate-800 leading-none">
           {value}
+        </p>
+        <p className="text-[12.5px] text-slate-500 font-medium mt-1.5">
+          {label}
         </p>
         {sub && <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>}
       </div>
@@ -72,16 +84,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Stat cards */}
+      {/* ── Stat cards ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="Credits remaining"
+          label="Saldo kredit"
           value={balance.toLocaleString()}
           sub={me.data?.wallet.currency}
-          accent="bg-indigo-50 text-indigo-600"
+          from="#eef2ff"
+          to="#faf5ff"
+          ring="rgba(99,102,241,0.2)"
           icon={
             <svg
-              className="w-5 h-5"
+              className="w-5 h-5 text-indigo-500"
               fill="none"
               stroke="currentColor"
               strokeWidth={1.75}
@@ -96,12 +110,14 @@ export default function DashboardPage() {
           }
         />
         <StatCard
-          label="Batches completed"
+          label="Batch selesai"
           value={String(completed)}
-          accent="bg-emerald-50 text-emerald-600"
+          from="#ecfdf5"
+          to="#f0fdf4"
+          ring="rgba(34,197,94,0.2)"
           icon={
             <svg
-              className="w-5 h-5"
+              className="w-5 h-5 text-emerald-500"
               fill="none"
               stroke="currentColor"
               strokeWidth={1.75}
@@ -116,12 +132,14 @@ export default function DashboardPage() {
           }
         />
         <StatCard
-          label="In progress"
+          label="Sedang proses"
           value={String(inProgress)}
-          accent="bg-amber-50 text-amber-600"
+          from="#fffbeb"
+          to="#fefce8"
+          ring="rgba(245,158,11,0.2)"
           icon={
             <svg
-              className="w-5 h-5"
+              className="w-5 h-5 text-amber-500"
               fill="none"
               stroke="currentColor"
               strokeWidth={1.75}
@@ -136,12 +154,14 @@ export default function DashboardPage() {
           }
         />
         <StatCard
-          label="Documents generated"
+          label="Dokumen dihasilkan"
           value={totalDocs.toLocaleString()}
-          accent="bg-violet-50 text-violet-600"
+          from="#f5f3ff"
+          to="#faf5ff"
+          ring="rgba(139,92,246,0.2)"
           icon={
             <svg
-              className="w-5 h-5"
+              className="w-5 h-5 text-violet-500"
               fill="none"
               stroke="currentColor"
               strokeWidth={1.75}
@@ -157,27 +177,44 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* ── Lists ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent transactions */}
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-[14px] font-semibold text-slate-900">
+        {/* Transactions */}
+        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.06)] overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-[14.5px] font-semibold text-slate-800">
               Transaksi terbaru
             </h2>
             <Link
               to="/dashboard/wallet"
-              className="text-[12px] font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+              className="text-[12px] font-semibold text-indigo-500 hover:text-indigo-700 transition-colors"
             >
               Lihat semua →
             </Link>
           </div>
+
           {!txs.data ? (
-            <div className="px-5 py-8 text-center">
-              <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin mx-auto" />
+            <div className="flex justify-center py-10">
+              <div className="w-5 h-5 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
             </div>
           ) : txs.data.data.length === 0 ? (
-            <div className="px-5 py-10 text-center text-sm text-slate-400">
-              Belum ada transaksi.
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-slate-300"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm text-slate-400">Belum ada transaksi.</p>
             </div>
           ) : (
             <ul className="divide-y divide-slate-50">
@@ -186,18 +223,18 @@ export default function DashboardPage() {
                 return (
                   <li
                     key={tx.id}
-                    className="px-5 py-3 flex items-center justify-between"
+                    className="px-6 py-3.5 flex items-center justify-between hover:bg-slate-50/60 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isDebit ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600'}`}
+                        className={`w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0 ${isDebit ? 'bg-rose-50 text-rose-400' : 'bg-emerald-50 text-emerald-500'}`}
                       >
                         {isDebit ? (
                           <svg
-                            className="w-4 h-4"
+                            className="w-3.5 h-3.5"
                             fill="none"
                             stroke="currentColor"
-                            strokeWidth={2}
+                            strokeWidth={2.5}
                             viewBox="0 0 24 24"
                           >
                             <path
@@ -208,10 +245,10 @@ export default function DashboardPage() {
                           </svg>
                         ) : (
                           <svg
-                            className="w-4 h-4"
+                            className="w-3.5 h-3.5"
                             fill="none"
                             stroke="currentColor"
-                            strokeWidth={2}
+                            strokeWidth={2.5}
                             viewBox="0 0 24 24"
                           >
                             <path
@@ -223,7 +260,7 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <div>
-                        <p className="text-[13px] font-medium text-slate-800">
+                        <p className="text-[13px] font-semibold text-slate-700">
                           {TX_LABELS[tx.type] ?? tx.type}
                         </p>
                         <p className="text-[11px] text-slate-400">
@@ -232,7 +269,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <span
-                      className={`text-[13.5px] font-semibold tabular-nums ${isDebit ? 'text-red-500' : 'text-emerald-600'}`}
+                      className={`text-[13.5px] font-bold tabular-nums ${isDebit ? 'text-rose-500' : 'text-emerald-600'}`}
                     >
                       {isDebit ? '-' : '+'}
                       {tx.amount.toLocaleString()}
@@ -244,41 +281,56 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Recent batches */}
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-[14px] font-semibold text-slate-900">
+        {/* Batches */}
+        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.06)] overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-[14.5px] font-semibold text-slate-800">
               Batch terbaru
             </h2>
             <Link
               to="/dashboard/batches"
-              className="text-[12px] font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+              className="text-[12px] font-semibold text-indigo-500 hover:text-indigo-700 transition-colors"
             >
               Lihat semua →
             </Link>
           </div>
+
           {!batches.data ? (
-            <div className="px-5 py-8 text-center">
-              <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin mx-auto" />
+            <div className="flex justify-center py-10">
+              <div className="w-5 h-5 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
             </div>
           ) : batches.data.data.length === 0 ? (
-            <div className="px-5 py-10 text-center text-sm text-slate-400">
-              Belum ada batch.
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-slate-300"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm text-slate-400">Belum ada batch.</p>
             </div>
           ) : (
             <ul className="divide-y divide-slate-50">
               {batches.data.data.slice(0, 6).map((b) => (
                 <li
                   key={b.id}
-                  className="px-5 py-3 flex items-center justify-between gap-3"
+                  className="px-6 py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-mono text-slate-400 truncate">
+                    <p className="text-[11.5px] font-mono text-slate-400 truncate">
                       {b.id}
                     </p>
                     <p className="text-[12px] text-slate-500 mt-0.5">
-                      {b.completed}/{b.total} dokumen ·{' '}
-                      {relativeTime(b.created_at)}
+                      {b.completed}/{b.total} dok · {relativeTime(b.created_at)}
                     </p>
                   </div>
                   <StatusBadge status={b.status} />
@@ -303,7 +355,7 @@ export function StatusBadge({ status }: { status: string }) {
       label: 'Sebagian gagal',
     },
     failed: {
-      cls: 'bg-red-50 text-red-700 ring-1 ring-red-200',
+      cls: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
       label: 'Gagal',
     },
     processing: {
@@ -321,7 +373,7 @@ export function StatusBadge({ status }: { status: string }) {
   };
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap ${cls}`}
+      className={`inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap ${cls}`}
     >
       {label}
     </span>

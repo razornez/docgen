@@ -146,7 +146,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-screen" style={{ background: '#f8f7fc' }}>
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
         className="w-60 flex-shrink-0 flex flex-col"
