@@ -13,7 +13,6 @@ import {
   createBatch,
   getBatch,
   getBatchDocuments,
-  getStoredToken,
   TEMPLATE_CATEGORIES,
   type TemplateItem,
 } from '../api/client.js';
@@ -832,10 +831,9 @@ export default function TemplatesPage() {
       const docs = await getBatchDocuments(b.id);
       const doc = docs.data[0];
       if (!doc) throw new Error('Dokumen tidak ditemukan');
-      const token = getStoredToken();
-      const resp = await fetch(`/v1/batches/${b.id}/documents/${doc.id}/pdf`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      if (doc.status !== 'completed' || !doc.output_url)
+        throw new Error(doc.error ?? 'Dokumen gagal diproses');
+      const resp = await fetch(doc.output_url);
       if (!resp.ok) throw new Error('Gagal mengunduh PDF');
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
