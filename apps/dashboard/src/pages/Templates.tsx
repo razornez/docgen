@@ -812,11 +812,10 @@ export default function TemplatesPage() {
     setPdfLoading(true);
     setPdfError('');
     try {
-      const { batch } = await createBatch({
+      let b = await createBatch({
         template: templateId,
         items: [{ ref: 'preview-dl', data }],
       });
-      let b = batch;
       for (
         let i = 0;
         i < 30 &&
@@ -826,8 +825,7 @@ export default function TemplatesPage() {
         i++
       ) {
         await new Promise((r) => setTimeout(r, 2000));
-        const res = await getBatch(b.id);
-        b = res.batch;
+        b = await getBatch(b.id);
       }
       if (b.status !== 'completed')
         throw new Error('Gagal atau timeout generate PDF');

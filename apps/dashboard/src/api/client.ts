@@ -248,7 +248,7 @@ export function getBatches(): Promise<BatchListResult> {
   return request('/batches');
 }
 
-export function getBatch(id: string): Promise<{ batch: BatchItem }> {
+export function getBatch(id: string): Promise<BatchItem> {
   return request(`/batches/${id}`);
 }
 
@@ -263,9 +263,7 @@ export interface BatchCreateInput {
   webhook_url?: string;
 }
 
-export function createBatch(
-  input: BatchCreateInput,
-): Promise<{ batch: BatchItem }> {
+export function createBatch(input: BatchCreateInput): Promise<BatchItem> {
   return request('/batches', { method: 'POST', body: JSON.stringify(input) });
 }
 

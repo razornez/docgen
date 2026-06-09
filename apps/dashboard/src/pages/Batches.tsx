@@ -207,7 +207,7 @@ export default function BatchesPage() {
       setItemsJson(PLACEHOLDER_ITEMS);
       setTemplateId('');
       setWebhookUrl('');
-      setSelectedBatchId(res.batch.id);
+      setSelectedBatchId(res.id);
     },
     onError: (e) =>
       setFormError(e instanceof Error ? e.message : 'Gagal membuat batch'),
