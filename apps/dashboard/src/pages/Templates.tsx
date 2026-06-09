@@ -1379,9 +1379,9 @@ export default function TemplatesPage() {
                   <textarea
                     value={previewData}
                     onChange={(e) => setPreviewData(e.target.value)}
-                    rows={8}
+                    rows={16}
                     spellCheck={false}
-                    className="w-full bg-white/5 ring-1 ring-white/10 rounded-xl px-3 py-2.5 text-[12px] font-mono text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none leading-relaxed"
+                    className="w-full bg-white/5 ring-1 ring-white/10 rounded-xl px-3 py-2.5 text-[12px] font-mono text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-y leading-relaxed"
                   />
                 </div>
                 {(previewError || pdfError) && (
