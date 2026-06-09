@@ -3,6 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getApiKeys, createApiKey, revokeApiKey } from '../api/client.js';
 import ConfirmModal from '../components/ConfirmModal.js';
 
+const inputCls =
+  'bg-white ring-1 ring-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all';
+
 export default function ApiKeysPage() {
   const qc = useQueryClient();
   const keys = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys });
@@ -18,7 +21,7 @@ export default function ApiKeysPage() {
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
       setNewKey(data.api_key.key);
     },
-    onError: (e) => setCreateError(e instanceof Error ? e.message : 'Failed'),
+    onError: (e) => setCreateError(e instanceof Error ? e.message : 'Gagal'),
   });
 
   const revoke = useMutation({
@@ -34,20 +37,24 @@ export default function ApiKeysPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-bold text-gray-900">API Keys</h1>
-
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Create new key</h2>
-        <form onSubmit={handleCreate} className="flex items-end gap-4">
+    <div className="space-y-6 max-w-4xl">
+      {/* Create key card */}
+      <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] p-6">
+        <h2 className="text-[14.5px] font-semibold text-slate-800 mb-5">
+          Buat API key baru
+        </h2>
+        <form
+          onSubmit={handleCreate}
+          className="flex flex-wrap items-end gap-4"
+        >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
               Mode
             </label>
             <select
               value={mode}
               onChange={(e) => setMode(e.target.value as 'live' | 'test')}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={inputCls}
             >
               <option value="live">Live (sk_live_…)</option>
               <option value="test">Test (sk_test_…)</option>
@@ -56,80 +63,129 @@ export default function ApiKeysPage() {
           <button
             type="submit"
             disabled={create.isPending}
-            className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+            className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
           >
-            {create.isPending ? 'Creating…' : 'Create key'}
+            {create.isPending ? 'Membuat…' : 'Buat key'}
           </button>
         </form>
 
         {createError && (
-          <p className="mt-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+          <div className="mt-4 flex items-center gap-2 text-sm text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-2xl px-4 py-3">
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
             {createError}
-          </p>
+          </div>
         )}
 
         {newKey && (
-          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <p className="text-sm font-semibold text-amber-800 mb-1">
-              Save this key — it won't be shown again.
-            </p>
-            <code className="text-sm font-mono text-amber-900 break-all">
-              {newKey}
-            </code>
+          <div
+            className="mt-5 rounded-2xl p-4 ring-1 ring-amber-200"
+            style={{ background: 'linear-gradient(135deg, #fffbeb, #fefce8)' }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg
+                  className="w-4 h-4 text-amber-600"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-amber-800 mb-1.5">
+                  Simpan key ini sekarang — tidak akan ditampilkan lagi.
+                </p>
+                <code className="text-[12px] font-mono text-amber-900 break-all bg-amber-100/60 rounded-xl px-3 py-2 block">
+                  {newKey}
+                </code>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200">
+      {/* Keys list */}
+      <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h2 className="text-[14.5px] font-semibold text-slate-800">
+            API keys
+          </h2>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs text-gray-400 uppercase text-left border-b border-gray-100">
-                <th className="px-5 py-3">Key</th>
-                <th className="px-5 py-3">Mode</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3">Last used</th>
-                <th className="px-5 py-3">Created</th>
-                <th className="px-5 py-3" />
+              <tr className="text-[11px] text-slate-400 uppercase tracking-wider text-left border-b border-slate-100">
+                <th className="px-6 py-3 font-semibold">Key</th>
+                <th className="px-6 py-3 font-semibold">Mode</th>
+                <th className="px-6 py-3 font-semibold">Status</th>
+                <th className="px-6 py-3 font-semibold">Terakhir dipakai</th>
+                <th className="px-6 py-3 font-semibold">Dibuat</th>
+                <th className="px-6 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-50">
               {keys.data?.data.map((k) => (
                 <tr
                   key={k.id}
-                  className={`hover:bg-gray-50 ${k.status === 'revoked' ? 'opacity-50' : ''}`}
+                  className={`hover:bg-slate-50/60 transition-colors ${k.status === 'revoked' ? 'opacity-40' : ''}`}
                 >
-                  <td className="px-5 py-3 font-mono text-xs text-gray-700">
+                  <td className="px-6 py-3.5 font-mono text-[12px] text-slate-600">
                     {k.prefix}…{k.last4}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-6 py-3.5">
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1 ${
                         k.mode === 'live'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-blue-100 text-blue-700'
+                          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                          : 'bg-blue-50 text-blue-700 ring-blue-200'
                       }`}
                     >
                       {k.mode}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-gray-600 capitalize">
-                    {k.status}
+                  <td className="px-6 py-3.5">
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-[12.5px] font-medium ${k.status === 'active' ? 'text-emerald-600' : 'text-slate-400'}`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${k.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                      />
+                      {k.status === 'active' ? 'Aktif' : 'Direvoke'}
+                    </span>
                   </td>
-                  <td className="px-5 py-3 text-gray-400">
+                  <td className="px-6 py-3.5 text-slate-400">
                     {k.last_used_at
                       ? new Date(k.last_used_at).toLocaleDateString('id-ID')
-                      : 'Never'}
+                      : 'Belum pernah'}
                   </td>
-                  <td className="px-5 py-3 text-gray-400">
+                  <td className="px-6 py-3.5 text-slate-400">
                     {new Date(k.created_at).toLocaleDateString('id-ID')}
                   </td>
-                  <td className="px-5 py-3 text-right">
+                  <td className="px-6 py-3.5 text-right">
                     {k.status === 'active' && (
                       <button
                         type="button"
                         onClick={() => setRevokeTarget(k.id)}
-                        className="text-xs text-red-500 hover:text-red-700 font-medium"
+                        className="text-[12px] font-semibold text-rose-400 hover:text-rose-600 transition-colors px-3 py-1 rounded-xl hover:bg-rose-50"
                       >
                         Revoke
                       </button>
@@ -141,9 +197,9 @@ export default function ApiKeysPage() {
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-5 py-10 text-center text-gray-400"
+                    className="px-6 py-12 text-center text-slate-400 text-sm"
                   >
-                    No keys found
+                    Belum ada API key.
                   </td>
                 </tr>
               )}
