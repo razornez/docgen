@@ -23,6 +23,5 @@ jobs:
             pnpm install --frozen-lockfile
             pnpm build:all
             pnpm db:migrate
-            ldconfig -p | grep -q libatk-1.0 || DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libatk1.0-0 libatk-bridge2.0-0 libgbm1 libnss3 libnspr4 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libcups2 libdrm2 libasound2 libx11-xcb1
             pm2 reload ecosystem.config.cjs --update-env
             echo "Deploy selesai: $(date)"
