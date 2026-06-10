@@ -99,24 +99,49 @@ export class KasugaiGateway implements PaymentGatewayPort {
     };
 
     // Step 2: inisiasi bayar (mengembalikan redirectUrl + token untuk Snap).
-    const payRes = await fetch(`${this.baseUrl}/v1/payment/pay`, {
-      method: 'POST',
-      headers: { ...this.authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId: input.orderId,
-        method: input.method,
-      }),
-    });
-    if (!payRes.ok) {
-      const text = await payRes.text();
-      throw new Error(`Kasugai pay gagal: ${payRes.status} ${text}`);
-    }
-    const payData = (await payRes.json().catch(() => ({}))) as {
+    // /methods tidak menandai metode mana yang aktif, jadi metode yang dikirim
+    // bisa kena METHOD_INACTIVE. Karena widget Snap tetap menampilkan SEMUA
+    // channel (Kasugai tak kirim enabled_payments), metode di sini hanya untuk
+    // mencetak token — coba beberapa kandidat sampai ada yang aktif.
+    const candidates = [
+      input.method,
+      'credit_card',
+      'gopay',
+      'midtrans_qris',
+      'bca_va',
+      'other_va',
+    ].filter((m, i, arr) => m && arr.indexOf(m) === i);
+
+    // ⚠️ field token-nya 'token'/'snapToken', BUKAN 'snapToken' lama
+    type PayData = {
       redirectUrl?: string;
-      token?: string; // ⚠️ field-nya 'token'/'snapToken', BUKAN 'snapToken' lama
+      token?: string;
       snapToken?: string;
       clientKey?: string;
     };
+    let payData: PayData | null = null;
+    let lastErr = '';
+    for (const method of candidates) {
+      const payRes = await fetch(`${this.baseUrl}/v1/payment/pay`, {
+        method: 'POST',
+        headers: { ...this.authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: input.orderId, method }),
+      });
+      if (payRes.ok) {
+        payData = (await payRes.json().catch(() => ({}))) as PayData;
+        break;
+      }
+      lastErr = `${payRes.status} ${await payRes.text()}`;
+      // Hanya lanjut ke kandidat berikut bila metode nonaktif; error lain → stop.
+      if (!lastErr.includes('METHOD_INACTIVE')) {
+        throw new Error(`Kasugai pay gagal: ${lastErr}`);
+      }
+    }
+    if (!payData) {
+      throw new Error(
+        `Kasugai pay gagal: tidak ada metode aktif yang bisa dipakai. ${lastErr}`,
+      );
+    }
 
     // Toleran terhadap dua bentuk respons (orders vs pay).
     const token =
