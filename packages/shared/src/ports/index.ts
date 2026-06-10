@@ -4,8 +4,8 @@ export type { StoragePort } from './storage.js';
 export type {
   PaymentGatewayPort,
   CreateTxInput,
-  PaymentStatus,
-  PaymentStatusValue,
+  PaymentMethod,
+  VerifiedWebhook,
 } from './payment-gateway.js';
 export type { QueuePort, EnqueueOptions } from './queue.js';
 export type { MailerPort, EmailMessage } from './mailer.js';

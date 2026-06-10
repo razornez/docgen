@@ -18,14 +18,14 @@ import { z } from 'zod';
  * produksi variabel datang dari environment asli, bukan file).
  */
 function findEnvFile(start: string): string | undefined {
-    let dir = start;
-    for (;;) {
-          const candidate = join(dir, '.env');
-          if (existsSync(candidate)) return candidate;
-          const parent = dirname(dir);
-          if (parent === dir) return undefined;
-          dir = parent;
-    }
+  let dir = start;
+  for (;;) {
+    const candidate = join(dir, '.env');
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
 }
 
 // Memuat .env ke process.env (no-op bila variabel sudah diset di lingkungan).
@@ -38,70 +38,75 @@ const envBool = z
   .transform((v) => v === 'true' || v === '1');
 
 const EnvSchema = z.object({
-    NODE_ENV: z
-      .enum(['development', 'test', 'production'])
-      .default('development'),
+  NODE_ENV: z
+    .enum(['development', 'test', 'production'])
+    .default('development'),
 
-    // Database & antrian
-    DATABASE_URL: z.string().url(),
-    REDIS_URL: z.string().url(),
+  // Database & antrian
+  DATABASE_URL: z.string().url(),
+  REDIS_URL: z.string().url(),
 
-    // API service
-    API_HOST: z.string().min(1).default('0.0.0.0'),
-    API_PORT: z.coerce.number().int().positive().default(3000),
-    LOG_LEVEL: z
-      .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
-      .default('info'),
-    PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
+  // API service
+  API_HOST: z.string().min(1).default('0.0.0.0'),
+  API_PORT: z.coerce.number().int().positive().default(3000),
+  LOG_LEVEL: z
+    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
+    .default('info'),
+  PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
 
-    // Penyimpanan objek (R2/S3/MinIO)
-    STORAGE_ENDPOINT: z.string().url().optional().default('http://localhost:9000'),
-    STORAGE_REGION: z.string().min(1).default('us-east-1'),
-    STORAGE_ACCESS_KEY: z.string().default(''),
-    STORAGE_SECRET_KEY: z.string().default(''),
-    STORAGE_BUCKET: z.string().min(1).default('docgen-files'),
-    STORAGE_FORCE_PATH_STYLE: envBool.default('true'),
-    // Driver storage aktif. 'filesystem' = dev tanpa MinIO; 's3' = R2/S3/MinIO.
-    STORAGE_DRIVER: z.enum(['filesystem', 's3']).default('filesystem'),
-    // Folder PDF lokal saat driver=filesystem.
-    STORAGE_DIR: z.string().min(1).default('./var/storage'),
-    // Umur tautan unduh bertanda tangan (detik) — pendek demi keamanan (docs/10).
-    SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  // Penyimpanan objek (R2/S3/MinIO)
+  STORAGE_ENDPOINT: z
+    .string()
+    .url()
+    .optional()
+    .default('http://localhost:9000'),
+  STORAGE_REGION: z.string().min(1).default('us-east-1'),
+  STORAGE_ACCESS_KEY: z.string().default(''),
+  STORAGE_SECRET_KEY: z.string().default(''),
+  STORAGE_BUCKET: z.string().min(1).default('docgen-files'),
+  STORAGE_FORCE_PATH_STYLE: envBool.default('true'),
+  // Driver storage aktif. 'filesystem' = dev tanpa MinIO; 's3' = R2/S3/MinIO.
+  STORAGE_DRIVER: z.enum(['filesystem', 's3']).default('filesystem'),
+  // Folder PDF lokal saat driver=filesystem.
+  STORAGE_DIR: z.string().min(1).default('./var/storage'),
+  // Umur tautan unduh bertanda tangan (detik) — pendek demi keamanan (docs/10).
+  SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(900),
 
-    // Render (Tahap 4)
-    // Batas tunggu API atas job render sync (ms). Worker harus selesai < ini.
-    RENDER_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
-    // Konkurensi job render per worker (disiplin sumber daya, docs/08).
-    RENDER_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  // Render (Tahap 4)
+  // Batas tunggu API atas job render sync (ms). Worker harus selesai < ini.
+  RENDER_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  // Konkurensi job render per worker (disiplin sumber daya, docs/08).
+  RENDER_CONCURRENCY: z.coerce.number().int().positive().default(2),
 
-    // Midtrans (boleh kosong di tahap awal — diperketat saat tahap top-up)
-    MIDTRANS_SERVER_KEY: z.string().default(''),
-    MIDTRANS_CLIENT_KEY: z.string().default(''),
-    MIDTRANS_IS_PRODUCTION: envBool.default('false'),
+  // Kasugai payment gateway (proxy di atas Midtrans). Top-up kredit lewat sini.
+  // Boleh kosong di dev; diperketat di produksi (top-up akan gagal tanpa key).
+  KASUGAI_BASE_URL: z.string().default('https://kasugai.razornez.net'),
+  KASUGAI_SECRET_KEY: z.string().default(''), // sk_... (BUKAN pk_)
+  KASUGAI_WEBHOOK_SECRET: z.string().default(''), // whsec_... (dari dashboard)
 
-    // Rahasia aplikasi
-    SESSION_SECRET: z.string().min(16),
-    APIKEY_HASH_PEPPER: z.string().min(16),
+  // Rahasia aplikasi
+  SESSION_SECRET: z.string().min(16),
+  APIKEY_HASH_PEPPER: z.string().min(16),
 
-    // Login Google (dipakai tahap auth)
-    GOOGLE_CLIENT_ID: z.string().default(''),
-    GOOGLE_CLIENT_SECRET: z.string().default(''),
+  // Login Google (dipakai tahap auth)
+  GOOGLE_CLIENT_ID: z.string().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().default(''),
 
-    // Email (Brevo SMTP relay)
-    EMAIL_SMTP_HOST: z.string().default('smtp-relay.brevo.com'),
-    EMAIL_SMTP_PORT: z.coerce.number().default(587),
-    EMAIL_SMTP_USER: z.string().default(''),
-    EMAIL_SMTP_PASS: z.string().default(''),
-    EMAIL_FROM: z.string().default(''),
+  // Email (Brevo SMTP relay)
+  EMAIL_SMTP_HOST: z.string().default('smtp-relay.brevo.com'),
+  EMAIL_SMTP_PORT: z.coerce.number().default(587),
+  EMAIL_SMTP_USER: z.string().default(''),
+  EMAIL_SMTP_PASS: z.string().default(''),
+  EMAIL_FROM: z.string().default(''),
 
-    // Observability
-    SENTRY_DSN: z.string().default(''),
+  // Observability
+  SENTRY_DSN: z.string().default(''),
 
-    // i18n (docs/22) — basis/fallback selalu 'en'
-    DEFAULT_LOCALE: z.enum(['id', 'en']).default('en'),
+  // i18n (docs/22) — basis/fallback selalu 'en'
+  DEFAULT_LOCALE: z.enum(['id', 'en']).default('en'),
 
-    // URL frontend dashboard — dipakai untuk redirect setelah Google OAuth callback.
-    DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
+  // URL frontend dashboard — dipakai untuk redirect setelah Google OAuth callback.
+  DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
 });
 
 export type AppConfig = Readonly<z.infer<typeof EnvSchema>>;
@@ -113,33 +118,33 @@ let cached: AppConfig | undefined;
  * jadi aman dipanggil berkali-kali. Melempar (gagal cepat) bila tidak valid.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-    if (cached) return cached;
+  if (cached) return cached;
 
   const parsed = EnvSchema.safeParse(env);
-    if (!parsed.success) {
-          const issues = parsed.error.issues
-            .map((i) => ` - ${i.path.join('.') || '(root)'}: ${i.message}`)
-            .join('\n');
-          throw new Error(
-                  `Konfigurasi environment tidak valid. Perbaiki .env Anda:\n${issues}`,
-                );
-    }
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((i) => ` - ${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('\n');
+    throw new Error(
+      `Konfigurasi environment tidak valid. Perbaiki .env Anda:\n${issues}`,
+    );
+  }
 
   // STORAGE_DIR di-resolve absolut terhadap ROOT REPO (folder .env), bukan cwd —
   // agar api & worker (cwd berbeda) memakai folder storage yang SAMA.
   const repoRoot = envPath ? dirname(envPath) : process.cwd();
-    const resolved: z.infer<typeof EnvSchema> = {
-          ...parsed.data,
-          STORAGE_DIR: isAbsolute(parsed.data.STORAGE_DIR)
-            ? parsed.data.STORAGE_DIR
-                  : resolve(repoRoot, parsed.data.STORAGE_DIR),
-    };
+  const resolved: z.infer<typeof EnvSchema> = {
+    ...parsed.data,
+    STORAGE_DIR: isAbsolute(parsed.data.STORAGE_DIR)
+      ? parsed.data.STORAGE_DIR
+      : resolve(repoRoot, parsed.data.STORAGE_DIR),
+  };
 
   cached = Object.freeze(resolved);
-    return cached;
+  return cached;
 }
 
 /** Hanya untuk pengujian: mengosongkan cache konfigurasi. */
 export function resetConfigCache(): void {
-    cached = undefined;
+  cached = undefined;
 }

@@ -45,7 +45,7 @@ import { DefaultBatchService } from './batches/batch.service.js';
 import { registerBatchRoutes } from './batches/batch.route.js';
 import { PgWebhookRepository } from './webhooks/webhook.repository.js';
 import { registerWebhookRoutes } from './webhooks/webhook.route.js';
-import { MidtransGateway } from './infra/midtrans.js';
+import { KasugaiGateway } from './infra/kasugai.js';
 import { PaymentService } from './payments/payment.service.js';
 import {
   registerPaymentRoutes,
@@ -149,9 +149,10 @@ export function buildApp(config: AppConfig): FastifyInstance {
   );
   const paymentService = new PaymentService(
     pool,
-    new MidtransGateway(
-      config.MIDTRANS_SERVER_KEY,
-      config.MIDTRANS_IS_PRODUCTION,
+    new KasugaiGateway(
+      config.KASUGAI_BASE_URL,
+      config.KASUGAI_SECRET_KEY,
+      config.KASUGAI_WEBHOOK_SECRET,
     ),
     idGen,
   );
@@ -192,6 +193,26 @@ export function buildApp(config: AppConfig): FastifyInstance {
       registerSessionRoutes(instance, sessionService);
       registerEmailAuthRoutes(instance, pool, userRepo, mailer, config);
       if (fsStorage) registerFileRoutes(instance, fsStorage);
+    },
+    { prefix: '/v1' },
+  );
+
+  // Webhook Kasugai dalam scope terisolasi: parser content-type khusus yang
+  // MENYIMPAN raw body (wajib untuk verifikasi HMAC). Parser ini hanya berlaku
+  // di scope ini — route lain tetap memakai JSON parser default Fastify.
+  void app.register(
+    async (instance) => {
+      instance.addContentTypeParser(
+        'application/json',
+        { parseAs: 'string' },
+        (req, body, done) => {
+          (req as typeof req & { rawBody?: string }).rawBody =
+            typeof body === 'string' ? body : '';
+          // Body tidak di-JSON.parse di sini: handler memakai rawBody, dan kita
+          // ingin selalu balas 200 (parse gagal tak boleh memicu 400).
+          done(null, {});
+        },
+      );
       registerPaymentWebhookRoute(instance, paymentService, idGen);
     },
     { prefix: '/v1' },

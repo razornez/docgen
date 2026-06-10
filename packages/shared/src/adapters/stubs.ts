@@ -10,7 +10,8 @@ import type { StoragePort } from '../ports/storage.js';
 import type {
   PaymentGatewayPort,
   CreateTxInput,
-  PaymentStatus,
+  PaymentMethod,
+  VerifiedWebhook,
 } from '../ports/payment-gateway.js';
 import type { QueuePort, EnqueueOptions } from '../ports/queue.js';
 import type { MailerPort, EmailMessage } from '../ports/mailer.js';
@@ -28,18 +29,16 @@ export class StubStorage implements StoragePort {
 }
 
 export class StubPaymentGateway implements PaymentGatewayPort {
+  listMethods(): Promise<PaymentMethod[]> {
+    throw new NotImplementedError('PaymentGatewayPort.listMethods');
+  }
   createTransaction(
     _input: CreateTxInput,
   ): Promise<{ orderId: string; paymentUrl: string }> {
     throw new NotImplementedError('PaymentGatewayPort.createTransaction');
   }
-  verifyNotificationSignature(_payload: unknown): boolean {
-    throw new NotImplementedError(
-      'PaymentGatewayPort.verifyNotificationSignature',
-    );
-  }
-  getStatus(_orderId: string): Promise<PaymentStatus> {
-    throw new NotImplementedError('PaymentGatewayPort.getStatus');
+  verifyWebhook(_rawBody: string, _signature: string): VerifiedWebhook | null {
+    throw new NotImplementedError('PaymentGatewayPort.verifyWebhook');
   }
 }
 

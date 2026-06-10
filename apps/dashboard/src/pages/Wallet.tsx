@@ -4,6 +4,7 @@ import {
   getWallet,
   getTransactions,
   getPackages,
+  getPaymentMethods,
   createTopup,
 } from '../api/client.js';
 
@@ -23,8 +24,13 @@ export default function WalletPage() {
     queryFn: () => getTransactions(),
   });
   const packages = useQuery({ queryKey: ['packages'], queryFn: getPackages });
+  const methods = useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: getPaymentMethods,
+  });
 
   const [selectedPkg, setSelectedPkg] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState('');
   const [topupError, setTopupError] = useState('');
 
   const topup = useMutation({
@@ -40,8 +46,12 @@ export default function WalletPage() {
 
   function handleTopup() {
     if (!selectedPkg) return;
+    if (!selectedMethod) {
+      setTopupError('Pilih metode pembayaran dulu.');
+      return;
+    }
     setTopupError('');
-    topup.mutate(selectedPkg);
+    topup.mutate({ packageId: selectedPkg, method: selectedMethod });
   }
 
   return (
@@ -100,6 +110,45 @@ export default function WalletPage() {
             )}
           </div>
 
+          <p className="text-[13px] font-semibold text-slate-700 mt-5 mb-3">
+            Metode pembayaran
+          </p>
+          <div className="space-y-2.5">
+            {methods.data?.data.map((m) => (
+              <label
+                key={m.code}
+                className={`flex items-center gap-3 cursor-pointer px-4 py-3 rounded-2xl ring-1 transition-all ${
+                  selectedMethod === m.code
+                    ? 'ring-indigo-400 bg-indigo-50/60'
+                    : 'ring-slate-200 bg-white/70 hover:ring-indigo-200'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="method"
+                  value={m.code}
+                  checked={selectedMethod === m.code}
+                  onChange={() => setSelectedMethod(m.code)}
+                  className="accent-indigo-500"
+                />
+                <span className="text-sm text-slate-700">{m.name}</span>
+              </label>
+            ))}
+            {methods.isLoading && (
+              <p className="text-sm text-slate-400">Memuat metode…</p>
+            )}
+            {methods.data?.data.length === 0 && (
+              <p className="text-sm text-slate-400">
+                Metode bayar belum tersedia
+              </p>
+            )}
+            {methods.isError && (
+              <p className="text-sm text-rose-400">
+                Gagal memuat metode pembayaran
+              </p>
+            )}
+          </div>
+
           {topupError && (
             <div className="mt-3 flex items-center gap-2 text-xs text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-xl px-3 py-2">
               <svg
@@ -121,14 +170,14 @@ export default function WalletPage() {
 
           <button
             onClick={handleTopup}
-            disabled={!selectedPkg || topup.isPending}
+            disabled={!selectedPkg || !selectedMethod || topup.isPending}
             className="mt-4 w-full py-3 px-4 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
             style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
           >
-            {topup.isPending ? 'Membuka pembayaran…' : 'Bayar via Midtrans'}
+            {topup.isPending ? 'Membuka pembayaran…' : 'Lanjut bayar'}
           </button>
           <p className="text-[11px] text-slate-400 mt-2.5 text-center">
-            QRIS · Virtual Account · E-wallet
+            Pembayaran aman via Kasugai
           </p>
         </div>
 

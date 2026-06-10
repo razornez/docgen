@@ -1,6 +1,11 @@
 import { withTransaction } from '@docgen/db';
 import { Errors, ID_PREFIXES } from '@docgen/shared';
-import type { IdGenerator, PaymentGatewayPort, TenantId } from '@docgen/shared';
+import type {
+  IdGenerator,
+  PaymentGatewayPort,
+  PaymentMethod,
+  TenantId,
+} from '@docgen/shared';
 import type { Queryable } from '@docgen/db';
 
 export interface CreditPackage {
@@ -43,9 +48,9 @@ interface PaymentRow {
 }
 
 /**
- * Layanan top-up kredit via Midtrans (docs/03 — Alur 3). Kredit hanya
+ * Layanan top-up kredit via Kasugai (docs/03 — Alur 3). Kredit hanya
  * ditambahkan setelah webhook server-to-server dari gateway diterima dan
- * diverifikasi (aturan keras docs/03 — Keamanan Top-up).
+ * diverifikasi HMAC (aturan keras docs/03 — Keamanan Top-up).
  */
 export class PaymentService {
   constructor(
@@ -53,6 +58,11 @@ export class PaymentService {
     private readonly gateway: PaymentGatewayPort,
     private readonly idGen: IdGenerator,
   ) {}
+
+  /** Daftar metode bayar aktif dari Kasugai (mis. QRIS, VA BCA). */
+  async listMethods(): Promise<PaymentMethod[]> {
+    return this.gateway.listMethods();
+  }
 
   async listPackages(): Promise<CreditPackage[]> {
     const { rows } = await this.db.query<CreditPackageRow>(
@@ -71,6 +81,7 @@ export class PaymentService {
   async createTopup(
     tenantId: TenantId,
     packageId: string,
+    method: string,
     customerEmail?: string,
   ): Promise<{ payment: PaymentRecord; paymentUrl: string }> {
     const { rows: pkgRows } = await this.db.query<CreditPackageRow>(
@@ -80,14 +91,23 @@ export class PaymentService {
     const pkg = pkgRows[0];
     if (!pkg) throw Errors.notFound('Credit package not found', 'package');
 
+    // Nama customer untuk Kasugai (wajib) — ambil dari tenant.
+    const { rows: tenantRows } = await this.db.query<{ name: string }>(
+      `SELECT name FROM tenants WHERE id = $1`,
+      [tenantId],
+    );
+    const customerName = tenantRows[0]?.name ?? 'DocGen User';
+
     const paymentId = this.idGen.generate(ID_PREFIXES.payment);
     const credits = Number(pkg.credits);
     const amountIdr = Number(pkg.price_idr);
 
-    // Buat transaksi di Midtrans.
+    // Buat transaksi di Kasugai (orders + pay).
     const { paymentUrl } = await this.gateway.createTransaction({
       orderId: paymentId,
       amountIdr,
+      method,
+      customerName,
       ...(customerEmail !== undefined ? { customerEmail } : {}),
     });
 
@@ -95,7 +115,7 @@ export class PaymentService {
     const { rows } = await this.db.query<PaymentRow>(
       `INSERT INTO payments
          (id, tenant_id, package_id, amount_idr, credits, currency, gateway, gateway_ref, status)
-       VALUES ($1, $2, $3, $4, $5, 'IDR', 'midtrans', $1, 'pending')
+       VALUES ($1, $2, $3, $4, $5, 'IDR', 'kasugai', $1, 'pending')
        RETURNING id, tenant_id, package_id, amount_idr, credits, status, gateway_ref, created_at`,
       [paymentId, tenantId, packageId, amountIdr, credits],
     );
@@ -117,30 +137,34 @@ export class PaymentService {
   }
 
   /**
-   * Handler webhook Midtrans. Verifikasi signature → konfirmasi ke Midtrans →
-   * kredit saldo dalam satu transaksi atomik. Idempoten via UNIQUE(topup,paymentId).
+   * Handler webhook Kasugai. Verifikasi HMAC atas RAW body → bila event
+   * 'payment.paid' kredit saldo dalam satu transaksi atomik. Idempoten via
+   * UNIQUE(topup, paymentId).
+   *
+   * Mengembalikan ringkasan untuk logging route. TIDAK melempar pada signature
+   * invalid — route tetap balas 200 agar Kasugai tidak retry tanpa henti
+   * (lihat brief — return 4xx menyebabkan spam retry).
    */
-  async handleMidtransWebhook(
-    payload: unknown,
+  async handleKasugaiWebhook(
+    rawBody: string,
+    signature: string,
     idGen: IdGenerator,
-  ): Promise<void> {
-    if (!this.gateway.verifyNotificationSignature(payload)) {
-      throw Errors.unauthorized('Invalid webhook signature');
+  ): Promise<{ ok: boolean; reason: string; orderId?: string }> {
+    const verified = this.gateway.verifyWebhook(rawBody, signature);
+    if (!verified) {
+      return { ok: false, reason: 'invalid_signature' };
+    }
+    if (!verified.paid) {
+      return { ok: true, reason: `skipped:${verified.event}` };
     }
 
-    const p = payload as Record<string, string>;
-    const orderId = p['order_id'];
-    if (!orderId) throw Errors.invalidRequest('Missing order_id');
-
-    // Konfirmasi ke Midtrans (jangan percaya notifikasi mentah).
-    const confirmed = await this.gateway.getStatus(orderId);
-    if (confirmed.status !== 'paid') return; // bukan paid, abaikan
+    const orderId = verified.orderId;
 
     await withTransaction(async (tx) => {
-      // Ambil payment record.
+      // Ambil payment record (idempoten — hanya yang masih pending).
       const { rows } = await tx.query<PaymentRow>(
         `SELECT id, tenant_id, credits FROM payments
-          WHERE gateway_ref = $1 AND gateway = 'midtrans' AND status = 'pending'`,
+          WHERE gateway_ref = $1 AND gateway = 'kasugai' AND status = 'pending'`,
         [orderId],
       );
       const payment = rows[0];
@@ -172,5 +196,7 @@ export class PaymentService {
         [txnId, tenantId, credits, balanceAfter, payment.id],
       );
     });
+
+    return { ok: true, reason: 'paid', orderId };
   }
 }

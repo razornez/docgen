@@ -165,11 +165,23 @@ export interface TopupResult {
   status: string;
 }
 
-export function createTopup(packageId: string): Promise<TopupResult> {
+export function createTopup(input: {
+  packageId: string;
+  method: string;
+}): Promise<TopupResult> {
   return request('/wallet/topups', {
     method: 'POST',
-    body: JSON.stringify({ package: packageId }),
+    body: JSON.stringify({ package: input.packageId, method: input.method }),
   });
+}
+
+export interface PaymentMethodItem {
+  code: string;
+  name: string;
+}
+
+export function getPaymentMethods(): Promise<{ data: PaymentMethodItem[] }> {
+  return request('/wallet/payment-methods');
 }
 
 // ---- Templates ----
