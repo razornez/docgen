@@ -18,12 +18,21 @@ export interface PaymentMethod {
   readonly name: string; // mis. 'QRIS'
 }
 
-/** Hasil verifikasi webhook Kasugai (HMAC atas raw body sudah lolos). */
-export interface VerifiedWebhook {
-  readonly orderId: string;
-  readonly event: string; // mis. 'payment.paid'
-  readonly paid: boolean;
-}
+/**
+ * Hasil verifikasi webhook Kasugai. Dibedakan agar log jelas: signature salah
+ * vs payload tak terbaca (mis. orderId hilang) — keduanya gagal tapi beda sebab.
+ */
+export type WebhookVerification =
+  | {
+      readonly ok: true;
+      readonly orderId: string;
+      readonly event: string; // mis. 'payment.paid'
+      readonly paid: boolean;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: 'invalid_signature' | 'bad_payload';
+    };
 
 export interface PaymentGatewayPort {
   /** Daftar metode bayar yang aktif untuk tenant. */
@@ -42,9 +51,9 @@ export interface PaymentGatewayPort {
   }>;
 
   /**
-   * Verifikasi HMAC-SHA256 atas RAW body webhook. Mengembalikan payload
-   * terverifikasi, atau null bila signature tidak cocok. WAJIB raw body —
-   * JSON yang di-encode ulang akan mengubah signature.
+   * Verifikasi HMAC-SHA256 atas RAW body webhook. WAJIB raw body — JSON yang
+   * di-encode ulang akan mengubah signature. Mengembalikan hasil terdiskriminasi
+   * (ok / reason) agar pemanggil bisa membedakan signature salah vs payload rusak.
    */
-  verifyWebhook(rawBody: string, signature: string): VerifiedWebhook | null;
+  verifyWebhook(rawBody: string, signature: string): WebhookVerification;
 }

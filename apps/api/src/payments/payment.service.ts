@@ -159,14 +159,15 @@ export class PaymentService {
     idGen: IdGenerator,
   ): Promise<{ ok: boolean; reason: string; orderId?: string }> {
     const verified = this.gateway.verifyWebhook(rawBody, signature);
-    if (!verified) {
-      return { ok: false, reason: 'invalid_signature' };
+    if (!verified.ok) {
+      return { ok: false, reason: verified.reason };
     }
     if (!verified.paid) {
       return { ok: true, reason: `skipped:${verified.event}` };
     }
 
     const orderId = verified.orderId;
+    let credited = false;
 
     await withTransaction(async (tx) => {
       // Ambil payment record (idempoten — hanya yang masih pending).
@@ -177,6 +178,7 @@ export class PaymentService {
       );
       const payment = rows[0];
       if (!payment) return; // sudah diproses atau tidak ditemukan
+      credited = true;
 
       const credits = Number(payment.credits);
       const tenantId = payment.tenant_id as TenantId;
@@ -205,6 +207,11 @@ export class PaymentService {
       );
     });
 
-    return { ok: true, reason: 'paid', orderId };
+    // Bedakan: benar-benar mengkredit vs order tak ditemukan/sudah diproses.
+    return {
+      ok: true,
+      reason: credited ? 'credited' : 'order_not_found_or_done',
+      orderId,
+    };
   }
 }

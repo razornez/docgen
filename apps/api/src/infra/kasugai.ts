@@ -3,7 +3,7 @@ import type {
   CreateTxInput,
   PaymentGatewayPort,
   PaymentMethod,
-  VerifiedWebhook,
+  WebhookVerification,
 } from '@docgen/shared';
 
 /**
@@ -135,8 +135,8 @@ export class KasugaiGateway implements PaymentGatewayPort {
     return { orderId: input.orderId, paymentUrl, token, clientKey };
   }
 
-  verifyWebhook(rawBody: string, signature: string): VerifiedWebhook | null {
-    if (!this.webhookSecret) return null;
+  verifyWebhook(rawBody: string, signature: string): WebhookVerification {
+    if (!this.webhookSecret) return { ok: false, reason: 'invalid_signature' };
     // HMAC WAJIB atas RAW body — json_encode ulang akan mengubah hasil.
     const expected =
       'sha256=' +
@@ -144,19 +144,30 @@ export class KasugaiGateway implements PaymentGatewayPort {
 
     const a = Buffer.from(expected);
     const b = Buffer.from(signature);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      return { ok: false, reason: 'invalid_signature' };
+    }
 
     let body: Record<string, unknown>;
     try {
       body = JSON.parse(rawBody) as Record<string, unknown>;
     } catch {
-      return null;
+      return { ok: false, reason: 'bad_payload' };
     }
-    const event = String(body['event'] ?? '');
-    const dataObj = (body['data'] ?? {}) as Record<string, unknown>;
-    const orderId = String(dataObj['orderId'] ?? dataObj['order_id'] ?? '');
-    if (!orderId) return null;
 
-    return { orderId, event, paid: event === 'payment.paid' };
+    const event = String(body['event'] ?? '');
+    // Payload Kasugai menaruh orderId di TOP-LEVEL. Tetap dukung bentuk nested
+    // (body.data.orderId) sebagai cadangan demi ketahanan.
+    const dataObj = (body['data'] ?? {}) as Record<string, unknown>;
+    const orderId = String(
+      body['orderId'] ??
+        body['order_id'] ??
+        dataObj['orderId'] ??
+        dataObj['order_id'] ??
+        '',
+    );
+    if (!orderId) return { ok: false, reason: 'bad_payload' };
+
+    return { ok: true, orderId, event, paid: event === 'payment.paid' };
   }
 }

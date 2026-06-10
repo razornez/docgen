@@ -11,69 +11,81 @@ function sign(rawBody: string, secret = SECRET): string {
 describe('KasugaiGateway.verifyWebhook', () => {
   const gw = new KasugaiGateway('https://kasugai.example', 'sk_x', SECRET);
 
-  it('menerima signature valid atas raw body dan mengekstrak orderId', () => {
+  it('menerima payload Kasugai (orderId di TOP-LEVEL) dengan signature valid', () => {
+    // Bentuk payload nyata Kasugai: orderId di top-level, bukan nested.
     const raw = JSON.stringify({
       event: 'payment.paid',
-      data: { orderId: 'pay_abc123' },
+      orderId: 'pay_CczIpW7t2rh7xQ2VaFS0BC',
+      amount: 25000,
+      currency: 'IDR',
+      paidAt: '2026-06-10T10:07:08.000Z',
     });
-    const result = gw.verifyWebhook(raw, sign(raw));
-    expect(result).toEqual({
-      orderId: 'pay_abc123',
+    expect(gw.verifyWebhook(raw, sign(raw))).toEqual({
+      ok: true,
+      orderId: 'pay_CczIpW7t2rh7xQ2VaFS0BC',
       event: 'payment.paid',
       paid: true,
     });
   });
 
-  it('menolak signature yang tidak cocok', () => {
+  it('tetap mendukung orderId nested (body.data.orderId) sbg cadangan', () => {
     const raw = JSON.stringify({
       event: 'payment.paid',
-      data: { orderId: 'x' },
+      data: { orderId: 'pay_nested' },
     });
-    expect(gw.verifyWebhook(raw, sign(raw, 'secret_salah'))).toBeNull();
+    const r = gw.verifyWebhook(raw, sign(raw));
+    expect(r).toMatchObject({ ok: true, orderId: 'pay_nested', paid: true });
   });
 
-  it('menolak bila raw body diubah sedikit pun (HMAC atas raw)', () => {
-    const raw = JSON.stringify({
-      event: 'payment.paid',
-      data: { orderId: 'x' },
+  it('signature salah → ok:false reason invalid_signature', () => {
+    const raw = JSON.stringify({ event: 'payment.paid', orderId: 'x' });
+    expect(gw.verifyWebhook(raw, sign(raw, 'secret_salah'))).toEqual({
+      ok: false,
+      reason: 'invalid_signature',
     });
+  });
+
+  it('raw body diubah sedikit pun → invalid_signature (HMAC atas raw)', () => {
+    const raw = JSON.stringify({ event: 'payment.paid', orderId: 'x' });
     const sig = sign(raw);
-    // Body di-re-serialize dengan spasi berbeda → signature tak lagi cocok.
     const tampered = raw.replace('{', '{ ');
-    expect(gw.verifyWebhook(tampered, sig)).toBeNull();
+    expect(gw.verifyWebhook(tampered, sig)).toEqual({
+      ok: false,
+      reason: 'invalid_signature',
+    });
+  });
+
+  it('signature valid tapi orderId hilang → ok:false reason bad_payload', () => {
+    const raw = JSON.stringify({ event: 'payment.paid', amount: 25000 });
+    expect(gw.verifyWebhook(raw, sign(raw))).toEqual({
+      ok: false,
+      reason: 'bad_payload',
+    });
   });
 
   it('event selain payment.paid → paid=false (tidak mengkredit)', () => {
-    const raw = JSON.stringify({
+    const raw = JSON.stringify({ event: 'payment.pending', orderId: 'pay_1' });
+    expect(gw.verifyWebhook(raw, sign(raw))).toMatchObject({
+      ok: true,
+      paid: false,
       event: 'payment.pending',
-      data: { orderId: 'pay_1' },
     });
-    const result = gw.verifyWebhook(raw, sign(raw));
-    expect(result).toMatchObject({ paid: false, event: 'payment.pending' });
   });
 
-  it('mendukung order_id (snake_case) selain orderId', () => {
-    const raw = JSON.stringify({
-      event: 'payment.paid',
-      data: { order_id: 'pay_snake' },
-    });
-    expect(gw.verifyWebhook(raw, sign(raw))?.orderId).toBe('pay_snake');
-  });
-
-  it('null bila webhook secret kosong (fail-closed)', () => {
+  it('webhook secret kosong → invalid_signature (fail-closed)', () => {
     const noSecret = new KasugaiGateway('https://k', 'sk_x', '');
-    const raw = JSON.stringify({
-      event: 'payment.paid',
-      data: { orderId: 'x' },
+    const raw = JSON.stringify({ event: 'payment.paid', orderId: 'x' });
+    expect(noSecret.verifyWebhook(raw, sign(raw))).toEqual({
+      ok: false,
+      reason: 'invalid_signature',
     });
-    expect(noSecret.verifyWebhook(raw, sign(raw))).toBeNull();
   });
 
-  it('signature kosong → null (tanpa throw)', () => {
-    const raw = JSON.stringify({
-      event: 'payment.paid',
-      data: { orderId: 'x' },
+  it('signature kosong → invalid_signature (tanpa throw)', () => {
+    const raw = JSON.stringify({ event: 'payment.paid', orderId: 'x' });
+    expect(gw.verifyWebhook(raw, '')).toEqual({
+      ok: false,
+      reason: 'invalid_signature',
     });
-    expect(gw.verifyWebhook(raw, '')).toBeNull();
   });
 });
