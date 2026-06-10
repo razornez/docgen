@@ -30,7 +30,7 @@ export default function WalletPage() {
   });
 
   const [selectedPkg, setSelectedPkg] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState('');
+  const [showMethods, setShowMethods] = useState(false);
   const [topupError, setTopupError] = useState('');
 
   const topup = useMutation({
@@ -38,21 +38,28 @@ export default function WalletPage() {
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ['wallet'] });
       void qc.invalidateQueries({ queryKey: ['me'] });
+      setShowMethods(false);
       window.open(data.payment_url, '_blank');
     },
     onError: (e) =>
       setTopupError(e instanceof Error ? e.message : 'Top-up gagal'),
   });
 
+  // Klik "Bayar" → buka popup berisi metode pembayaran dari Kasugai.
   function handleTopup() {
     if (!selectedPkg) return;
-    if (!selectedMethod) {
-      setTopupError('Pilih metode pembayaran dulu.');
-      return;
-    }
     setTopupError('');
-    topup.mutate({ packageId: selectedPkg, method: selectedMethod });
+    setShowMethods(true);
   }
+
+  // Klik salah satu metode di popup → buat transaksi & buka halaman bayar.
+  function handlePickMethod(method: string) {
+    if (!selectedPkg) return;
+    setTopupError('');
+    topup.mutate({ packageId: selectedPkg, method });
+  }
+
+  const selectedPkgData = packages.data?.data.find((p) => p.id === selectedPkg);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -110,45 +117,6 @@ export default function WalletPage() {
             )}
           </div>
 
-          <p className="text-[13px] font-semibold text-slate-700 mt-5 mb-3">
-            Metode pembayaran
-          </p>
-          <div className="space-y-2.5">
-            {methods.data?.data.map((m) => (
-              <label
-                key={m.code}
-                className={`flex items-center gap-3 cursor-pointer px-4 py-3 rounded-2xl ring-1 transition-all ${
-                  selectedMethod === m.code
-                    ? 'ring-indigo-400 bg-indigo-50/60'
-                    : 'ring-slate-200 bg-white/70 hover:ring-indigo-200'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="method"
-                  value={m.code}
-                  checked={selectedMethod === m.code}
-                  onChange={() => setSelectedMethod(m.code)}
-                  className="accent-indigo-500"
-                />
-                <span className="text-sm text-slate-700">{m.name}</span>
-              </label>
-            ))}
-            {methods.isLoading && (
-              <p className="text-sm text-slate-400">Memuat metode…</p>
-            )}
-            {methods.data?.data.length === 0 && (
-              <p className="text-sm text-slate-400">
-                Metode bayar belum tersedia
-              </p>
-            )}
-            {methods.isError && (
-              <p className="text-sm text-rose-400">
-                Gagal memuat metode pembayaran
-              </p>
-            )}
-          </div>
-
           {topupError && (
             <div className="mt-3 flex items-center gap-2 text-xs text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-xl px-3 py-2">
               <svg
@@ -170,14 +138,14 @@ export default function WalletPage() {
 
           <button
             onClick={handleTopup}
-            disabled={!selectedPkg || !selectedMethod || topup.isPending}
+            disabled={!selectedPkg || topup.isPending}
             className="mt-4 w-full py-3 px-4 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
             style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
           >
-            {topup.isPending ? 'Membuka pembayaran…' : 'Lanjut bayar'}
+            {topup.isPending ? 'Membuka pembayaran…' : 'Bayar pakai Midtrans'}
           </button>
           <p className="text-[11px] text-slate-400 mt-2.5 text-center">
-            Pembayaran aman via Kasugai
+            QRIS · Virtual Account · E-wallet · Kartu
           </p>
         </div>
 
@@ -280,6 +248,109 @@ export default function WalletPage() {
           </div>
         </div>
       </div>
+
+      {/* Popup metode pembayaran dari Kasugai */}
+      {showMethods && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+          onClick={() => !topup.isPending && setShowMethods(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-3xl shadow-2xl ring-1 ring-slate-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-[15px] font-semibold text-slate-800">
+                  Metode pembayaran
+                </h3>
+                {selectedPkgData && (
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {selectedPkgData.credits.toLocaleString()} credits · Rp{' '}
+                    {selectedPkgData.price_idr.toLocaleString()}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => !topup.isPending && setShowMethods(false)}
+                className="text-slate-400 hover:text-slate-600 disabled:opacity-40"
+                disabled={topup.isPending}
+                aria-label="Tutup"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-3 space-y-2">
+              {methods.isLoading && (
+                <p className="text-sm text-slate-400 px-3 py-4 text-center">
+                  Memuat metode…
+                </p>
+              )}
+              {methods.isError && (
+                <p className="text-sm text-rose-500 px-3 py-4 text-center">
+                  Gagal memuat metode pembayaran
+                </p>
+              )}
+              {methods.data?.data.map((m) => (
+                <button
+                  key={m.code}
+                  onClick={() => handlePickMethod(m.code)}
+                  disabled={topup.isPending}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl ring-1 ring-slate-200 bg-white hover:ring-indigo-300 hover:bg-indigo-50/40 transition-all text-left disabled:opacity-50"
+                >
+                  <span className="text-sm font-medium text-slate-700">
+                    {m.name}
+                  </span>
+                  <svg
+                    className="w-4 h-4 text-slate-300"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              ))}
+              {methods.data?.data.length === 0 && !methods.isLoading && (
+                <p className="text-sm text-slate-400 px-3 py-4 text-center">
+                  Metode bayar belum tersedia
+                </p>
+              )}
+            </div>
+
+            {topupError && (
+              <div className="px-4 pb-4">
+                <div className="text-xs text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-xl px-3 py-2">
+                  {topupError}
+                </div>
+              </div>
+            )}
+            {topup.isPending && (
+              <div className="px-4 pb-4 text-center text-xs text-slate-400">
+                Membuka halaman pembayaran…
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
