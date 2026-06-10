@@ -119,6 +119,18 @@ export function getWallet(): Promise<WalletResult> {
   return request('/wallet');
 }
 
+export interface TxDetail {
+  gateway?: string;
+  amount_idr?: number;
+  payment_ref?: string;
+  method?: string;
+  template_name?: string;
+  item_ref?: string;
+  batch_total?: number;
+  document_id?: string;
+  batch_id?: string;
+}
+
 export interface TxItem {
   id: string;
   type: string;
@@ -127,6 +139,7 @@ export interface TxItem {
   ref_type: string;
   ref_id: string;
   created_at: string;
+  detail?: TxDetail;
 }
 
 export interface TxListResult {

@@ -6,6 +6,7 @@ import {
   getPackages,
   getPaymentMethods,
   createTopup,
+  type TxItem,
 } from '../api/client.js';
 
 const TX_LABELS: Record<string, string> = {
@@ -15,6 +16,48 @@ const TX_LABELS: Record<string, string> = {
   refund: 'Refund',
   adjustment: 'Penyesuaian',
 };
+
+const GATEWAY_LABELS: Record<string, string> = {
+  kasugai: 'Kasugai',
+  midtrans: 'Midtrans',
+  xendit: 'Xendit',
+};
+
+/** Baris detail manusiawi per transaksi (metode bayar, ref, template, dll). */
+function txDetailText(tx: TxItem): string {
+  const d = tx.detail ?? {};
+  if (tx.type === 'topup') {
+    const parts: string[] = [];
+    if (d.gateway) parts.push(GATEWAY_LABELS[d.gateway] ?? d.gateway);
+    if (d.method) parts.push(d.method);
+    if (typeof d.amount_idr === 'number')
+      parts.push('Rp ' + d.amount_idr.toLocaleString('id-ID'));
+    if (d.payment_ref) parts.push(d.payment_ref);
+    return parts.join(' · ');
+  }
+  if (tx.ref_type === 'document') {
+    const parts: string[] = [];
+    if (d.template_name) parts.push(d.template_name);
+    if (typeof d.batch_total === 'number')
+      parts.push(`${d.batch_total} dokumen`);
+    if (d.item_ref) parts.push(`ref: ${d.item_ref}`);
+    parts.push(d.batch_id ?? d.document_id ?? tx.ref_id);
+    return parts.join(' · ');
+  }
+  if (tx.type === 'signup_bonus') return 'Bonus pendaftaran akun';
+  return tx.ref_id;
+}
+
+/** Tanggal + jam lengkap, mis. "10 Jun 2026, 20.16". */
+function fmtDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 interface SnapCallbacks {
   onSuccess?: (result: unknown) => void;
@@ -311,9 +354,7 @@ export default function WalletPage() {
                   <th className="px-6 py-3 font-semibold text-right">
                     Saldo akhir
                   </th>
-                  <th className="px-6 py-3 font-semibold text-right">
-                    Tanggal
-                  </th>
+                  <th className="px-6 py-3 font-semibold text-right">Waktu</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -359,9 +400,14 @@ export default function WalletPage() {
                               </svg>
                             )}
                           </div>
-                          <span className="font-medium text-slate-700">
-                            {TX_LABELS[tx.type] ?? tx.type}
-                          </span>
+                          <div className="min-w-0">
+                            <span className="font-medium text-slate-700 block">
+                              {TX_LABELS[tx.type] ?? tx.type}
+                            </span>
+                            <span className="text-[11px] text-slate-400 block truncate max-w-[260px]">
+                              {txDetailText(tx)}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td
@@ -373,8 +419,8 @@ export default function WalletPage() {
                       <td className="px-6 py-3.5 text-right text-slate-400 tabular-nums">
                         {tx.balance_after.toLocaleString()}
                       </td>
-                      <td className="px-6 py-3.5 text-right text-slate-400">
-                        {new Date(tx.created_at).toLocaleDateString('id-ID')}
+                      <td className="px-6 py-3.5 text-right text-slate-400 whitespace-nowrap">
+                        {fmtDateTime(tx.created_at)}
                       </td>
                     </tr>
                   );
