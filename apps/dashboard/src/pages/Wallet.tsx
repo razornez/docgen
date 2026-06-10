@@ -16,6 +16,52 @@ const TX_LABELS: Record<string, string> = {
   adjustment: 'Penyesuaian',
 };
 
+interface SnapCallbacks {
+  onSuccess?: (result: unknown) => void;
+  onPending?: (result: unknown) => void;
+  onError?: (result: unknown) => void;
+  onClose?: () => void;
+}
+interface SnapApi {
+  pay: (token: string, cb?: SnapCallbacks) => void;
+}
+declare global {
+  interface Window {
+    snap?: SnapApi;
+  }
+}
+
+/**
+ * Muat script Midtrans Snap (snap.js) secara dinamis dengan client key.
+ * Sandbox vs produksi dideteksi dari prefix client key: 'SB-' = sandbox.
+ * Mengembalikan window.snap saat siap.
+ */
+function loadSnap(clientKey: string): Promise<SnapApi> {
+  const isSandbox = clientKey.startsWith('SB-');
+  const src = isSandbox
+    ? 'https://app.sandbox.midtrans.com/snap/snap.js'
+    : 'https://app.midtrans.com/snap/snap.js';
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[data-snap="1"]`,
+    );
+    if (existing && window.snap) {
+      resolve(window.snap);
+      return;
+    }
+    const s = existing ?? document.createElement('script');
+    s.src = src;
+    s.setAttribute('data-client-key', clientKey);
+    s.setAttribute('data-snap', '1');
+    s.onload = () => {
+      if (window.snap) resolve(window.snap);
+      else reject(new Error('Snap tidak tersedia setelah load'));
+    };
+    s.onerror = () => reject(new Error('Gagal memuat Snap'));
+    if (!existing) document.body.appendChild(s);
+  });
+}
+
 export default function WalletPage() {
   const qc = useQueryClient();
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: getWallet });
@@ -30,36 +76,48 @@ export default function WalletPage() {
   });
 
   const [selectedPkg, setSelectedPkg] = useState('');
-  const [showMethods, setShowMethods] = useState(false);
   const [topupError, setTopupError] = useState('');
+
+  function refreshWallet() {
+    void qc.invalidateQueries({ queryKey: ['wallet'] });
+    void qc.invalidateQueries({ queryKey: ['transactions'] });
+    void qc.invalidateQueries({ queryKey: ['me'] });
+  }
 
   const topup = useMutation({
     mutationFn: createTopup,
-    onSuccess: (data) => {
-      void qc.invalidateQueries({ queryKey: ['wallet'] });
-      void qc.invalidateQueries({ queryKey: ['me'] });
-      setShowMethods(false);
-      window.open(data.payment_url, '_blank');
+    onSuccess: async (data) => {
+      // Tampilkan widget Snap embedded bila ada snapToken + clientKey.
+      if (data.snap_token && data.client_key) {
+        try {
+          const snap = await loadSnap(data.client_key);
+          snap.pay(data.snap_token, {
+            onSuccess: () => refreshWallet(),
+            onPending: () => refreshWallet(),
+            onClose: () => undefined,
+            onError: () => setTopupError('Pembayaran gagal di Snap.'),
+          });
+          return;
+        } catch {
+          // Fallback ke redirect bila Snap gagal dimuat.
+        }
+      }
+      if (data.payment_url) window.open(data.payment_url, '_blank');
+      else setTopupError('Gateway tidak mengembalikan token pembayaran.');
     },
     onError: (e) =>
       setTopupError(e instanceof Error ? e.message : 'Top-up gagal'),
   });
 
-  // Klik "Bayar" → buka popup berisi metode pembayaran dari Kasugai.
+  // Klik "Bayar pakai Midtrans" → buat transaksi → tampilkan Snap popup.
+  // Channel ditentukan widget Snap sendiri; kita kirim 1 method valid sbg
+  // syarat API Kasugai (default: method pertama yang aktif).
   function handleTopup() {
     if (!selectedPkg) return;
     setTopupError('');
-    setShowMethods(true);
-  }
-
-  // Klik salah satu metode di popup → buat transaksi & buka halaman bayar.
-  function handlePickMethod(method: string) {
-    if (!selectedPkg) return;
-    setTopupError('');
+    const method = methods.data?.data[0]?.code ?? 'midtrans_qris';
     topup.mutate({ packageId: selectedPkg, method });
   }
-
-  const selectedPkgData = packages.data?.data.find((p) => p.id === selectedPkg);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -248,109 +306,6 @@ export default function WalletPage() {
           </div>
         </div>
       </div>
-
-      {/* Popup metode pembayaran dari Kasugai */}
-      {showMethods && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-          onClick={() => !topup.isPending && setShowMethods(false)}
-        >
-          <div
-            className="w-full max-w-sm bg-white rounded-3xl shadow-2xl ring-1 ring-slate-200 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-[15px] font-semibold text-slate-800">
-                  Metode pembayaran
-                </h3>
-                {selectedPkgData && (
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {selectedPkgData.credits.toLocaleString()} credits · Rp{' '}
-                    {selectedPkgData.price_idr.toLocaleString()}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => !topup.isPending && setShowMethods(false)}
-                className="text-slate-400 hover:text-slate-600 disabled:opacity-40"
-                disabled={topup.isPending}
-                aria-label="Tutup"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="max-h-[60vh] overflow-y-auto p-3 space-y-2">
-              {methods.isLoading && (
-                <p className="text-sm text-slate-400 px-3 py-4 text-center">
-                  Memuat metode…
-                </p>
-              )}
-              {methods.isError && (
-                <p className="text-sm text-rose-500 px-3 py-4 text-center">
-                  Gagal memuat metode pembayaran
-                </p>
-              )}
-              {methods.data?.data.map((m) => (
-                <button
-                  key={m.code}
-                  onClick={() => handlePickMethod(m.code)}
-                  disabled={topup.isPending}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl ring-1 ring-slate-200 bg-white hover:ring-indigo-300 hover:bg-indigo-50/40 transition-all text-left disabled:opacity-50"
-                >
-                  <span className="text-sm font-medium text-slate-700">
-                    {m.name}
-                  </span>
-                  <svg
-                    className="w-4 h-4 text-slate-300"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </button>
-              ))}
-              {methods.data?.data.length === 0 && !methods.isLoading && (
-                <p className="text-sm text-slate-400 px-3 py-4 text-center">
-                  Metode bayar belum tersedia
-                </p>
-              )}
-            </div>
-
-            {topupError && (
-              <div className="px-4 pb-4">
-                <div className="text-xs text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-xl px-3 py-2">
-                  {topupError}
-                </div>
-              </div>
-            )}
-            {topup.isPending && (
-              <div className="px-4 pb-4 text-center text-xs text-slate-400">
-                Membuka halaman pembayaran…
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

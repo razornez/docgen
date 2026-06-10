@@ -31,11 +31,15 @@ export interface PaymentGatewayPort {
 
   /**
    * Kunci nominal (POST /orders) lalu inisiasi bayar (POST /pay).
-   * Mengembalikan URL redirect ke halaman Snap.
+   * Mengembalikan URL redirect ke halaman Snap, plus token + clientKey
+   * untuk menampilkan widget Snap embedded (snap.js) di dashboard.
    */
-  createTransaction(
-    input: CreateTxInput,
-  ): Promise<{ orderId: string; paymentUrl: string }>;
+  createTransaction(input: CreateTxInput): Promise<{
+    orderId: string;
+    paymentUrl: string;
+    token: string | null;
+    clientKey: string | null;
+  }>;
 
   /**
    * Verifikasi HMAC-SHA256 atas RAW body webhook. Mengembalikan payload

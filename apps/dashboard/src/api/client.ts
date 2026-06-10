@@ -162,6 +162,8 @@ export interface TopupResult {
   amount_idr: number;
   credits: number;
   payment_url: string;
+  snap_token: string | null;
+  client_key: string | null;
   status: string;
 }
 

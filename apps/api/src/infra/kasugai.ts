@@ -20,11 +20,18 @@ export class KasugaiGateway implements PaymentGatewayPort {
   private readonly baseUrl: string;
   private readonly secretKey: string;
   private readonly webhookSecret: string;
+  private readonly publishableKey: string;
 
-  constructor(baseUrl: string, secretKey: string, webhookSecret: string) {
+  constructor(
+    baseUrl: string,
+    secretKey: string,
+    webhookSecret: string,
+    publishableKey = '',
+  ) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.secretKey = secretKey;
     this.webhookSecret = webhookSecret;
+    this.publishableKey = publishableKey;
   }
 
   private authHeaders(): Record<string, string> {
@@ -62,10 +69,14 @@ export class KasugaiGateway implements PaymentGatewayPort {
     });
   }
 
-  async createTransaction(
-    input: CreateTxInput,
-  ): Promise<{ orderId: string; paymentUrl: string }> {
-    // Step 1: kunci nominal.
+  async createTransaction(input: CreateTxInput): Promise<{
+    orderId: string;
+    paymentUrl: string;
+    token: string | null;
+    clientKey: string | null;
+  }> {
+    // Step 1: kunci nominal. Panduan resmi menunjukkan /orders bisa langsung
+    // mengembalikan snapToken — kita tangkap bila ada.
     const orderRes = await fetch(`${this.baseUrl}/v1/payment/orders`, {
       method: 'POST',
       headers: { ...this.authHeaders(), 'Content-Type': 'application/json' },
@@ -80,8 +91,14 @@ export class KasugaiGateway implements PaymentGatewayPort {
       const text = await orderRes.text();
       throw new Error(`Kasugai order gagal: ${orderRes.status} ${text}`);
     }
+    const orderData = (await orderRes.json().catch(() => ({}))) as {
+      snapToken?: string;
+      token?: string;
+      redirectUrl?: string;
+      clientKey?: string;
+    };
 
-    // Step 2: inisiasi bayar.
+    // Step 2: inisiasi bayar (mengembalikan redirectUrl + token untuk Snap).
     const payRes = await fetch(`${this.baseUrl}/v1/payment/pay`, {
       method: 'POST',
       headers: { ...this.authHeaders(), 'Content-Type': 'application/json' },
@@ -94,15 +111,28 @@ export class KasugaiGateway implements PaymentGatewayPort {
       const text = await payRes.text();
       throw new Error(`Kasugai pay gagal: ${payRes.status} ${text}`);
     }
-
-    const data = (await payRes.json()) as {
+    const payData = (await payRes.json().catch(() => ({}))) as {
       redirectUrl?: string;
-      token?: string; // ⚠️ field-nya 'token', BUKAN 'snapToken'
+      token?: string; // ⚠️ field-nya 'token'/'snapToken', BUKAN 'snapToken' lama
+      snapToken?: string;
+      clientKey?: string;
     };
-    if (!data.redirectUrl) {
-      throw new Error('Kasugai pay: redirectUrl kosong');
+
+    // Toleran terhadap dua bentuk respons (orders vs pay).
+    const token =
+      payData.token ??
+      payData.snapToken ??
+      orderData.snapToken ??
+      orderData.token ??
+      null;
+    const paymentUrl = payData.redirectUrl ?? orderData.redirectUrl ?? '';
+    const clientKey =
+      payData.clientKey ?? orderData.clientKey ?? (this.publishableKey || null);
+
+    if (!paymentUrl && !token) {
+      throw new Error('Kasugai: tidak ada redirectUrl maupun snapToken');
     }
-    return { orderId: input.orderId, paymentUrl: data.redirectUrl };
+    return { orderId: input.orderId, paymentUrl, token, clientKey };
   }
 
   verifyWebhook(rawBody: string, signature: string): VerifiedWebhook | null {

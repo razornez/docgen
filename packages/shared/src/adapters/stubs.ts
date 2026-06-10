@@ -32,9 +32,12 @@ export class StubPaymentGateway implements PaymentGatewayPort {
   listMethods(): Promise<PaymentMethod[]> {
     throw new NotImplementedError('PaymentGatewayPort.listMethods');
   }
-  createTransaction(
-    _input: CreateTxInput,
-  ): Promise<{ orderId: string; paymentUrl: string }> {
+  createTransaction(_input: CreateTxInput): Promise<{
+    orderId: string;
+    paymentUrl: string;
+    token: string | null;
+    clientKey: string | null;
+  }> {
     throw new NotImplementedError('PaymentGatewayPort.createTransaction');
   }
   verifyWebhook(_rawBody: string, _signature: string): VerifiedWebhook | null {

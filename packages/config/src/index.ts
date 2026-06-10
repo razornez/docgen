@@ -81,7 +81,8 @@ const EnvSchema = z.object({
   // Kasugai payment gateway (proxy di atas Midtrans). Top-up kredit lewat sini.
   // Boleh kosong di dev; diperketat di produksi (top-up akan gagal tanpa key).
   KASUGAI_BASE_URL: z.string().default('https://kasugai.razornez.net'),
-  KASUGAI_SECRET_KEY: z.string().default(''), // sk_... (BUKAN pk_)
+  KASUGAI_SECRET_KEY: z.string().default(''), // sk_... (BUKAN pk_) — server only
+  KASUGAI_PUBLISHABLE_KEY: z.string().default(''), // pk_... — untuk snap.js di browser
   KASUGAI_WEBHOOK_SECRET: z.string().default(''), // whsec_... (dari dashboard)
 
   // Rahasia aplikasi

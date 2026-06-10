@@ -83,7 +83,12 @@ export class PaymentService {
     packageId: string,
     method: string,
     customerEmail?: string,
-  ): Promise<{ payment: PaymentRecord; paymentUrl: string }> {
+  ): Promise<{
+    payment: PaymentRecord;
+    paymentUrl: string;
+    snapToken: string | null;
+    clientKey: string | null;
+  }> {
     const { rows: pkgRows } = await this.db.query<CreditPackageRow>(
       `SELECT id, name, credits, price_idr, active FROM credit_packages WHERE id = $1 AND active = TRUE`,
       [packageId],
@@ -103,13 +108,14 @@ export class PaymentService {
     const amountIdr = Number(pkg.price_idr);
 
     // Buat transaksi di Kasugai (orders + pay).
-    const { paymentUrl } = await this.gateway.createTransaction({
-      orderId: paymentId,
-      amountIdr,
-      method,
-      customerName,
-      ...(customerEmail !== undefined ? { customerEmail } : {}),
-    });
+    const { paymentUrl, token, clientKey } =
+      await this.gateway.createTransaction({
+        orderId: paymentId,
+        amountIdr,
+        method,
+        customerName,
+        ...(customerEmail !== undefined ? { customerEmail } : {}),
+      });
 
     // Simpan record payment dengan status 'pending'.
     const { rows } = await this.db.query<PaymentRow>(
@@ -133,6 +139,8 @@ export class PaymentService {
         createdAt: row.created_at,
       },
       paymentUrl,
+      snapToken: token,
+      clientKey,
     };
   }
 

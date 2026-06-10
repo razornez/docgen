@@ -45,11 +45,8 @@ export function registerPaymentRoutes(
   app.post('/wallet/topups', async (request, reply) => {
     const ctx = requireAuth(request);
     const body = TopupBody.parse(request.body);
-    const { payment, paymentUrl } = await service.createTopup(
-      ctx.tenantId,
-      body.package,
-      body.method,
-    );
+    const { payment, paymentUrl, snapToken, clientKey } =
+      await service.createTopup(ctx.tenantId, body.package, body.method);
     reply.code(201);
     return {
       payment_id: payment.id,
@@ -57,6 +54,8 @@ export function registerPaymentRoutes(
       credits: payment.credits,
       currency: 'IDR',
       payment_url: paymentUrl,
+      snap_token: snapToken,
+      client_key: clientKey,
       status: payment.status,
     };
   });

@@ -153,6 +153,7 @@ export function buildApp(config: AppConfig): FastifyInstance {
       config.KASUGAI_BASE_URL,
       config.KASUGAI_SECRET_KEY,
       config.KASUGAI_WEBHOOK_SECRET,
+      config.KASUGAI_PUBLISHABLE_KEY,
     ),
     idGen,
   );
