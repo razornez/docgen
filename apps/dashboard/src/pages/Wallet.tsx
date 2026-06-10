@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getWallet,
@@ -77,11 +77,55 @@ export default function WalletPage() {
 
   const [selectedPkg, setSelectedPkg] = useState('');
   const [topupError, setTopupError] = useState('');
+  const [confirmMsg, setConfirmMsg] = useState('');
+
+  // Saldo sebelum bayar (untuk deteksi kredit masuk) & timer polling.
+  const balanceBeforeRef = useRef(0);
+  const pollRef = useRef<number | null>(null);
+
+  // Bersihkan timer polling saat komponen unmount.
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) window.clearInterval(pollRef.current);
+    };
+  }, []);
 
   function refreshWallet() {
     void qc.invalidateQueries({ queryKey: ['wallet'] });
     void qc.invalidateQueries({ queryKey: ['transactions'] });
     void qc.invalidateQueries({ queryKey: ['me'] });
+  }
+
+  /**
+   * Setelah Snap sukses, kredit final datang dari webhook (server→server) yang
+   * tiba beberapa detik kemudian. Kita poll saldo tiap 2 dtk (maks ~40 dtk)
+   * sampai bertambah dari saldo sebelum bayar → update otomatis, tanpa klik manual.
+   */
+  function pollUntilCredited() {
+    if (pollRef.current) window.clearInterval(pollRef.current);
+    setConfirmMsg('Mengonfirmasi pembayaran…');
+    let tries = 0;
+    pollRef.current = window.setInterval(() => {
+      tries += 1;
+      void getWallet()
+        .then((w) => {
+          if (w.balance > balanceBeforeRef.current) {
+            if (pollRef.current) window.clearInterval(pollRef.current);
+            pollRef.current = null;
+            refreshWallet();
+            setConfirmMsg('Pembayaran berhasil — saldo diperbarui.');
+            window.setTimeout(() => setConfirmMsg(''), 5000);
+          } else if (tries >= 20) {
+            if (pollRef.current) window.clearInterval(pollRef.current);
+            pollRef.current = null;
+            refreshWallet();
+            setConfirmMsg(
+              'Pembayaran sedang diproses. Saldo akan terupdate otomatis sebentar lagi.',
+            );
+          }
+        })
+        .catch(() => undefined);
+    }, 2000);
   }
 
   const topup = useMutation({
@@ -92,8 +136,8 @@ export default function WalletPage() {
         try {
           const snap = await loadSnap(data.client_key);
           snap.pay(data.snap_token, {
-            onSuccess: () => refreshWallet(),
-            onPending: () => refreshWallet(),
+            onSuccess: () => pollUntilCredited(),
+            onPending: () => pollUntilCredited(),
             onClose: () => undefined,
             onError: () => setTopupError('Pembayaran gagal di Snap.'),
           });
@@ -115,6 +159,9 @@ export default function WalletPage() {
   function handleTopup() {
     if (!selectedPkg) return;
     setTopupError('');
+    setConfirmMsg('');
+    // Rekam saldo sekarang agar polling bisa mendeteksi kredit webhook masuk.
+    balanceBeforeRef.current = wallet.data?.balance ?? 0;
     const method = methods.data?.data[0]?.code ?? 'midtrans_qris';
     topup.mutate({ packageId: selectedPkg, method });
   }
@@ -205,6 +252,47 @@ export default function WalletPage() {
           <p className="text-[11px] text-slate-400 mt-2.5 text-center">
             QRIS · Virtual Account · E-wallet · Kartu
           </p>
+
+          {confirmMsg && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50 ring-1 ring-indigo-200 rounded-xl px-3 py-2">
+              {pollRef.current !== null ? (
+                <svg
+                  className="w-3.5 h-3.5 flex-shrink-0 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-3.5 h-3.5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              )}
+              {confirmMsg}
+            </div>
+          )}
         </div>
 
         {/* Transaction history */}
