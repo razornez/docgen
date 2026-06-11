@@ -1,20 +1,48 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth.js';
 import Layout from './components/Layout.js';
+// Halaman entry (unauth) di-load eager agar first paint tanpa flash.
 import LandingPage from './pages/Landing.js';
 import LoginPage from './pages/Login.js';
 import AuthCallbackPage from './pages/AuthCallback.js';
-import DashboardPage from './pages/Dashboard.js';
-import WalletPage from './pages/Wallet.js';
-import TemplatesPage from './pages/Templates.js';
-import BatchesPage from './pages/Batches.js';
-import ApiKeysPage from './pages/ApiKeys.js';
-import WebhooksPage from './pages/Webhooks.js';
-import AdminPage from './pages/admin/AdminOverview.js';
+
+// Halaman terproteksi di-load lazy (code-splitting) — memangkas bundle awal.
+// Yang terberat (Templates + RichEditor) hanya diunduh saat dibuka.
+const DashboardPage = lazy(() => import('./pages/Dashboard.js'));
+const WalletPage = lazy(() => import('./pages/Wallet.js'));
+const TemplatesPage = lazy(() => import('./pages/Templates.js'));
+const BatchesPage = lazy(() => import('./pages/Batches.js'));
+const ApiKeysPage = lazy(() => import('./pages/ApiKeys.js'));
+const WebhooksPage = lazy(() => import('./pages/Webhooks.js'));
+const AdminPage = lazy(() => import('./pages/admin/AdminOverview.js'));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   return token ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+/** Placeholder ringan saat chunk halaman sedang diunduh. */
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center py-24 text-slate-400">
+      <svg className="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"
+        />
+      </svg>
+    </div>
+  );
 }
 
 export default function App() {
@@ -32,13 +60,62 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<DashboardPage />} />
-          <Route path="wallet" element={<WalletPage />} />
-          <Route path="templates" element={<TemplatesPage />} />
-          <Route path="batches" element={<BatchesPage />} />
-          <Route path="api-keys" element={<ApiKeysPage />} />
-          <Route path="webhooks" element={<WebhooksPage />} />
-          <Route path="admin" element={<AdminPage />} />
+          <Route
+            index
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <DashboardPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="wallet"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <WalletPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="templates"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <TemplatesPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="batches"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <BatchesPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="api-keys"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <ApiKeysPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="webhooks"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <WebhooksPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="admin"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <AdminPage />
+              </Suspense>
+            }
+          />
         </Route>
       </Routes>
     </BrowserRouter>
