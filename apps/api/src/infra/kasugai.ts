@@ -17,6 +17,19 @@ import type {
  * Auth: Bearer sk_... (WAJIB secret key, BUKAN publishable pk_).
  * Webhook: HMAC-SHA256 atas RAW body, header X-Kasugai-Signature = 'sha256=<hex>'.
  */
+
+/**
+ * Metode cadangan untuk mencetak token Snap bila metode yang diminta nonaktif
+ * (422 METHOD_INACTIVE). Urut dari yang paling umum aktif. Tidak memengaruhi
+ * channel yang tampil di widget (Snap menampilkan semua channel akun Midtrans).
+ */
+const FALLBACK_PAY_METHODS = [
+  'credit_card',
+  'gopay',
+  'midtrans_qris',
+  'bca_va',
+  'other_va',
+] as const;
 export class KasugaiGateway implements PaymentGatewayPort {
   private readonly baseUrl: string;
   private readonly secretKey: string;
@@ -104,14 +117,9 @@ export class KasugaiGateway implements PaymentGatewayPort {
     // bisa kena METHOD_INACTIVE. Karena widget Snap tetap menampilkan SEMUA
     // channel (Kasugai tak kirim enabled_payments), metode di sini hanya untuk
     // mencetak token — coba beberapa kandidat sampai ada yang aktif.
-    const candidates = [
-      input.method,
-      'credit_card',
-      'gopay',
-      'midtrans_qris',
-      'bca_va',
-      'other_va',
-    ].filter((m, i, arr) => m && arr.indexOf(m) === i);
+    const candidates = [input.method, ...FALLBACK_PAY_METHODS].filter(
+      (m, i, arr) => m && arr.indexOf(m) === i,
+    );
 
     // ⚠️ field token-nya 'token'/'snapToken', BUKAN 'snapToken' lama
     type PayData = {

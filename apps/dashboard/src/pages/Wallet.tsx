@@ -106,6 +106,10 @@ function loadSnap(clientKey: string): Promise<SnapApi> {
   });
 }
 
+// Polling konfirmasi pembayaran: cek tiap 2 dtk, hingga ~60 dtk (30x).
+const CONFIRM_POLL_INTERVAL_MS = 2000;
+const CONFIRM_POLL_MAX_TRIES = 30;
+
 export default function WalletPage() {
   const qc = useQueryClient();
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: getWallet });
@@ -161,7 +165,7 @@ export default function WalletPage() {
             refreshWallet();
             setConfirmMsg('Pembayaran berhasil — saldo sudah masuk.');
             window.setTimeout(() => setConfirmMsg(''), 6000);
-          } else if (tries >= 30) {
+          } else if (tries >= CONFIRM_POLL_MAX_TRIES) {
             if (pollRef.current) window.clearInterval(pollRef.current);
             pollRef.current = null;
             setConfirming(false);
@@ -174,7 +178,7 @@ export default function WalletPage() {
         .catch(() => undefined);
     };
     tick(); // cek langsung sekali, lalu berkala
-    pollRef.current = window.setInterval(tick, 2000);
+    pollRef.current = window.setInterval(tick, CONFIRM_POLL_INTERVAL_MS);
   }
 
   const topup = useMutation({
