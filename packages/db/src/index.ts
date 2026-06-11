@@ -10,3 +10,5 @@ export type {
   QueryResult,
   QueryResultRow,
 } from './pool.js';
+export { applyWalletCredit, reserveWalletCredits } from './ledger.js';
+export type { LedgerEntry, LedgerType, LedgerRefType } from './ledger.js';

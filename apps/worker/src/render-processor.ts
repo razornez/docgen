@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { applyWalletCredit } from '@docgen/db';
 import type { Queryable } from '@docgen/db';
 import { PdfRenderer, renderHtml, TemplateRenderError } from '@docgen/renderer';
 import type {
@@ -121,21 +123,18 @@ async function updateBatchProgress(
   if (row.failed === 0) return;
 
   // Batch selesai dan ada item gagal → refund kredit untuk item gagal.
-  await db.query<{ balance: string }>(
-    `UPDATE wallets SET balance = balance + $1 WHERE tenant_id = $2
-     RETURNING balance`,
-    [row.failed, tenantId],
-  );
-  // Catat transaksi refund (idempoten via UNIQUE refund+batchId).
-  await db.query(
-    `INSERT INTO wallet_transactions
-       (id, tenant_id, type, amount, balance_after, ref_type, ref_id, unit_price, metadata)
-     SELECT 'txn_' || md5($3::text || $1::text), $2, 'refund', $1,
-            (SELECT balance FROM wallets WHERE tenant_id = $2),
-            'document', $3, 1, '{}'
-     ON CONFLICT (type, ref_id) DO NOTHING`,
-    [row.failed, tenantId, batchId],
-  );
+  // id deterministik (worker tanpa IdGenerator); idempotensi tetap dijamin
+  // UNIQUE(refund, batchId) di ledger + guard status batch terminal di atas.
+  const txnId =
+    'txn_' + createHash('md5').update(`${batchId}:refund`).digest('hex');
+  await applyWalletCredit(db, {
+    id: txnId,
+    tenantId,
+    type: 'refund',
+    amount: row.failed,
+    refType: 'document',
+    refId: batchId,
+  });
 }
 
 /**

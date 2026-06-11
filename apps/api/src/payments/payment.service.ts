@@ -1,4 +1,4 @@
-import { withTransaction } from '@docgen/db';
+import { withTransaction, applyWalletCredit } from '@docgen/db';
 import { Errors, ID_PREFIXES } from '@docgen/shared';
 import type {
   IdGenerator,
@@ -201,20 +201,14 @@ export class PaymentService {
         [payment.id],
       );
 
-      const walletUpd = await tx.query<{ balance: string }>(
-        `UPDATE wallets SET balance = balance + $1 WHERE tenant_id = $2 RETURNING balance`,
-        [credits, tenantId],
-      );
-      const balanceAfter = Number(walletUpd.rows[0]!.balance);
-      const txnId = this.idGen.generate(ID_PREFIXES.transaction);
-
-      await tx.query(
-        `INSERT INTO wallet_transactions
-           (id, tenant_id, type, amount, balance_after, ref_type, ref_id, unit_price, metadata)
-         VALUES ($1, $2, 'topup', $3, $4, 'payment', $5, 1, '{}')
-         ON CONFLICT (type, ref_id) DO NOTHING`,
-        [txnId, tenantId, credits, balanceAfter, payment.id],
-      );
+      await applyWalletCredit(tx, {
+        id: this.idGen.generate(ID_PREFIXES.transaction),
+        tenantId,
+        type: 'topup',
+        amount: credits,
+        refType: 'payment',
+        refId: payment.id,
+      });
     });
     return credited;
   }

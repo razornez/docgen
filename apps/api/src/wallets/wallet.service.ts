@@ -1,4 +1,8 @@
-import { withTransaction } from '@docgen/db';
+import {
+  withTransaction,
+  applyWalletCredit,
+  reserveWalletCredits,
+} from '@docgen/db';
 import { Errors, ID_PREFIXES } from '@docgen/shared';
 import type {
   BatchId,
@@ -35,52 +39,33 @@ export class WalletService implements CreditGate {
    */
   async reserve(tenantId: TenantId, documentId: DocumentId): Promise<number> {
     return withTransaction(async (tx) => {
-      const upd = await tx.query<{ balance: string }>(
-        `UPDATE wallets
-            SET balance = balance - $1
-          WHERE tenant_id = $2 AND balance >= $1
-          RETURNING balance`,
-        [UNIT_PRICE, tenantId],
-      );
-
-      if ((upd.rowCount ?? 0) === 0) {
-        throw Errors.insufficientCredit();
-      }
-
-      const balanceAfter = Number(upd.rows[0]!.balance);
-      const txnId = this.idGen.generate(ID_PREFIXES.transaction);
-
-      await tx.query(
-        `INSERT INTO wallet_transactions
-           (id, tenant_id, type, amount, balance_after, ref_type, ref_id, unit_price, metadata)
-         VALUES ($1, $2, 'debit', $3, $4, 'document', $5, $6, '{}')
-         ON CONFLICT (type, ref_id) DO NOTHING`,
-        [txnId, tenantId, -UNIT_PRICE, balanceAfter, documentId, UNIT_PRICE],
-      );
-
-      return balanceAfter;
+      const reserved = await reserveWalletCredits(tx, {
+        id: this.idGen.generate(ID_PREFIXES.transaction),
+        tenantId,
+        type: 'debit',
+        amount: UNIT_PRICE,
+        refType: 'document',
+        refId: documentId,
+        unitPrice: UNIT_PRICE,
+      });
+      if (!reserved) throw Errors.insufficientCredit();
+      return reserved.balanceAfter;
     });
   }
 
   /** Kembalikan kredit yang sudah dicadangkan bila render gagal. */
   async refund(tenantId: TenantId, documentId: DocumentId): Promise<void> {
-    await withTransaction(async (tx) => {
-      const upd = await tx.query<{ balance: string }>(
-        `UPDATE wallets SET balance = balance + $1 WHERE tenant_id = $2
-         RETURNING balance`,
-        [UNIT_PRICE, tenantId],
-      );
-      const balanceAfter = Number(upd.rows[0]!.balance);
-      const txnId = this.idGen.generate(ID_PREFIXES.transaction);
-
-      await tx.query(
-        `INSERT INTO wallet_transactions
-           (id, tenant_id, type, amount, balance_after, ref_type, ref_id, unit_price, metadata)
-         VALUES ($1, $2, 'refund', $3, $4, 'document', $5, $6, '{}')
-         ON CONFLICT (type, ref_id) DO NOTHING`,
-        [txnId, tenantId, UNIT_PRICE, balanceAfter, documentId, UNIT_PRICE],
-      );
-    });
+    await withTransaction((tx) =>
+      applyWalletCredit(tx, {
+        id: this.idGen.generate(ID_PREFIXES.transaction),
+        tenantId,
+        type: 'refund',
+        amount: UNIT_PRICE,
+        refType: 'document',
+        refId: documentId,
+        unitPrice: UNIT_PRICE,
+      }),
+    );
   }
 
   /** Tandai dokumen sebagai sudah ditagih (commit billing — docs/03). */
@@ -104,27 +89,17 @@ export class WalletService implements CreditGate {
     amount: number,
   ): Promise<number> {
     return withTransaction(async (tx) => {
-      const upd = await tx.query<{ balance: string }>(
-        `UPDATE wallets
-            SET balance = balance - $1
-          WHERE tenant_id = $2 AND balance >= $1
-          RETURNING balance`,
-        [amount, tenantId],
-      );
-      if ((upd.rowCount ?? 0) === 0) throw Errors.insufficientCredit();
-
-      const balanceAfter = Number(upd.rows[0]!.balance);
-      const txnId = this.idGen.generate(ID_PREFIXES.transaction);
-
-      await tx.query(
-        `INSERT INTO wallet_transactions
-           (id, tenant_id, type, amount, balance_after, ref_type, ref_id, unit_price, metadata)
-         VALUES ($1, $2, 'debit', $3, $4, 'document', $5, $6, '{}')
-         ON CONFLICT (type, ref_id) DO NOTHING`,
-        [txnId, tenantId, -amount, balanceAfter, batchId, UNIT_PRICE],
-      );
-
-      return balanceAfter;
+      const reserved = await reserveWalletCredits(tx, {
+        id: this.idGen.generate(ID_PREFIXES.transaction),
+        tenantId,
+        type: 'debit',
+        amount,
+        refType: 'document',
+        refId: batchId,
+        unitPrice: UNIT_PRICE,
+      });
+      if (!reserved) throw Errors.insufficientCredit();
+      return reserved.balanceAfter;
     });
   }
 
@@ -138,21 +113,16 @@ export class WalletService implements CreditGate {
     failedCount: number,
   ): Promise<void> {
     if (failedCount <= 0) return;
-    await withTransaction(async (tx) => {
-      const upd = await tx.query<{ balance: string }>(
-        `UPDATE wallets SET balance = balance + $1 WHERE tenant_id = $2 RETURNING balance`,
-        [failedCount, tenantId],
-      );
-      const balanceAfter = Number(upd.rows[0]!.balance);
-      const txnId = this.idGen.generate(ID_PREFIXES.transaction);
-
-      await tx.query(
-        `INSERT INTO wallet_transactions
-           (id, tenant_id, type, amount, balance_after, ref_type, ref_id, unit_price, metadata)
-         VALUES ($1, $2, 'refund', $3, $4, 'document', $5, $6, '{}')
-         ON CONFLICT (type, ref_id) DO NOTHING`,
-        [txnId, tenantId, failedCount, balanceAfter, batchId, UNIT_PRICE],
-      );
-    });
+    await withTransaction((tx) =>
+      applyWalletCredit(tx, {
+        id: this.idGen.generate(ID_PREFIXES.transaction),
+        tenantId,
+        type: 'refund',
+        amount: failedCount,
+        refType: 'document',
+        refId: batchId,
+        unitPrice: UNIT_PRICE,
+      }),
+    );
   }
 }
