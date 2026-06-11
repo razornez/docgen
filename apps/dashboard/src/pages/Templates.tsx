@@ -304,6 +304,9 @@ export default function TemplatesPage() {
       setPdfError(e instanceof Error ? e.message : 'Gagal mengunduh PDF');
     } finally {
       setPdfLoading(false);
+      // Batch mendebit kredit saat dibuat → segarkan saldo (header & wallet).
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      void qc.invalidateQueries({ queryKey: ['wallet'] });
     }
   }
 

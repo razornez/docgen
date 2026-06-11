@@ -203,6 +203,9 @@ export default function BatchesPage() {
     mutationFn: createBatch,
     onSuccess: (res) => {
       void qc.invalidateQueries({ queryKey: ['batches'] });
+      // Batch mendebit kredit → segarkan saldo (header baca ['me'], Wallet baca keduanya).
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      void qc.invalidateQueries({ queryKey: ['wallet'] });
       setShowForm(false);
       setItemsJson(PLACEHOLDER_ITEMS);
       setTemplateId('');

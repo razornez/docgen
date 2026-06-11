@@ -129,6 +129,14 @@ const DUMMY_VALUES: Record<string, string> = {
   lama_bekerja: '6 tahun',
   status_karyawan: 'Karyawan Tetap',
   jenis_kontrak: 'Kontrak Kerja Tetap',
+  penilaian_kinerja: 'sangat baik dan profesional',
+  kinerja: 'sangat baik',
+  prestasi: 'menyelesaikan proyek tepat waktu dengan kualitas tinggi',
+  rekomendasi: 'sangat direkomendasikan',
+  email: 'budi.santoso@email.com',
+  telepon: '081234567890',
+  no_hp: '081234567890',
+  no_telepon: '021-12345678',
 };
 
 /** Bangun JSON data contoh (dummy Indonesia) untuk variabel template. */
