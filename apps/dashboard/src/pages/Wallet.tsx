@@ -6,6 +6,7 @@ import {
   getPackages,
   getPaymentMethods,
   createTopup,
+  confirmTopup,
   type TxItem,
 } from '../api/client.js';
 
@@ -121,9 +122,8 @@ export default function WalletPage() {
   const [selectedPkg, setSelectedPkg] = useState('');
   const [topupError, setTopupError] = useState('');
   const [confirmMsg, setConfirmMsg] = useState('');
+  const [confirming, setConfirming] = useState(false);
 
-  // Saldo sebelum bayar (untuk deteksi kredit masuk) & timer polling.
-  const balanceBeforeRef = useRef(0);
   const pollRef = useRef<number | null>(null);
 
   // Bersihkan timer polling saat komponen unmount.
@@ -140,47 +140,54 @@ export default function WalletPage() {
   }
 
   /**
-   * Setelah Snap sukses, kredit final datang dari webhook (server→server) yang
-   * tiba beberapa detik kemudian. Kita poll saldo tiap 2 dtk (maks ~40 dtk)
-   * sampai bertambah dari saldo sebelum bayar → update otomatis, tanpa klik manual.
+   * Setelah Snap sukses, konfirmasi cepat ke server (yang cek langsung ke
+   * Kasugai, bukan menunggu webhook). Poll tiap 2 dtk sampai status 'paid'
+   * → saldo masuk hampir seketika. Webhook tetap jadi cadangan (idempoten).
+   * CATATAN: krediting terjadi di SERVER — menutup halaman tak membatalkannya.
    */
-  function pollUntilCredited() {
+  function pollConfirm(paymentId: string) {
     if (pollRef.current) window.clearInterval(pollRef.current);
-    setConfirmMsg('Mengonfirmasi pembayaran…');
+    setConfirming(true);
+    setConfirmMsg('Pembayaran diterima — mengonfirmasi & memasukkan saldo…');
     let tries = 0;
-    pollRef.current = window.setInterval(() => {
+    const tick = () => {
       tries += 1;
-      void getWallet()
-        .then((w) => {
-          if (w.balance > balanceBeforeRef.current) {
+      void confirmTopup(paymentId)
+        .then((r) => {
+          if (r.status === 'paid') {
             if (pollRef.current) window.clearInterval(pollRef.current);
             pollRef.current = null;
+            setConfirming(false);
             refreshWallet();
-            setConfirmMsg('Pembayaran berhasil — saldo diperbarui.');
-            window.setTimeout(() => setConfirmMsg(''), 5000);
-          } else if (tries >= 20) {
+            setConfirmMsg('Pembayaran berhasil — saldo sudah masuk.');
+            window.setTimeout(() => setConfirmMsg(''), 6000);
+          } else if (tries >= 30) {
             if (pollRef.current) window.clearInterval(pollRef.current);
             pollRef.current = null;
+            setConfirming(false);
             refreshWallet();
             setConfirmMsg(
-              'Pembayaran sedang diproses. Saldo akan terupdate otomatis sebentar lagi.',
+              'Pembayaran sedang diproses. Saldo akan masuk otomatis — aman meski halaman ditutup.',
             );
           }
         })
         .catch(() => undefined);
-    }, 2000);
+    };
+    tick(); // cek langsung sekali, lalu berkala
+    pollRef.current = window.setInterval(tick, 2000);
   }
 
   const topup = useMutation({
     mutationFn: createTopup,
     onSuccess: async (data) => {
+      const paymentId = data.payment_id;
       // Tampilkan widget Snap embedded bila ada snapToken + clientKey.
       if (data.snap_token && data.client_key) {
         try {
           const snap = await loadSnap(data.client_key);
           snap.pay(data.snap_token, {
-            onSuccess: () => pollUntilCredited(),
-            onPending: () => pollUntilCredited(),
+            onSuccess: () => pollConfirm(paymentId),
+            onPending: () => pollConfirm(paymentId),
             onClose: () => undefined,
             onError: () => setTopupError('Pembayaran gagal di Snap.'),
           });
@@ -203,8 +210,6 @@ export default function WalletPage() {
     if (!selectedPkg) return;
     setTopupError('');
     setConfirmMsg('');
-    // Rekam saldo sekarang agar polling bisa mendeteksi kredit webhook masuk.
-    balanceBeforeRef.current = wallet.data?.balance ?? 0;
     const method = methods.data?.data[0]?.code ?? 'midtrans_qris';
     topup.mutate({ packageId: selectedPkg, method });
   }
@@ -298,7 +303,7 @@ export default function WalletPage() {
 
           {confirmMsg && (
             <div className="mt-3 flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50 ring-1 ring-indigo-200 rounded-xl px-3 py-2">
-              {pollRef.current !== null ? (
+              {confirming ? (
                 <svg
                   className="w-3.5 h-3.5 flex-shrink-0 animate-spin"
                   fill="none"

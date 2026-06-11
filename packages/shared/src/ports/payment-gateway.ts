@@ -34,6 +34,9 @@ export type WebhookVerification =
       readonly reason: 'invalid_signature' | 'bad_payload';
     };
 
+/** Status order ternormalisasi dari gateway (sumber kebenaran server-to-server). */
+export type OrderStatusValue = 'paid' | 'pending' | 'failed';
+
 export interface PaymentGatewayPort {
   /** Daftar metode bayar yang aktif untuk tenant. */
   listMethods(): Promise<PaymentMethod[]>;
@@ -56,4 +59,10 @@ export interface PaymentGatewayPort {
    * (ok / reason) agar pemanggil bisa membedakan signature salah vs payload rusak.
    */
   verifyWebhook(rawBody: string, signature: string): WebhookVerification;
+
+  /**
+   * Konfirmasi status order langsung ke gateway (server-to-server, otoritatif).
+   * Dipakai untuk mempercepat kredit tanpa menunggu webhook delivery.
+   */
+  getStatus(orderId: string): Promise<{ status: OrderStatusValue }>;
 }

@@ -156,7 +156,6 @@ export class PaymentService {
   async handleKasugaiWebhook(
     rawBody: string,
     signature: string,
-    idGen: IdGenerator,
   ): Promise<{ ok: boolean; reason: string; orderId?: string }> {
     const verified = this.gateway.verifyWebhook(rawBody, signature);
     if (!verified.ok) {
@@ -167,10 +166,24 @@ export class PaymentService {
     }
 
     const orderId = verified.orderId;
-    let credited = false;
+    const credited = await this.creditPaidOrder(orderId);
 
+    // Bedakan: benar-benar mengkredit vs order tak ditemukan/sudah diproses.
+    return {
+      ok: true,
+      reason: credited ? 'credited' : 'order_not_found_or_done',
+      orderId,
+    };
+  }
+
+  /**
+   * Kredit saldo untuk order yang sudah lunas (idempoten via UNIQUE(topup,ref)).
+   * Dipakai oleh webhook DAN konfirmasi status. Mengembalikan true bila baris
+   * payment pending ditemukan & diproses; false bila sudah diproses/tidak ada.
+   */
+  private async creditPaidOrder(orderId: string): Promise<boolean> {
+    let credited = false;
     await withTransaction(async (tx) => {
-      // Ambil payment record (idempoten — hanya yang masih pending).
       const { rows } = await tx.query<PaymentRow>(
         `SELECT id, tenant_id, credits FROM payments
           WHERE gateway_ref = $1 AND gateway = 'kasugai' AND status = 'pending'`,
@@ -183,21 +196,18 @@ export class PaymentService {
       const credits = Number(payment.credits);
       const tenantId = payment.tenant_id as TenantId;
 
-      // Update payment status ke 'paid'.
       await tx.query(
         `UPDATE payments SET status = 'paid', paid_at = now() WHERE id = $1`,
         [payment.id],
       );
 
-      // Tambah kredit ke wallet.
       const walletUpd = await tx.query<{ balance: string }>(
         `UPDATE wallets SET balance = balance + $1 WHERE tenant_id = $2 RETURNING balance`,
         [credits, tenantId],
       );
       const balanceAfter = Number(walletUpd.rows[0]!.balance);
-      const txnId = idGen.generate(ID_PREFIXES.transaction);
+      const txnId = this.idGen.generate(ID_PREFIXES.transaction);
 
-      // Catat transaksi topup (idempoten).
       await tx.query(
         `INSERT INTO wallet_transactions
            (id, tenant_id, type, amount, balance_after, ref_type, ref_id, unit_price, metadata)
@@ -206,12 +216,47 @@ export class PaymentService {
         [txnId, tenantId, credits, balanceAfter, payment.id],
       );
     });
+    return credited;
+  }
 
-    // Bedakan: benar-benar mengkredit vs order tak ditemukan/sudah diproses.
-    return {
-      ok: true,
-      reason: credited ? 'credited' : 'order_not_found_or_done',
-      orderId,
-    };
+  /**
+   * Konfirmasi cepat (server-to-server) status sebuah top-up milik tenant.
+   * Menanyakan status otoritatif ke Kasugai; bila 'paid', langsung kredit
+   * (idempoten — webhook yang datang kemudian tidak menggandakan). Ini
+   * memangkas waktu tunggu dibanding menunggu webhook delivery Kasugai.
+   */
+  async confirmTopup(
+    tenantId: TenantId,
+    paymentId: string,
+  ): Promise<{ status: string; credited: boolean; balance: number }> {
+    // Pastikan payment milik tenant ini (cegah cek lintas-tenant).
+    const { rows } = await this.db.query<{ status: string }>(
+      `SELECT status FROM payments
+        WHERE id = $1 AND tenant_id = $2 AND gateway = 'kasugai'`,
+      [paymentId, tenantId],
+    );
+    const payment = rows[0];
+    if (!payment) throw Errors.notFound('Payment not found', 'payment');
+
+    let credited = false;
+    if (payment.status === 'pending') {
+      const { status } = await this.gateway.getStatus(paymentId);
+      if (status === 'paid') {
+        credited = await this.creditPaidOrder(paymentId);
+      }
+    }
+
+    const { rows: wr } = await this.db.query<{ balance: string }>(
+      `SELECT balance FROM wallets WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    const balance = Number(wr[0]?.balance ?? 0);
+
+    // Status terkini setelah kemungkinan kredit.
+    const { rows: pr } = await this.db.query<{ status: string }>(
+      `SELECT status FROM payments WHERE id = $1`,
+      [paymentId],
+    );
+    return { status: pr[0]?.status ?? payment.status, credited, balance };
   }
 }

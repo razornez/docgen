@@ -12,6 +12,7 @@ import type {
   CreateTxInput,
   PaymentMethod,
   WebhookVerification,
+  OrderStatusValue,
 } from '../ports/payment-gateway.js';
 import type { QueuePort, EnqueueOptions } from '../ports/queue.js';
 import type { MailerPort, EmailMessage } from '../ports/mailer.js';
@@ -42,6 +43,9 @@ export class StubPaymentGateway implements PaymentGatewayPort {
   }
   verifyWebhook(_rawBody: string, _signature: string): WebhookVerification {
     throw new NotImplementedError('PaymentGatewayPort.verifyWebhook');
+  }
+  getStatus(_orderId: string): Promise<{ status: OrderStatusValue }> {
+    throw new NotImplementedError('PaymentGatewayPort.getStatus');
   }
 }
 

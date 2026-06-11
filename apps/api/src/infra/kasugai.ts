@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type {
   CreateTxInput,
+  OrderStatusValue,
   PaymentGatewayPort,
   PaymentMethod,
   WebhookVerification,
@@ -158,6 +159,27 @@ export class KasugaiGateway implements PaymentGatewayPort {
       throw new Error('Kasugai: tidak ada redirectUrl maupun snapToken');
     }
     return { orderId: input.orderId, paymentUrl, token, clientKey };
+  }
+
+  async getStatus(orderId: string): Promise<{ status: OrderStatusValue }> {
+    const res = await fetch(
+      `${this.baseUrl}/v1/payment/orders/${encodeURIComponent(orderId)}`,
+      { headers: this.authHeaders() },
+    );
+    if (!res.ok) {
+      // Order belum ada / tidak ketemu → anggap masih pending (jangan kredit).
+      return { status: 'pending' };
+    }
+    const data = (await res.json().catch(() => ({}))) as { status?: string };
+    const raw = (data.status ?? '').toLowerCase();
+    // Kasugai: 'paid' = lunas; 'pending'/'open' = belum; sisanya = gagal/kedaluwarsa.
+    const status: OrderStatusValue =
+      raw === 'paid'
+        ? 'paid'
+        : raw === 'pending' || raw === 'open' || raw === ''
+          ? 'pending'
+          : 'failed';
+    return { status };
   }
 
   verifyWebhook(rawBody: string, signature: string): WebhookVerification {

@@ -67,6 +67,7 @@ export type {
   CreateTxInput,
   PaymentMethod,
   WebhookVerification,
+  OrderStatusValue,
   QueuePort,
   EnqueueOptions,
   MailerPort,

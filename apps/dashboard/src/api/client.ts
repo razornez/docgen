@@ -199,6 +199,17 @@ export function getPaymentMethods(): Promise<{ data: PaymentMethodItem[] }> {
   return request('/wallet/payment-methods');
 }
 
+export interface ConfirmTopupResult {
+  status: string; // 'pending' | 'paid' | 'failed'
+  credited: boolean;
+  balance: number;
+}
+
+/** Konfirmasi cepat status top-up (server cek ke Kasugai & kredit bila lunas). */
+export function confirmTopup(paymentId: string): Promise<ConfirmTopupResult> {
+  return request(`/wallet/topups/${paymentId}/confirm`, { method: 'POST' });
+}
+
 // ---- Templates ----
 
 export interface TemplateItem {

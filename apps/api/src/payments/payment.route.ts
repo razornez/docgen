@@ -59,6 +59,19 @@ export function registerPaymentRoutes(
       status: payment.status,
     };
   });
+
+  // Konfirmasi cepat: cek status ke Kasugai (server-to-server) & kredit bila lunas.
+  // Dipoll frontend setelah Snap sukses agar saldo masuk tanpa menunggu webhook.
+  app.post('/wallet/topups/:id/confirm', async (request) => {
+    const ctx = requireAuth(request);
+    const { id } = request.params as { id: string };
+    const result = await service.confirmTopup(ctx.tenantId, id);
+    return {
+      status: result.status,
+      credited: result.credited,
+      balance: result.balance,
+    };
+  });
 }
 
 /**
@@ -73,14 +86,14 @@ export function registerPaymentRoutes(
 export function registerPaymentWebhookRoute(
   app: FastifyInstance,
   service: PaymentService,
-  idGen: IdGenerator,
+  _idGen: IdGenerator,
 ): void {
   app.post('/webhooks/payments', async (request, reply) => {
     const raw =
       (request as FastifyRequest & { rawBody?: string }).rawBody ?? '';
     const sig = (request.headers['x-kasugai-signature'] as string) ?? '';
 
-    const result = await service.handleKasugaiWebhook(raw, sig, idGen);
+    const result = await service.handleKasugaiWebhook(raw, sig);
 
     if (!result.ok) {
       request.log.warn(
