@@ -3,7 +3,14 @@ import { useAuth } from '../hooks/useAuth.js';
 import { useQuery } from '@tanstack/react-query';
 import { getMe } from '../api/client.js';
 
-const nav = [
+type NavItem = {
+  to: string;
+  label: string;
+  exact?: boolean;
+  icon: JSX.Element;
+};
+
+const workspaceNav: NavItem[] = [
   {
     to: '/dashboard',
     exact: true,
@@ -81,6 +88,9 @@ const nav = [
       </svg>
     ),
   },
+];
+
+const developerNav: NavItem[] = [
   {
     to: '/dashboard/api-keys',
     label: 'API Keys',
@@ -131,6 +141,45 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/admin': 'Admin',
 };
 
+function NavRow({ to, label, exact, icon }: NavItem) {
+  return (
+    <NavLink
+      to={to}
+      end={exact}
+      className={({ isActive }) =>
+        `group relative flex items-center gap-3 pl-3.5 pr-3 py-2 rounded-lg text-[13.5px] font-medium transition-all duration-200 ${
+          isActive
+            ? 'bg-white/[0.07] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]'
+            : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04]'
+        }`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {/* Active accent bar */}
+          <span
+            className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-full transition-all duration-200 ${
+              isActive
+                ? 'h-5 bg-gradient-to-b from-indigo-400 to-violet-500 shadow-[0_0_8px_rgba(129,140,248,0.6)]'
+                : 'h-0 bg-transparent'
+            }`}
+          />
+          <span
+            className={`flex items-center justify-center transition-colors duration-200 ${
+              isActive
+                ? 'text-indigo-300'
+                : 'text-slate-500 group-hover:text-slate-300'
+            }`}
+          >
+            {icon}
+          </span>
+          {label}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
 export default function Layout() {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -149,16 +198,16 @@ export default function Layout() {
     <div className="flex h-screen" style={{ background: '#f8f7fc' }}>
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
-        className="w-60 flex-shrink-0 flex flex-col"
+        className="w-60 flex-shrink-0 flex flex-col border-r border-white/[0.06]"
         style={{
-          background: 'linear-gradient(180deg, #0f1729 0%, #111827 100%)',
+          background: 'linear-gradient(180deg, #0f1729 0%, #0d1322 100%)',
         }}
       >
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/5">
+        <div className="px-5 py-5">
           <div className="flex items-center gap-2.5">
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-[0_4px_14px_rgba(99,102,241,0.45)]"
               style={{
                 background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
               }}
@@ -172,69 +221,65 @@ export default function Layout() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          <p className="px-2 mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-            Menu
+        <nav className="flex-1 px-3 py-2 overflow-y-auto">
+          <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Workspace
           </p>
-          {nav.map(({ to, label, exact, icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={exact}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] font-medium transition-all duration-150 ${
-                  isActive
-                    ? 'bg-indigo-500/20 text-indigo-300 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.2)]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                }`
-              }
-            >
-              {icon}
-              {label}
-            </NavLink>
-          ))}
+          <div className="space-y-0.5">
+            {workspaceNav.map((item) => (
+              <NavRow key={item.to} {...item} />
+            ))}
+          </div>
+
+          <p className="px-3 mt-5 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Developer
+          </p>
+          <div className="space-y-0.5">
+            {developerNav.map((item) => (
+              <NavRow key={item.to} {...item} />
+            ))}
+          </div>
         </nav>
 
         {/* Bottom section */}
-        <div className="px-3 pb-4 space-y-0.5 border-t border-white/5 pt-3">
-          <NavLink
+        <div className="px-3 pb-4 pt-3 mt-1 border-t border-white/[0.06] space-y-2">
+          <NavRow
             to="/dashboard/admin"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] font-medium transition-all duration-150 ${
-                isActive
-                  ? 'bg-indigo-500/20 text-indigo-300'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-              }`
+            label="Admin"
+            icon={
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
             }
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            Admin
-          </NavLink>
+          />
 
-          {/* User row */}
-          <div className="flex items-center gap-2.5 px-3 py-2 mt-1">
-            <div className="w-7 h-7 rounded-full bg-indigo-500/30 text-indigo-300 flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+          {/* User card */}
+          <div className="flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] transition-colors hover:bg-white/[0.06]">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 text-white shadow-[0_2px_8px_rgba(99,102,241,0.4)]"
+              style={{
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              }}
+            >
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-medium text-slate-300 truncate">
+              <p className="text-[12px] font-medium text-slate-200 truncate">
                 {data?.tenant.name ?? '…'}
               </p>
               <p className="text-[11px] text-slate-500">
@@ -244,7 +289,7 @@ export default function Layout() {
             <button
               onClick={handleLogout}
               title="Sign out"
-              className="flex-shrink-0 text-slate-500 hover:text-slate-300 transition-colors"
+              className="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-white/10 transition-colors"
             >
               <svg
                 className="w-4 h-4"
