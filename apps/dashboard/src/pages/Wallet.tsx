@@ -296,10 +296,54 @@ export default function WalletPage() {
           <button
             onClick={handleTopup}
             disabled={!selectedPkg || topup.isPending}
-            className="mt-4 w-full py-3 px-4 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+            className="group mt-4 w-full py-3.5 px-5 text-[14px] font-bold rounded-2xl text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98] shadow-lg shadow-indigo-300/50 flex items-center justify-center gap-2.5 relative overflow-hidden"
+            style={{
+              background:
+                'linear-gradient(135deg, #6366f1 0%, #8b5cf6 60%, #a855f7 100%)',
+            }}
           >
-            {topup.isPending ? 'Membuka pembayaran…' : 'Bayar pakai Midtrans'}
+            <span className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 skew-x-12 pointer-events-none" />
+            {topup.isPending ? (
+              <>
+                <svg
+                  className="w-4 h-4 animate-spin flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"
+                  />
+                </svg>
+                <span>Membuka pembayaran…</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-4.5 h-4.5 w-[18px] h-[18px] flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                  />
+                </svg>
+                <span>Bayar Sekarang</span>
+              </>
+            )}
           </button>
           <p className="text-[11px] text-slate-400 mt-2.5 text-center">
             QRIS · Virtual Account · E-wallet · Kartu
