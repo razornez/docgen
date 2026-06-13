@@ -149,23 +149,27 @@ function NavRow({ to, label, exact, icon }: NavItem) {
       className={({ isActive }) =>
         `group relative flex items-center gap-3 pl-3.5 pr-3 py-2 rounded-lg text-[13.5px] font-medium transition-all duration-200 ${
           isActive
-            ? 'bg-white/[0.07] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]'
+            ? 'text-white'
             : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04]'
         }`
       }
     >
       {({ isActive }) => (
         <>
+          {/* Active spotlight background */}
+          {isActive && (
+            <span className="absolute inset-0 rounded-lg bg-gradient-to-r from-indigo-500/[0.22] via-indigo-500/[0.08] to-transparent shadow-[inset_0_0_0_1px_rgba(99,102,241,0.18)]" />
+          )}
           {/* Active accent bar */}
           <span
-            className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-full transition-all duration-200 ${
+            className={`absolute left-0 top-1/2 -translate-y-1/2 rounded-full transition-all duration-200 ${
               isActive
-                ? 'h-5 bg-gradient-to-b from-indigo-400 to-violet-500 shadow-[0_0_8px_rgba(129,140,248,0.6)]'
-                : 'h-0 bg-transparent'
+                ? 'w-[3px] h-5 bg-gradient-to-b from-indigo-400 to-violet-500 shadow-[0_0_12px_rgba(129,140,248,0.75)]'
+                : 'w-0.5 h-0 bg-transparent'
             }`}
           />
           <span
-            className={`flex items-center justify-center transition-colors duration-200 ${
+            className={`relative flex items-center justify-center transition-colors duration-200 ${
               isActive
                 ? 'text-indigo-300'
                 : 'text-slate-500 group-hover:text-slate-300'
@@ -173,7 +177,7 @@ function NavRow({ to, label, exact, icon }: NavItem) {
           >
             {icon}
           </span>
-          {label}
+          <span className="relative">{label}</span>
         </>
       )}
     </NavLink>
@@ -198,13 +202,18 @@ export default function Layout() {
     <div className="flex h-screen" style={{ background: '#f8f7fc' }}>
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
-        className="w-60 flex-shrink-0 flex flex-col border-r border-white/[0.06]"
+        className="w-60 flex-shrink-0 flex flex-col border-r border-white/[0.06] relative overflow-hidden"
         style={{
           background: 'linear-gradient(180deg, #0f1729 0%, #0d1322 100%)',
         }}
       >
+        {/* Top accent line */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+        {/* Subtle top glow blob */}
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-40 h-24 bg-indigo-600/[0.08] blur-3xl rounded-full pointer-events-none" />
+
         {/* Logo */}
-        <div className="px-5 py-5">
+        <div className="px-5 py-5 border-b border-white/[0.05]">
           <div className="flex items-center gap-2.5">
             <div
               className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-[0_4px_14px_rgba(99,102,241,0.45)]"
