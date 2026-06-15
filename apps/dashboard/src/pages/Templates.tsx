@@ -354,6 +354,12 @@ export default function TemplatesPage() {
     groupMap[c]!,
   ]);
 
+  /**
+   * Format sebuah ISO date string menjadi tanggal lokal Indonesia.
+   *
+   * @param iso - Tanggal dalam format ISO 8601 (mis. "2026-06-15T03:00:00Z").
+   * @returns Tanggal ringkas berlokal id-ID, mis. "15 Jun 2026".
+   */
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('id-ID', {
       day: 'numeric',
