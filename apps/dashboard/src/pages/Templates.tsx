@@ -646,6 +646,8 @@ export default function TemplatesPage() {
                 </button>
                 <button
                   type="button"
+                  title="Batal"
+                  aria-label="Batal"
                   onClick={closePanel}
                   className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-slate-600 ring-1 ring-slate-200 bg-white hover:bg-slate-50 transition-all"
                 >
@@ -756,6 +758,8 @@ export default function TemplatesPage() {
                     </button>
                     <button
                       type="button"
+                      title="Batal"
+                      aria-label="Batal"
                       onClick={closePanel}
                       className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-slate-600 ring-1 ring-slate-200 bg-white hover:bg-slate-50 transition-all"
                     >
