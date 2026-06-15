@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getWebhooks, createWebhook, deleteWebhook } from '../api/client.js';
 import ConfirmModal from '../components/ConfirmModal.js';
+import { formatDate } from '../lib/format.js';
 
 const EVENTS = [
   'batch.completed',
@@ -53,7 +54,14 @@ export default function WebhooksPage() {
     e.preventDefault();
     setFormError('');
     setSecret('');
-    create.mutate({ url: url.trim(), events: selectedEvents });
+    const trimmed = url.trim();
+    if (!/^https:\/\//i.test(trimmed)) {
+      setFormError(
+        'URL harus diawali https:// (endpoint webhook wajib HTTPS).',
+      );
+      return;
+    }
+    create.mutate({ url: trimmed, events: selectedEvents });
   }
 
   return (
@@ -265,7 +273,7 @@ export default function WebhooksPage() {
                       </span>
                       <span className="text-slate-200">·</span>
                       <span className="text-[11.5px] text-slate-400">
-                        {new Date(w.created_at).toLocaleDateString('id-ID')}
+                        {formatDate(w.created_at)}
                       </span>
                     </div>
                     <p className="font-mono text-[12.5px] text-slate-600 truncate mb-2.5">

@@ -8,6 +8,7 @@ import {
   type BatchDocumentItem,
 } from '../api/client.js';
 import { StatusBadge } from './Dashboard.js';
+import { formatDate } from '../lib/format.js';
 
 const PLACEHOLDER_ITEMS = `[
   { "ref": "doc-001", "data": { "nama": "Andi Wijaya", "total": "Rp 500.000" } },
@@ -18,17 +19,33 @@ const inputCls =
   'w-full bg-white ring-1 ring-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all placeholder:text-slate-300';
 
 function DocStatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, string> = {
-    completed: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    failed: 'bg-rose-50 text-rose-600 ring-1 ring-rose-200',
-    processing: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-    queued: 'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
+  const cfg: Record<string, { cls: string; label: string }> = {
+    completed: {
+      cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+      label: 'Selesai',
+    },
+    failed: {
+      cls: 'bg-rose-50 text-rose-600 ring-1 ring-rose-200',
+      label: 'Gagal',
+    },
+    processing: {
+      cls: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+      label: 'Proses',
+    },
+    queued: {
+      cls: 'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
+      label: 'Antrian',
+    },
+  };
+  const { cls, label } = cfg[status] ?? {
+    cls: 'bg-slate-100 text-slate-500',
+    label: status,
   };
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold ${cfg[status] ?? 'bg-slate-100 text-slate-500'}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold ${cls}`}
     >
-      {status}
+      {label}
     </span>
   );
 }
@@ -447,7 +464,7 @@ export default function BatchesPage() {
                       {b.credits_reserved}
                     </td>
                     <td className="px-6 py-3.5 text-right text-slate-400">
-                      {new Date(b.created_at).toLocaleDateString('id-ID')}
+                      {formatDate(b.created_at)}
                     </td>
                     <td className="px-6 py-3.5 text-right">
                       <button

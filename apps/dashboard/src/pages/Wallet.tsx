@@ -9,6 +9,7 @@ import {
   confirmTopup,
   type TxItem,
 } from '../api/client.js';
+import { formatDateTime } from '../lib/format.js';
 
 const TX_LABELS: Record<string, string> = {
   signup_bonus: 'Signup bonus',
@@ -47,17 +48,6 @@ function txDetailText(tx: TxItem): string {
   }
   if (tx.type === 'signup_bonus') return 'Bonus pendaftaran akun';
   return tx.ref_id;
-}
-
-/** Tanggal + jam lengkap, mis. "10 Jun 2026, 20.16". */
-function fmtDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 interface SnapCallbacks {
@@ -473,7 +463,7 @@ export default function WalletPage() {
                         {tx.balance_after.toLocaleString()}
                       </td>
                       <td className="px-6 py-3.5 text-right text-slate-400 whitespace-nowrap">
-                        {fmtDateTime(tx.created_at)}
+                        {formatDateTime(tx.created_at)}
                       </td>
                     </tr>
                   );

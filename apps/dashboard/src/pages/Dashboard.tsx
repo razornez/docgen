@@ -82,8 +82,73 @@ export default function DashboardPage() {
   const totalDocs =
     batches.data?.data.reduce((s, b) => s + b.completed, 0) ?? 0;
 
+  // Akun baru: belum pernah membuat batch → tampilkan panduan langkah awal.
+  const showOnboarding = batches.data?.data.length === 0;
+
   return (
     <div className="space-y-6">
+      {/* ── Onboarding (akun baru) ──────────────────────────────────── */}
+      {showOnboarding && (
+        <div className="rounded-3xl ring-1 ring-indigo-100 bg-white shadow-[0_4px_24px_rgba(99,102,241,0.06)] overflow-hidden">
+          <div
+            className="px-6 py-4 border-b border-indigo-50"
+            style={{ background: 'linear-gradient(135deg, #eef2ff, #faf5ff)' }}
+          >
+            <h2 className="text-[14.5px] font-semibold text-slate-800">
+              Mulai dari sini
+            </h2>
+            <p className="text-[12.5px] text-slate-500 mt-0.5">
+              Tiga langkah untuk membuat dokumen pertama Anda.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+            {[
+              {
+                n: 1,
+                to: '/dashboard/templates',
+                title: 'Buat template',
+                desc: 'Susun dokumen dengan variabel {{...}}.',
+                cta: 'Ke Templates',
+              },
+              {
+                n: 2,
+                to: '/dashboard/batches',
+                title: 'Buat batch',
+                desc: 'Isi data dan hasilkan PDF massal.',
+                cta: 'Ke Batches',
+              },
+              {
+                n: 3,
+                to: '/dashboard/api-keys',
+                title: 'Ambil API key',
+                desc: 'Integrasikan ke aplikasi Anda via API.',
+                cta: 'Ke API Keys',
+              },
+            ].map((step) => (
+              <div key={step.n} className="p-5 flex flex-col gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-[12px] font-bold flex items-center justify-center flex-shrink-0">
+                    {step.n}
+                  </span>
+                  <p className="text-[13px] font-semibold text-slate-700">
+                    {step.title}
+                  </p>
+                </div>
+                <p className="text-[12px] text-slate-400 leading-relaxed">
+                  {step.desc}
+                </p>
+                <Link
+                  to={step.to}
+                  className="mt-auto text-[12px] font-semibold text-indigo-500 hover:text-indigo-700 transition-colors"
+                >
+                  {step.cta} →
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Stat cards ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -272,7 +337,7 @@ export default function DashboardPage() {
                       className={`text-[13.5px] font-bold tabular-nums ${isDebit ? 'text-rose-500' : 'text-emerald-600'}`}
                     >
                       {isDebit ? '-' : '+'}
-                      {tx.amount.toLocaleString()}
+                      {Math.abs(tx.amount).toLocaleString()}
                     </span>
                   </li>
                 );

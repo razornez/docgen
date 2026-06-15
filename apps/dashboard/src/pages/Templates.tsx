@@ -25,6 +25,7 @@ import {
   buildDummyJson,
 } from '../lib/templateData.js';
 import { ApiGuideModal } from '../components/ApiGuideModal.js';
+import { formatDate } from '../lib/format.js';
 
 type Panel =
   | { type: 'none' }
@@ -353,13 +354,6 @@ export default function TemplatesPage() {
     c,
     groupMap[c]!,
   ]);
-
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
 
   return (
     <div className="space-y-4">
@@ -1115,14 +1109,14 @@ export default function TemplatesPage() {
                       }}
                       className="px-3 py-1.5 text-[12px] font-semibold rounded-lg text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
                     >
-                      Edit
+                      Ubah
                     </button>
                     <button
                       type="button"
                       onClick={() => void openPreview(t)}
                       className="px-3 py-1.5 text-[12px] font-semibold rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                     >
-                      Preview
+                      Pratinjau
                     </button>
                     <button
                       type="button"

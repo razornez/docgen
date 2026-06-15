@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth.js';
 import Layout from './components/Layout.js';
 // Halaman entry (unauth) di-load eager agar first paint tanpa flash.
@@ -20,6 +20,38 @@ const AdminPage = lazy(() => import('./pages/admin/AdminOverview.js'));
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   return token ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+/** Halaman 404 ber-UI (bukan JSON mentah) untuk rute yang tidak dikenal. */
+function NotFoundPage() {
+  const { token } = useAuth();
+  const home = token ? '/dashboard' : '/login';
+  return (
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
+      style={{
+        background:
+          'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+      }}
+    >
+      <p className="text-[80px] font-bold leading-none text-indigo-400">404</p>
+      <h1 className="mt-3 text-xl font-semibold text-white">
+        Halaman tidak ditemukan
+      </h1>
+      <p className="mt-2 text-sm text-slate-400 max-w-sm">
+        Tautan yang Anda buka tidak ada atau sudah dipindahkan.
+      </p>
+      <Link
+        to={home}
+        className="mt-6 px-5 py-2.5 text-sm font-semibold rounded-xl text-white transition-all hover:opacity-90"
+        style={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+        }}
+      >
+        Kembali ke {token ? 'dashboard' : 'halaman masuk'}
+      </Link>
+    </div>
+  );
 }
 
 /** Placeholder ringan saat chunk halaman sedang diunduh. */
@@ -117,6 +149,7 @@ export default function App() {
             }
           />
         </Route>
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );
