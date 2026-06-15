@@ -634,6 +634,8 @@ export default function TemplatesPage() {
               <div className="flex gap-3">
                 <button
                   type="submit"
+                  title="Simpan"
+                  aria-label="Simpan"
                   disabled={createMut.isPending}
                   className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
                   style={{
@@ -742,6 +744,8 @@ export default function TemplatesPage() {
                   <div className="flex gap-3">
                     <button
                       type="submit"
+                      title="Simpan"
+                      aria-label="Simpan"
                       disabled={editMut.isPending}
                       className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
                       style={{
