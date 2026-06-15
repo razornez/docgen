@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { useQuery } from '@tanstack/react-query';
@@ -193,6 +194,14 @@ export default function Layout() {
   const pageTitle = PAGE_TITLES[location.pathname] ?? 'DocGen';
   const initials = data?.tenant.name?.slice(0, 2).toUpperCase() ?? 'DG';
 
+  // Drawer (mobile) + menu profil. Ditutup otomatis saat pindah halaman.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    setSidebarOpen(false);
+    setMenuOpen(false);
+  }, [location.pathname]);
+
   function handleLogout() {
     logout();
     navigate('/', { replace: true });
@@ -200,9 +209,20 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen" style={{ background: '#f8f7fc' }}>
+      {/* Backdrop drawer (mobile) */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
-        className="w-60 flex-shrink-0 flex flex-col border-r border-white/[0.06] relative overflow-hidden"
+        className={`fixed lg:relative inset-y-0 left-0 z-40 w-60 flex-shrink-0 flex flex-col border-r border-white/[0.06] overflow-hidden transform transition-transform duration-300 ease-out lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
         style={{
           background: 'linear-gradient(180deg, #0f1729 0%, #0d1322 100%)',
         }}
@@ -277,31 +297,65 @@ export default function Layout() {
             }
           />
 
-          {/* User card */}
-          <div className="flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] transition-colors hover:bg-white/[0.06]">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 text-white shadow-[0_2px_8px_rgba(99,102,241,0.4)]"
-              style={{
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-              }}
-            >
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-medium text-slate-200 truncate">
-                {data?.tenant.name ?? '…'}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                {(data?.wallet.balance ?? 0).toLocaleString()} credits
-              </p>
-            </div>
+          {/* User card → menu profil */}
+          <div className="relative">
+            {menuOpen && (
+              <div
+                className="fixed inset-0 z-0"
+                onClick={() => setMenuOpen(false)}
+                aria-hidden="true"
+              />
+            )}
+            {menuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 z-10 rounded-xl overflow-hidden border border-white/10 bg-[#131a2b] shadow-[0_8px_30px_rgba(0,0,0,0.5)] py-1">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12.5px] font-medium text-slate-200 hover:bg-white/[0.06] transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                    />
+                  </svg>
+                  Keluar
+                </button>
+              </div>
+            )}
             <button
-              onClick={handleLogout}
-              title="Sign out"
-              className="flex-shrink-0 p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-white/10 transition-colors"
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] transition-colors hover:bg-white/[0.06]"
             >
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 text-white shadow-[0_2px_8px_rgba(99,102,241,0.4)]"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                }}
+              >
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-[12px] font-medium text-slate-200 truncate">
+                  {data?.tenant.name ?? '…'}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {(data?.wallet.balance ?? 0).toLocaleString()} credits
+                </p>
+              </div>
               <svg
-                className="w-4 h-4"
+                className={`w-4 h-4 flex-shrink-0 text-slate-500 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={1.75}
@@ -310,7 +364,7 @@ export default function Layout() {
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
                 />
               </svg>
             </button>
@@ -321,10 +375,32 @@ export default function Layout() {
       {/* ── Main ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white/80 backdrop-blur border-b border-slate-200/80 px-8 py-3.5 flex items-center justify-between">
-          <h1 className="text-[15px] font-semibold text-slate-800">
-            {pageTitle}
-          </h1>
+        <header className="bg-white/80 backdrop-blur border-b border-slate-200/80 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden -ml-1 p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+              aria-label="Buka menu"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"
+                />
+              </svg>
+            </button>
+            <h1 className="text-[15px] font-semibold text-slate-800">
+              {pageTitle}
+            </h1>
+          </div>
           <div className="flex items-center gap-3">
             {data && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-100">
@@ -338,7 +414,7 @@ export default function Layout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto px-8 py-6">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6">
           <Outlet />
         </main>
       </div>

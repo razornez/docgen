@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getApiKeys, createApiKey, revokeApiKey } from '../api/client.js';
 import ConfirmModal from '../components/ConfirmModal.js';
+import { formatDate } from '../lib/format.js';
 
 const inputCls =
   'bg-white ring-1 ring-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all';
@@ -127,7 +128,7 @@ export default function ApiKeysPage() {
       <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="text-[14.5px] font-semibold text-slate-800">
-            API keys
+            API Keys
           </h2>
         </div>
         <div className="overflow-x-auto">
@@ -153,7 +154,7 @@ export default function ApiKeysPage() {
                   </td>
                   <td className="px-6 py-3.5">
                     <span
-                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1 ${
+                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ring-1 ${
                         k.mode === 'live'
                           ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
                           : 'bg-blue-50 text-blue-700 ring-blue-200'
@@ -174,11 +175,11 @@ export default function ApiKeysPage() {
                   </td>
                   <td className="px-6 py-3.5 text-slate-400">
                     {k.last_used_at
-                      ? new Date(k.last_used_at).toLocaleDateString('id-ID')
+                      ? formatDate(k.last_used_at)
                       : 'Belum pernah'}
                   </td>
                   <td className="px-6 py-3.5 text-slate-400">
-                    {new Date(k.created_at).toLocaleDateString('id-ID')}
+                    {formatDate(k.created_at)}
                   </td>
                   <td className="px-6 py-3.5 text-right">
                     {k.status === 'active' && (
@@ -187,7 +188,7 @@ export default function ApiKeysPage() {
                         onClick={() => setRevokeTarget(k.id)}
                         className="text-[12px] font-semibold text-rose-400 hover:text-rose-600 transition-colors px-3 py-1 rounded-xl hover:bg-rose-50"
                       >
-                        Revoke
+                        Cabut
                       </button>
                     )}
                   </td>
@@ -210,9 +211,9 @@ export default function ApiKeysPage() {
 
       <ConfirmModal
         isOpen={revokeTarget !== null}
-        title="Revoke API key?"
-        message="Key yang sudah direvoke tidak bisa diaktifkan kembali. Pastikan tidak ada sistem yang masih menggunakannya."
-        confirmLabel="Ya, revoke"
+        title="Cabut API key?"
+        message="Key yang sudah dicabut tidak bisa diaktifkan kembali. Pastikan tidak ada sistem yang masih menggunakannya."
+        confirmLabel="Ya, cabut"
         danger
         onConfirm={() => {
           if (revokeTarget) revoke.mutate(revokeTarget);
