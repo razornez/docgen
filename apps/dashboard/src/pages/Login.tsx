@@ -117,7 +117,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-slate-200 text-xs">
+        <p className="text-white text-xs">
           © 2025 DocGen. All rights reserved.
         </p>
       </div>
