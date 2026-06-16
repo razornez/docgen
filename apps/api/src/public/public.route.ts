@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
+import { readSiteContent } from '../site-content.js';
 
 /**
  * Rute publik (TANPA auth) untuk halaman landing: harga paket & saldo gratis.
@@ -37,4 +38,7 @@ export function registerPublicRoutes(app: FastifyInstance, pool: Pool): void {
       })),
     };
   });
+
+  // Konten publik (footer landing) — dikelola owner.
+  app.get('/public/content', async () => readSiteContent(pool));
 }

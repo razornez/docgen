@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth.js';
-import { getPublicPricing } from '../api/client.js';
+import { getPublicPricing, getPublicContent } from '../api/client.js';
 import { useLang } from '../i18n/index.js';
 
 function Flower({ className = 'w-8 h-8' }: { className?: string }) {
@@ -124,10 +124,34 @@ const STEPS = [
   },
 ];
 
-const FOOTER_COLS = [
-  { head: 'Produk', items: ['Fitur', 'Harga', 'Templates', 'Status'] },
-  { head: 'Developer', items: ['Dokumentasi', 'API', 'Webhooks', 'SDK'] },
-  { head: 'Perusahaan', items: ['Tentang', 'Blog', 'Kontak', 'Privasi'] },
+const FOOTER_FALLBACK = [
+  {
+    head: 'Produk',
+    items: [
+      { label: 'Fitur', href: '#fitur' },
+      { label: 'Harga', href: '#harga' },
+      { label: 'Templates', href: '#' },
+      { label: 'Status', href: '#' },
+    ],
+  },
+  {
+    head: 'Developer',
+    items: [
+      { label: 'Dokumentasi', href: '#' },
+      { label: 'API', href: '#' },
+      { label: 'Webhooks', href: '#' },
+      { label: 'SDK', href: '#' },
+    ],
+  },
+  {
+    head: 'Perusahaan',
+    items: [
+      { label: 'Tentang', href: '#' },
+      { label: 'Blog', href: '#' },
+      { label: 'Kontak', href: '#' },
+      { label: 'Privasi', href: '#' },
+    ],
+  },
 ];
 
 const CODE_TABS = ['cURL', 'Node', 'Python'] as const;
@@ -218,8 +242,16 @@ export default function LandingPage() {
     queryKey: ['public-pricing'],
     queryFn: getPublicPricing,
   });
+  const content = useQuery({
+    queryKey: ['public-content'],
+    queryFn: getPublicContent,
+  });
   const [codeTab, setCodeTab] = useState<CodeTab>('cURL');
   if (token) return <Navigate to="/dashboard" replace />;
+
+  const footerCols = content.data?.footer_columns ?? FOOTER_FALLBACK;
+  const footerTagline =
+    content.data?.footer_tagline ?? 'Mesin generate dokumen via API.';
 
   const fmt = (n: number) => n.toLocaleString('id-ID');
   const bonus = pricing.data?.signup_bonus_credits ?? 100;
@@ -604,22 +636,22 @@ export default function LandingPage() {
               </span>
             </div>
             <p className="text-[12px] text-mut mt-3 max-w-[200px]">
-              Mesin generate dokumen via API.
+              {footerTagline}
             </p>
           </div>
-          {FOOTER_COLS.map((col) => (
+          {footerCols.map((col) => (
             <div key={col.head}>
               <p className="text-[10.5px] font-bold uppercase tracking-wider text-mut/80">
                 {col.head}
               </p>
               <ul className="mt-3 space-y-2">
-                {col.items.map((it) => (
-                  <li key={it}>
+                {col.items.map((it, i) => (
+                  <li key={i}>
                     <a
-                      href="#"
+                      href={it.href || '#'}
                       className="text-[13px] text-mut hover:text-ink transition-colors"
                     >
-                      {it}
+                      {it.label}
                     </a>
                   </li>
                 ))}

@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { randomBase62 } from '@docgen/shared';
 import type { AppConfig } from '@docgen/config';
+import { readSiteContent } from '../site-content.js';
 
 const LoginSchema = z.object({
   email: z.string().trim().min(1),
@@ -26,6 +27,24 @@ const SettingsSchema = z.object({
       }),
     )
     .max(20),
+});
+const ContentSchema = z.object({
+  footer_tagline: z.string().trim().max(200),
+  footer_columns: z
+    .array(
+      z.object({
+        head: z.string().trim().min(1).max(40),
+        items: z
+          .array(
+            z.object({
+              label: z.string().trim().min(1).max(40),
+              href: z.string().trim().max(300),
+            }),
+          )
+          .max(12),
+      }),
+    )
+    .max(6),
 });
 
 /** Verifikasi token owner (JWT klaim owner:true). */
@@ -623,6 +642,42 @@ export function registerOwnerRoutes(
           [p.id, p.name, p.credits, p.bonus, p.price_idr, p.highlight],
         );
       }
+      await client.query('COMMIT');
+      return { saved: true };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  });
+
+  // Konten publik (footer landing) — baca & simpan.
+  app.get('/owner/content', async (request, reply) => {
+    const denied = ownerGuard(request, reply, config.SESSION_SECRET);
+    if (denied) return denied;
+    return readSiteContent(pool);
+  });
+
+  app.put('/owner/content', async (request, reply) => {
+    const denied = ownerGuard(request, reply, config.SESSION_SECRET);
+    if (denied) return denied;
+    const body = ContentSchema.parse(request.body ?? {});
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('footer_tagline', $1::jsonb, now())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+        [JSON.stringify(body.footer_tagline)],
+      );
+      await client.query(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('footer_columns', $1::jsonb, now())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+        [JSON.stringify(body.footer_columns)],
+      );
       await client.query('COMMIT');
       return { saved: true };
     } catch (err) {

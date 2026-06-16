@@ -308,6 +308,30 @@ export function getPublicPricing(): Promise<PublicPricing> {
   return request('/public/pricing', {}, '');
 }
 
+export interface SiteContent {
+  footer_tagline: string;
+  footer_columns: { head: string; items: { label: string; href: string }[] }[];
+}
+
+/** Konten publik (footer landing) tanpa auth. */
+export function getPublicContent(): Promise<SiteContent> {
+  return request('/public/content', {}, '');
+}
+
+export function getOwnerContent(): Promise<SiteContent> {
+  return request('/owner/content', {}, getOwnerToken() ?? '');
+}
+
+export function saveOwnerContent(
+  body: SiteContent,
+): Promise<{ saved: boolean }> {
+  return request(
+    '/owner/content',
+    { method: 'PUT', body: JSON.stringify(body) },
+    getOwnerToken() ?? '',
+  );
+}
+
 export interface OwnerPackage {
   id?: string;
   name?: string;

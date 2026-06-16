@@ -117,6 +117,17 @@ const NAV: NavItem[] = [
       </>
     ),
   },
+  {
+    to: '/owner/content',
+    label: 'Konten',
+    icon: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 6h16M4 10h16M4 14h10M4 18h10"
+      />
+    ),
+  },
 ];
 
 function NavRow({ item, onNav }: { item: NavItem; onNav: () => void }) {

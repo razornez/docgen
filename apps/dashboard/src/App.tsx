@@ -25,6 +25,7 @@ const OwnerRenderPage = lazy(() => import('./pages/owner/OwnerSystem.js'));
 const OwnerBillingPage = lazy(() => import('./pages/owner/OwnerBilling.js'));
 const OwnerHealthPage = lazy(() => import('./pages/owner/OwnerHealth.js'));
 const OwnerSettingsPage = lazy(() => import('./pages/owner/OwnerSettings.js'));
+const OwnerContentPage = lazy(() => import('./pages/owner/OwnerContent.js'));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -223,6 +224,14 @@ export default function App() {
             element={
               <Suspense fallback={<PageLoader />}>
                 <OwnerSettingsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="content"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <OwnerContentPage />
               </Suspense>
             }
           />
