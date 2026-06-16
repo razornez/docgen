@@ -7,20 +7,20 @@ import {
   type TxItem,
   type BatchItem,
 } from '../api/client.js';
-import { useLang } from '../i18n/index.js';
+import { useLang, type Lang } from '../i18n/index.js';
 
 /* ── Helpers data ──────────────────────────────────────────────────── */
-const WEEKDAYS_ID = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, lang: Lang): string {
+  const en = lang === 'en';
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'baru saja';
-  if (m < 60) return `${m} menit lalu`;
+  if (m < 1) return en ? 'just now' : 'baru saja';
+  if (m < 60) return en ? `${m} min ago` : `${m} menit lalu`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam lalu`;
+  if (h < 24) return en ? `${h} h ago` : `${h} jam lalu`;
   const d = Math.floor(h / 24);
-  return d === 1 ? 'kemarin' : `${d} hari lalu`;
+  if (d === 1) return en ? 'yesterday' : 'kemarin';
+  return en ? `${d} days ago` : `${d} hari lalu`;
 }
 
 function isThisMonth(iso: string): boolean {
@@ -29,13 +29,18 @@ function isThisMonth(iso: string): boolean {
   return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
 }
 
-function weekActivity(batches: BatchItem[]) {
+function weekActivity(batches: BatchItem[], lang: Lang) {
+  const locale = lang === 'en' ? 'en-US' : 'id-ID';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(today);
     d.setDate(d.getDate() - (6 - i));
-    return { ts: d.getTime(), label: WEEKDAYS_ID[d.getDay()], docs: 0 };
+    return {
+      ts: d.getTime(),
+      label: d.toLocaleDateString(locale, { weekday: 'short' }),
+      docs: 0,
+    };
   });
   for (const b of batches) {
     const c = new Date(b.created_at);
@@ -46,14 +51,18 @@ function weekActivity(batches: BatchItem[]) {
   return days;
 }
 
-function txLabel(tx: TxItem): string {
+function txLabel(tx: TxItem, lang: Lang): string {
+  const en = lang === 'en';
   const d = tx.detail ?? {};
   if (tx.type === 'topup') return `Top-up — ${d.method ?? d.gateway ?? 'QRIS'}`;
-  if (tx.type === 'refund') return 'Refund — dana kembali';
-  if (tx.type === 'signup_bonus') return 'Bonus pendaftaran';
-  if (tx.ref_type === 'document' && d.item_ref) return 'Dokumen tunggal';
+  if (tx.type === 'refund')
+    return en ? 'Refund — returned' : 'Refund — dana kembali';
+  if (tx.type === 'signup_bonus')
+    return en ? 'Sign-up bonus' : 'Bonus pendaftaran';
+  if (tx.ref_type === 'document' && d.item_ref)
+    return en ? 'Single document' : 'Dokumen tunggal';
   if (d.template_name) return `Batch: ${d.template_name}`;
-  return 'Dokumen dibuat';
+  return en ? 'Documents created' : 'Dokumen dibuat';
 }
 
 /* ── UI primitives ─────────────────────────────────────────────────── */
@@ -83,15 +92,29 @@ function CardHead({
 }
 
 export function StatusBadge({ status }: { status: string }) {
+  const { lang } = useLang();
+  const en = lang === 'en';
   const cfg: Record<string, { cls: string; label: string }> = {
-    completed: { cls: 'bg-emerald-100/70 text-emerald-700', label: 'Selesai' },
+    completed: {
+      cls: 'bg-emerald-100/70 text-emerald-700',
+      label: en ? 'Completed' : 'Selesai',
+    },
     partially_failed: {
       cls: 'bg-orange-100/70 text-orange-700',
-      label: 'Sebagian gagal',
+      label: en ? 'Partly failed' : 'Sebagian gagal',
     },
-    failed: { cls: 'bg-rose-100/70 text-rose-700', label: 'Gagal' },
-    processing: { cls: 'bg-blue-100/70 text-blue-700', label: 'Proses' },
-    queued: { cls: 'bg-slate-200/70 text-slate-600', label: 'Antrian' },
+    failed: {
+      cls: 'bg-rose-100/70 text-rose-700',
+      label: en ? 'Failed' : 'Gagal',
+    },
+    processing: {
+      cls: 'bg-blue-100/70 text-blue-700',
+      label: en ? 'Processing' : 'Proses',
+    },
+    queued: {
+      cls: 'bg-slate-200/70 text-slate-600',
+      label: en ? 'Queued' : 'Antrian',
+    },
   };
   const { cls, label } = cfg[status] ?? {
     cls: 'bg-slate-200/70 text-slate-600',
@@ -107,32 +130,10 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-const TIPS = [
-  {
-    title: 'Variabel dinamis',
-    icon: 'M8 9l3 3-3 3m5 0h3',
-    code: '<h1>Halo {{nama}}</h1>',
-  },
-  {
-    title: 'Page break',
-    icon: 'M4 7h16M4 12h16M4 17h7',
-    code: '<div style="page-break-after: always"></div>',
-  },
-  {
-    title: 'Gambar & logo (base64)',
-    icon: 'M4 16l4-4 3 3 5-5 4 4M4 6h16v12H4z',
-    code: '<img src="data:image/png;base64,iVBOR…" />',
-  },
-  {
-    title: 'Ukuran kertas',
-    icon: 'M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z',
-    code: '@page { size: A4; margin: 0 }',
-  },
-];
-
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { fmtNum } = useLang();
+  const { lang, fmtNum } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const me = useQuery({ queryKey: ['me'], queryFn: getMe });
   const txs = useQuery({
     queryKey: ['transactions'],
@@ -155,30 +156,54 @@ export default function DashboardPage() {
     (b) => b.status === 'queued' || b.status === 'processing',
   ).length;
 
-  const week = weekActivity(batches);
+  const week = weekActivity(batches, lang);
   const weekDocs = week.reduce((s, d) => s + d.docs, 0);
   const maxDocs = Math.max(...week.map((d) => d.docs), 1);
 
   const tenantName = me.data?.tenant.name ?? '…';
+  const dok = t('dok', 'docs');
+
+  const TIPS = [
+    {
+      title: t('Variabel dinamis', 'Dynamic variables'),
+      icon: 'M8 9l3 3-3 3m5 0h3',
+      code: '<h1>Halo {{nama}}</h1>',
+    },
+    {
+      title: 'Page break',
+      icon: 'M4 7h16M4 12h16M4 17h7',
+      code: '<div style="page-break-after: always"></div>',
+    },
+    {
+      title: t('Gambar & logo (base64)', 'Images & logos (base64)'),
+      icon: 'M4 16l4-4 3 3 5-5 4 4M4 6h16v12H4z',
+      code: '<img src="data:image/png;base64,iVBOR…" />',
+    },
+    {
+      title: t('Ukuran kertas', 'Paper size'),
+      icon: 'M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z',
+      code: '@page { size: A4; margin: 0 }',
+    },
+  ];
 
   const stats = [
     {
-      label: 'Saldo kredit',
+      label: t('Saldo kredit', 'Credit balance'),
       value: fmtNum(balance),
-      sub: `≈ ${fmtNum(balance)} dok`,
+      sub: `≈ ${fmtNum(balance)} ${dok}`,
     },
     {
-      label: 'Dokumen / bln',
+      label: t('Dokumen / bln', 'Documents / mo'),
       value: fmtNum(docsThisMonth),
       sub: '↑ 18%',
       subClass: 'text-emerald-600',
     },
     {
-      label: 'Tingkat sukses',
+      label: t('Tingkat sukses', 'Success rate'),
       value: `${successRate.toFixed(1)}%`,
-      sub: '30 hari',
+      sub: t('30 hari', '30 days'),
     },
-    { label: 'Render p95', value: '1.8s', sub: 'cepat' },
+    { label: 'Render p95', value: '1.8s', sub: t('cepat', 'fast') },
   ];
 
   return (
@@ -188,15 +213,19 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
           <div className="min-w-0">
             <p className="num text-[11px] font-semibold uppercase tracking-wider text-mut">
-              Selamat datang · {tenantName}
+              {t('Selamat datang', 'Welcome')} · {tenantName}
             </p>
             <h1 className="mt-1.5 text-[26px] sm:text-[30px] font-extrabold text-ink leading-tight">
-              <span className="text-grad">{fmtNum(docsThisMonth)}</span> dokumen
-              tercetak bulan ini.
+              <span className="text-grad">{fmtNum(docsThisMonth)}</span>{' '}
+              {t(
+                'dokumen tercetak bulan ini.',
+                'documents printed this month.',
+              )}
             </h1>
             <p className="num mt-2 text-[12.5px] text-mut">
-              sukses {successRate.toFixed(1)}% · render 1.8s rata-rata ·{' '}
-              {fmtNum(balance)} kredit tersisa
+              {t('sukses', 'success')} {successRate.toFixed(1)}% ·{' '}
+              {t('render 1.8s rata-rata', '1.8s avg render')} ·{' '}
+              {fmtNum(balance)} {t('kredit tersisa', 'credits left')}
             </p>
           </div>
           <div className="flex items-center gap-2.5 flex-shrink-0">
@@ -270,17 +299,19 @@ export default function DashboardPage() {
 
       {/* ── Aktivitas 7 hari ────────────────────────────────────────── */}
       <Card className="px-6 py-5">
-        <h2 className="text-[14.5px] font-bold text-ink">Aktivitas 7 hari</h2>
+        <h2 className="text-[14.5px] font-bold text-ink">
+          {t('Aktivitas 7 hari', '7-day activity')}
+        </h2>
         <div className="mt-3 flex flex-col sm:flex-row sm:items-end gap-6">
           <div className="flex-shrink-0">
             <p className="num text-[40px] font-extrabold text-ink leading-none">
               {fmtNum(weekDocs)}
             </p>
             <p className="text-[10.5px] font-bold uppercase tracking-wider text-mut mt-1.5">
-              Dok minggu ini
+              {t('Dok minggu ini', 'Docs this week')}
             </p>
             <span className="inline-flex items-center gap-1 mt-2.5 px-2 py-1 rounded-lg bg-emerald-100/70 text-emerald-700 text-[11px] font-semibold">
-              ↑ +12% vs minggu lalu
+              ↑ +12% {t('vs minggu lalu', 'vs last week')}
             </span>
           </div>
           <div className="flex-1 flex items-end justify-between gap-2 sm:gap-3 h-[120px]">
@@ -297,7 +328,7 @@ export default function DashboardPage() {
                       isMax ? 'bg-grad' : 'bg-brand-purple/25'
                     }`}
                     style={{ height: `${h}%`, animationDelay: `${i * 60}ms` }}
-                    title={`${d.docs} dok`}
+                    title={`${d.docs} ${dok}`}
                   />
                   <span className="text-[10.5px] text-mut">{d.label}</span>
                 </div>
@@ -310,19 +341,19 @@ export default function DashboardPage() {
       {/* ── Batch terbaru ───────────────────────────────────────────── */}
       <Card>
         <CardHead
-          title="Batch terbaru"
+          title={t('Batch terbaru', 'Recent batches')}
           action={
             <Link
               to="/dashboard/batches"
               className="text-[12px] font-semibold text-brand-purple hover:opacity-80 transition-opacity"
             >
-              Semua batch →
+              {t('Semua batch', 'All batches')} →
             </Link>
           }
         />
         {batches.length === 0 ? (
           <p className="px-6 py-10 text-center text-[13px] text-mut">
-            Belum ada batch.
+            {t('Belum ada batch.', 'No batches yet.')}
           </p>
         ) : (
           <ul className="divide-y divide-white/40">
@@ -336,7 +367,8 @@ export default function DashboardPage() {
                         {b.id}
                       </p>
                       <p className="num text-[11px] text-mut mt-0.5">
-                        {b.completed}/{b.total} · {relativeTime(b.created_at)}
+                        {b.completed}/{b.total} ·{' '}
+                        {relativeTime(b.created_at, lang)}
                       </p>
                     </div>
                     <StatusBadge status={b.status} />
@@ -357,23 +389,23 @@ export default function DashboardPage() {
       {/* ── Status sistem + Transaksi ───────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Card>
-          <CardHead title="Status sistem" />
+          <CardHead title={t('Status sistem', 'System status')} />
           <ul className="px-6 py-2 divide-y divide-white/40">
             {[
               {
-                name: 'Mesin render',
-                meta: 'p95 1.8 dtk',
+                name: t('Mesin render', 'Render engine'),
+                meta: t('p95 1.8 dtk', 'p95 1.8s'),
                 dot: 'bg-emerald-500',
               },
               { name: 'API', meta: '99.98% uptime', dot: 'bg-emerald-500' },
               {
-                name: 'Antrian batch',
-                meta: `${inQueue} berjalan`,
+                name: t('Antrian batch', 'Batch queue'),
+                meta: `${inQueue} ${t('berjalan', 'running')}`,
                 dot: 'bg-brand-pink',
               },
               {
-                name: 'Penyimpanan',
-                meta: 'R2 · 30 hari',
+                name: t('Penyimpanan', 'Storage'),
+                meta: t('R2 · 30 hari', 'R2 · 30 days'),
                 dot: 'bg-emerald-500',
               },
             ].map((r) => (
@@ -393,19 +425,19 @@ export default function DashboardPage() {
 
         <Card>
           <CardHead
-            title="Transaksi"
+            title={t('Transaksi', 'Transactions')}
             action={
               <Link
                 to="/dashboard/wallet"
                 className="text-[12px] font-semibold text-brand-purple hover:opacity-80 transition-opacity"
               >
-                Dompet →
+                {t('Dompet', 'Wallet')} →
               </Link>
             }
           />
           {!txs.data || txs.data.data.length === 0 ? (
             <p className="px-6 py-10 text-center text-[13px] text-mut">
-              Belum ada transaksi.
+              {t('Belum ada transaksi.', 'No transactions yet.')}
             </p>
           ) : (
             <ul className="px-6 py-1 divide-y divide-white/40">
@@ -418,10 +450,10 @@ export default function DashboardPage() {
                   >
                     <div className="min-w-0">
                       <p className="text-[13px] font-medium text-ink truncate">
-                        {txLabel(tx)}
+                        {txLabel(tx, lang)}
                       </p>
                       <p className="num text-[11px] text-mut mt-0.5">
-                        {relativeTime(tx.created_at)}
+                        {relativeTime(tx.created_at, lang)}
                       </p>
                     </div>
                     <span
@@ -441,13 +473,13 @@ export default function DashboardPage() {
       {/* ── Tips menulis template HTML ──────────────────────────────── */}
       <Card>
         <CardHead
-          title="Tips menulis template HTML"
+          title={t('Tips menulis template HTML', 'HTML template tips')}
           action={
             <Link
               to="/dashboard/templates"
               className="text-[12px] font-semibold text-brand-purple hover:opacity-80 transition-opacity"
             >
-              Buka editor →
+              {t('Buka editor', 'Open editor')} →
             </Link>
           }
         />
