@@ -36,8 +36,8 @@ export const DEFAULT_CONTENT: SiteContent = {
     {
       head: L('Produk', 'Product'),
       items: [
-        { label: L('Fitur', 'Features'), href: '/p/fitur' },
-        { label: L('Harga', 'Pricing'), href: '/p/harga' },
+        { label: L('Fitur', 'Features'), href: '/p/features' },
+        { label: L('Harga', 'Pricing'), href: '/p/pricing' },
         { label: L('Templates', 'Templates'), href: '/p/templates' },
         { label: L('Status', 'Status'), href: '/p/status' },
       ],
@@ -45,7 +45,7 @@ export const DEFAULT_CONTENT: SiteContent = {
     {
       head: L('Developer', 'Developer'),
       items: [
-        { label: L('Dokumentasi', 'Documentation'), href: '/p/dokumentasi' },
+        { label: L('Dokumentasi', 'Documentation'), href: '/p/docs' },
         { label: L('API', 'API'), href: '/p/api' },
         { label: L('Webhooks', 'Webhooks'), href: '/p/webhooks' },
         { label: L('SDK', 'SDK'), href: '/p/sdk' },
@@ -54,16 +54,16 @@ export const DEFAULT_CONTENT: SiteContent = {
     {
       head: L('Perusahaan', 'Company'),
       items: [
-        { label: L('Tentang', 'About'), href: '/p/tentang' },
+        { label: L('Tentang', 'About'), href: '/p/about' },
         { label: L('Blog', 'Blog'), href: '/p/blog' },
-        { label: L('Kontak', 'Contact'), href: '/p/kontak' },
-        { label: L('Privasi', 'Privacy'), href: '/p/privasi' },
+        { label: L('Kontak', 'Contact'), href: '/p/contact' },
+        { label: L('Privasi', 'Privacy'), href: '/p/privacy' },
       ],
     },
   ],
   pages: [
     {
-      slug: 'fitur',
+      slug: 'features',
       title: L('Fitur', 'Features'),
       body: L(
         'DocGen mengubah template HTML + data JSON menjadi PDF rapi lewat API. Mendukung variabel {{...}}, page break, gambar base64, dan kontrol ukuran kertas via CSS @page.',
@@ -71,7 +71,7 @@ export const DEFAULT_CONTENT: SiteContent = {
       ),
     },
     {
-      slug: 'harga',
+      slug: 'pricing',
       title: L('Harga', 'Pricing'),
       body: L(
         'Model prepaid berbasis kredit, tanpa langganan. Dapat dokumen gratis saat daftar, lalu top-up via QRIS, Virtual Account, atau e-wallet. 1 kredit = 1 dokumen (sampai 5 halaman).',
@@ -95,7 +95,7 @@ export const DEFAULT_CONTENT: SiteContent = {
       ),
     },
     {
-      slug: 'dokumentasi',
+      slug: 'docs',
       title: L('Dokumentasi', 'Documentation'),
       body: L(
         'Panduan lengkap memakai API DocGen: autentikasi, membuat template, mengirim data, render massal, dan menangani webhook.',
@@ -127,7 +127,7 @@ export const DEFAULT_CONTENT: SiteContent = {
       ),
     },
     {
-      slug: 'tentang',
+      slug: 'about',
       title: L('Tentang', 'About'),
       body: L(
         'DocGen adalah mesin pembuatan dokumen untuk developer Indonesia — bayar dalam Rupiah, render cepat dengan Chromium, dan kendali penuh lewat template HTML Anda sendiri.',
@@ -143,7 +143,7 @@ export const DEFAULT_CONTENT: SiteContent = {
       ),
     },
     {
-      slug: 'kontak',
+      slug: 'contact',
       title: L('Kontak', 'Contact'),
       body: L(
         'Butuh bantuan? Hubungi kami di support@docgen.id. Tim kami siap membantu.',
@@ -151,7 +151,7 @@ export const DEFAULT_CONTENT: SiteContent = {
       ),
     },
     {
-      slug: 'privasi',
+      slug: 'privacy',
       title: L('Privasi', 'Privacy'),
       body: L(
         'Kami menghormati privasi Anda. Data dienkripsi saat transit dan saat disimpan, terpisah antar pelanggan, dan tidak dibagikan ke pihak ketiga.',

@@ -84,9 +84,9 @@ export function OrbsBg() {
 }
 
 const NAV_LINKS: { to: string; label: Loc }[] = [
-  { to: '/p/fitur', label: { id: 'Fitur', en: 'Features' } },
-  { to: '/p/harga', label: { id: 'Harga', en: 'Pricing' } },
-  { to: '/p/dokumentasi', label: { id: 'Dokumentasi', en: 'Docs' } },
+  { to: '/p/features', label: { id: 'Fitur', en: 'Features' } },
+  { to: '/p/pricing', label: { id: 'Harga', en: 'Pricing' } },
+  { to: '/p/docs', label: { id: 'Dokumentasi', en: 'Docs' } },
   { to: '/p/api', label: { id: 'API', en: 'API' } },
 ];
 

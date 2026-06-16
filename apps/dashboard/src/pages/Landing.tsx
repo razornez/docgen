@@ -249,7 +249,7 @@ export default function LandingPage() {
               {fmt(bonus)} {dok}
             </Link>
             <Link
-              to="/p/dokumentasi"
+              to="/p/docs"
               className="px-5 py-3 text-[14px] font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
             >
               {t('Lihat dokumentasi', 'View documentation')}
@@ -321,7 +321,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section id="fitur" className="max-w-6xl mx-auto px-6 py-16">
+      <section id="features" className="max-w-6xl mx-auto px-6 py-16">
         <h2 className="text-center text-[28px] font-extrabold tracking-tight">
           {t(
             'Semua yang dibutuhkan untuk dokumen massal',
@@ -401,7 +401,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section id="harga" className="max-w-6xl mx-auto px-6 py-16">
+      <section id="pricing" className="max-w-6xl mx-auto px-6 py-16">
         <h2 className="text-center text-[28px] font-extrabold tracking-tight">
           {t('Harga sejujur kredit', 'Honest credit pricing')}
         </h2>
