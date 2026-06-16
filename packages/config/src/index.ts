@@ -93,6 +93,9 @@ const EnvSchema = z.object({
   // tenant. Di produksi WAJIB diganti nilai kuat via .env.
   OWNER_EMAIL: z.string().default('owner@docgen.local'),
   OWNER_PASSWORD: z.string().min(6).default('owner12345'),
+  /** Alternatif aman: hash bcrypt password owner. Jika di-set, dipakai
+   *  menggantikan OWNER_PASSWORD plaintext. */
+  OWNER_PASSWORD_HASH: z.string().optional(),
 
   // Login Google (dipakai tahap auth)
   GOOGLE_CLIENT_ID: z.string().default(''),

@@ -89,8 +89,10 @@ export class PaymentService {
     snapToken: string | null;
     clientKey: string | null;
   }> {
-    const { rows: pkgRows } = await this.db.query<CreditPackageRow>(
-      `SELECT id, name, credits, price_idr, active FROM credit_packages WHERE id = $1 AND active = TRUE`,
+    const { rows: pkgRows } = await this.db.query<
+      CreditPackageRow & { bonus: string }
+    >(
+      `SELECT id, name, credits, bonus, price_idr, active FROM credit_packages WHERE id = $1 AND active = TRUE`,
       [packageId],
     );
     const pkg = pkgRows[0];
@@ -104,7 +106,8 @@ export class PaymentService {
     const customerName = tenantRows[0]?.name ?? 'DocGen User';
 
     const paymentId = this.idGen.generate(ID_PREFIXES.payment);
-    const credits = Number(pkg.credits);
+    // Kredit diterima = kredit paket + bonus paket (jika ada).
+    const credits = Number(pkg.credits) + Number(pkg.bonus ?? 0);
     const amountIdr = Number(pkg.price_idr);
 
     // Buat transaksi di Kasugai (orders + pay).

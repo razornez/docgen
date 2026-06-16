@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { randomBase62 } from '@docgen/shared';
 import type { AppConfig } from '@docgen/config';
@@ -108,28 +109,29 @@ export function registerOwnerRoutes(
   config: AppConfig,
 ): void {
   app.post('/owner/login', async (request, reply) => {
-    // Keamanan: di produksi, tolak login owner selama password masih default
-    // bawaan ('owner12345'). Owner Console baru aktif setelah OWNER_PASSWORD
-    // kuat di-set via environment. (Lokal/dev tetap pakai default agar praktis.)
-    if (
-      config.NODE_ENV === 'production' &&
-      config.OWNER_PASSWORD === 'owner12345'
-    ) {
+    // Owner dianggap terkonfigurasi bila pakai hash, atau password plaintext
+    // sudah diganti dari default bawaan.
+    const configured =
+      !!config.OWNER_PASSWORD_HASH || config.OWNER_PASSWORD !== 'owner12345';
+    // Keamanan: di produksi, tolak login selama belum dikonfigurasi.
+    if (config.NODE_ENV === 'production' && !configured) {
       reply.code(503);
       return {
         error: {
           type: 'not_configured',
           message:
-            'Owner Console belum dikonfigurasi. Set OWNER_EMAIL & OWNER_PASSWORD yang kuat di environment server.',
+            'Owner Console belum dikonfigurasi. Set OWNER_EMAIL & OWNER_PASSWORD (atau OWNER_PASSWORD_HASH) yang kuat di environment server.',
           request_id: request.id,
         },
       };
     }
     const body = LoginSchema.parse(request.body ?? {});
-    const ok =
-      body.email.toLowerCase() === config.OWNER_EMAIL.toLowerCase() &&
-      body.password === config.OWNER_PASSWORD;
-    if (!ok) {
+    const emailOk =
+      body.email.toLowerCase() === config.OWNER_EMAIL.toLowerCase();
+    const passOk = config.OWNER_PASSWORD_HASH
+      ? await bcrypt.compare(body.password, config.OWNER_PASSWORD_HASH)
+      : body.password === config.OWNER_PASSWORD;
+    if (!emailOk || !passOk) {
       reply.code(401);
       return {
         error: {
@@ -333,7 +335,7 @@ export function registerOwnerRoutes(
     const denied = ownerGuard(request, reply, config.SESSION_SECRET);
     if (denied) return denied;
 
-    const [queue, jobs] = await Promise.all([
+    const [queue, jobs, days, p95res] = await Promise.all([
       pool.query<{ running: string; queued: string }>(
         `SELECT (SELECT count(*) FROM batches WHERE status='processing') AS running,
                 (SELECT count(*) FROM batches WHERE status='queued') AS queued`,
@@ -353,26 +355,42 @@ export function registerOwnerRoutes(
           ORDER BY d.created_at DESC
           LIMIT 6`,
       ),
+      // Throughput 14 hari = dokumen dibuat per hari (data nyata).
+      pool.query<{ cnt: string }>(
+        `SELECT count(d.*) AS cnt
+           FROM generate_series(now()::date - interval '13 days',
+                                now()::date, interval '1 day') gs
+           LEFT JOIN documents d ON d.created_at::date = gs::date
+          GROUP BY gs ORDER BY gs ASC`,
+      ),
+      // p95 durasi render nyata (dok selesai 30 hari, buang anomali >60s).
+      pool.query<{ p95: string | null }>(
+        `SELECT round(
+                  percentile_cont(0.95) WITHIN GROUP (ORDER BY s)::numeric, 1
+                ) AS p95
+           FROM (SELECT extract(epoch from (completed_at - created_at)) AS s
+                   FROM documents
+                  WHERE status='completed' AND completed_at IS NOT NULL
+                    AND created_at > now() - interval '30 days'
+                    AND extract(epoch from (completed_at - created_at))
+                        BETWEEN 0 AND 60) x`,
+      ),
     ]);
     const q = queue.rows[0]!;
-    // Throughput render = telemetri infra (pola demo deterministik) — kita belum
-    // menyimpan agregat throughput harian; angka dokumen riil terlalu jarang.
-    const pattern = [
-      0.62, 0.66, 0.58, 0.74, 0.81, 0.55, 0.63, 0.7, 0.78, 0.88, 0.95, 0.72,
-      0.8, 1.0,
-    ];
-    const peak = 14970;
+    const days14 = days.rows.map((r) => Number(r.cnt));
+    const perDay = days14.length ? Math.max(...days14) : 0;
+    const p95 = p95res.rows[0]?.p95 != null ? Number(p95res.rows[0]!.p95) : 1.8;
     return {
       status_ok: true,
       stats: {
         workers: 8,
         running: Number(q.running),
         queued: Number(q.queued),
-        p95: 1.8,
+        p95,
       },
       throughput: {
-        per_day: peak,
-        days14: pattern.map((f) => Math.round(f * peak)),
+        per_day: perDay,
+        days14,
       },
       recent_jobs: jobs.rows.map((r) => ({
         id: r.id,
