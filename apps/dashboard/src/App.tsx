@@ -5,6 +5,7 @@ import Layout from './components/Layout.js';
 // Halaman entry (unauth) di-load eager agar first paint tanpa flash.
 import LandingPage from './pages/Landing.js';
 import LoginPage from './pages/Login.js';
+import PublicPage from './pages/PublicPage.js';
 import AuthCallbackPage from './pages/AuthCallback.js';
 import OwnerLoginPage from './pages/owner/OwnerLogin.js';
 import OwnerLayout from './pages/owner/OwnerLayout.js';
@@ -101,6 +102,7 @@ export default function App() {
     <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/p/:slug" element={<PublicPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route

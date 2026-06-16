@@ -308,22 +308,47 @@ export function getPublicPricing(): Promise<PublicPricing> {
   return request('/public/pricing', {}, '');
 }
 
-export interface SiteContent {
-  footer_tagline: string;
-  footer_columns: { head: string; items: { label: string; href: string }[] }[];
+export interface Loc {
+  id: string;
+  en: string;
+}
+export interface FooterLink {
+  label: Loc;
+  href: string;
+}
+export interface FooterColumn {
+  head: Loc;
+  items: FooterLink[];
+}
+export interface CmsPage {
+  slug: string;
+  title: Loc;
+  body: Loc;
+}
+export interface PublicContent {
+  footer_tagline: Loc;
+  footer_columns: FooterColumn[];
+}
+export interface OwnerSiteContent extends PublicContent {
+  pages: CmsPage[];
 }
 
-/** Konten publik (footer landing) tanpa auth. */
-export function getPublicContent(): Promise<SiteContent> {
+/** Konten publik (footer) tanpa auth. */
+export function getPublicContent(): Promise<PublicContent> {
   return request('/public/content', {}, '');
 }
 
-export function getOwnerContent(): Promise<SiteContent> {
+/** Halaman CMS publik per slug. */
+export function getPublicPage(slug: string): Promise<CmsPage> {
+  return request(`/public/page/${slug}`, {}, '');
+}
+
+export function getOwnerContent(): Promise<OwnerSiteContent> {
   return request('/owner/content', {}, getOwnerToken() ?? '');
 }
 
 export function saveOwnerContent(
-  body: SiteContent,
+  body: OwnerSiteContent,
 ): Promise<{ saved: boolean }> {
   return request(
     '/owner/content',

@@ -40,5 +40,29 @@ export function registerPublicRoutes(app: FastifyInstance, pool: Pool): void {
   });
 
   // Konten publik (footer landing) — dikelola owner.
-  app.get('/public/content', async () => readSiteContent(pool));
+  app.get('/public/content', async () => {
+    const c = await readSiteContent(pool);
+    return {
+      footer_tagline: c.footer_tagline,
+      footer_columns: c.footer_columns,
+    };
+  });
+
+  // Halaman publik (CMS) per slug — dwibahasa.
+  app.get('/public/page/:slug', async (request, reply) => {
+    const { slug } = request.params as { slug: string };
+    const c = await readSiteContent(pool);
+    const page = c.pages.find((p) => p.slug === slug);
+    if (!page) {
+      reply.code(404);
+      return {
+        error: {
+          type: 'not_found',
+          message: 'Halaman tidak ditemukan',
+          request_id: request.id,
+        },
+      };
+    }
+    return page;
+  });
 }

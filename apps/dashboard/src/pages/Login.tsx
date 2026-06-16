@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth.js';
 import { authLogin, authRegister, getPublicPricing } from '../api/client.js';
 import { useLang } from '../i18n/index.js';
+import { Flower, LangToggle } from '../components/PublicChrome.js';
 
 type Tab = 'login' | 'register';
 
@@ -16,53 +17,6 @@ const PAPERS: Array<React.CSSProperties & { '--r': string }> = [
   { bottom: '2%', left: '46%', width: 104, height: 138, '--r': '-5deg' },
 ];
 
-function Flower({ className = 'w-8 h-8' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 32 32" aria-hidden="true">
-      <defs>
-        <linearGradient id="login-flower" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f15bb5" />
-          <stop offset="0.5" stopColor="#9b5de5" />
-          <stop offset="1" stopColor="#fca15b" />
-        </linearGradient>
-      </defs>
-      <g fill="url(#login-flower)">
-        {[0, 72, 144, 216, 288].map((a) => (
-          <ellipse
-            key={a}
-            cx="16"
-            cy="8.5"
-            rx="4"
-            ry="6.6"
-            transform={`rotate(${a} 16 16)`}
-          />
-        ))}
-      </g>
-      <circle cx="16" cy="16" r="3.1" fill="#fff" opacity="0.92" />
-    </svg>
-  );
-}
-
-function LangToggle() {
-  const { lang, setLang } = useLang();
-  return (
-    <div className="flex items-center rounded-full glass-soft p-0.5 text-[11px] font-bold">
-      {(['id', 'en'] as const).map((l) => (
-        <button
-          key={l}
-          type="button"
-          onClick={() => setLang(l)}
-          className={`px-2.5 py-1 rounded-full uppercase transition-all ${
-            lang === l ? 'bg-grad text-white' : 'text-mut hover:text-ink'
-          }`}
-        >
-          {l}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 const inputCls =
   'w-full bg-white/70 border border-white/60 rounded-xl px-3.5 py-2.5 text-[14px] text-ink placeholder:text-mut/70 focus:outline-none focus:ring-2 focus:ring-brand-purple/30 transition-all';
 
@@ -71,7 +25,7 @@ function PwToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
     <button
       type="button"
       onClick={onToggle}
-      aria-label={show ? 'Sembunyikan kata sandi' : 'Lihat kata sandi'}
+      aria-label="toggle"
       className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-mut hover:text-ink transition-colors"
     >
       <svg
@@ -108,7 +62,9 @@ function PwToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const { lang } = useLang();
   const navigate = useNavigate();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const [tab, setTab] = useState<Tab>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -123,11 +79,11 @@ export default function LoginPage() {
     queryFn: getPublicPricing,
   });
   const bonus = (pricing.data?.signup_bonus_credits ?? 100).toLocaleString(
-    'id-ID',
+    lang === 'en' ? 'en-US' : 'id-ID',
   );
 
-  function switchTab(t: Tab) {
-    setTab(t);
+  function switchTab(x: Tab) {
+    setTab(x);
     setError('');
     setForgotOpen(false);
   }
@@ -137,30 +93,25 @@ export default function LoginPage() {
     setPassword(DEMO_PASSWORD);
     setError('');
   }
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const res = await authLogin(email.trim(), password);
+      const res =
+        tab === 'login'
+          ? await authLogin(email.trim(), password)
+          : await authRegister(name.trim(), email.trim(), password);
       login(res.token);
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login gagal');
-    } finally {
-      setLoading(false);
-    }
-  }
-  async function handleRegister(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const res = await authRegister(name.trim(), email.trim(), password);
-      login(res.token);
-      navigate('/dashboard', { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Pendaftaran gagal');
+      setError(
+        err instanceof Error
+          ? err.message
+          : tab === 'login'
+            ? t('Login gagal', 'Login failed')
+            : t('Pendaftaran gagal', 'Sign-up failed'),
+      );
     } finally {
       setLoading(false);
     }
@@ -171,7 +122,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex text-ink">
-      {/* ── Left brand panel ─────────────────────────────────────────── */}
+      {/* Left brand panel */}
       <div
         className="hidden lg:flex flex-col justify-between w-[42%] relative overflow-hidden p-12"
         style={{
@@ -193,17 +144,18 @@ export default function LoginPage() {
             />
           ))}
         </div>
-
         <div className="relative flex items-center gap-2.5">
           <Flower className="w-9 h-9" />
           <span className="text-[20px] font-extrabold tracking-tight text-white lowercase">
             docgen
           </span>
         </div>
-
         <div className="relative">
           <h1 className="text-[34px] font-extrabold text-white leading-[1.15]">
-            Dari HTML &amp; data, jadi PDF rapi —{' '}
+            {t(
+              'Dari HTML & data, jadi PDF rapi — ',
+              'From HTML & data to clean PDFs — ',
+            )}
             <span
               className="bg-clip-text text-transparent"
               style={{
@@ -211,16 +163,16 @@ export default function LoginPage() {
                   'linear-gradient(135deg, #c8a8ff 0%, #f5a9d4 100%)',
               }}
             >
-              dalam satu panggilan.
+              {t('dalam satu panggilan.', 'in a single call.')}
             </span>
           </h1>
           <ul className="mt-8 space-y-3.5">
             {[
-              'Template HTML + variabel',
-              'Kredit prepaid',
-              'API & Webhooks',
-            ].map((t) => (
-              <li key={t} className="flex items-center gap-3">
+              t('Template HTML + variabel', 'HTML templates + variables'),
+              t('Kredit prepaid', 'Prepaid credits'),
+              t('API & Webhooks', 'API & Webhooks'),
+            ].map((txt) => (
+              <li key={txt} className="flex items-center gap-3">
                 <svg
                   className="w-4 h-4 text-[#c8a8ff] flex-shrink-0"
                   fill="none"
@@ -234,18 +186,18 @@ export default function LoginPage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span className="text-[14px] text-slate-200">{t}</span>
+                <span className="text-[14px] text-slate-200">{txt}</span>
               </li>
             ))}
           </ul>
         </div>
-
         <p className="num relative text-[11px] text-slate-400/80">
-          Tanpa kartu kredit · Kredit prepaid · QRIS / VA / e-wallet
+          {t('Tanpa kartu kredit', 'No credit card')} ·{' '}
+          {t('Kredit prepaid', 'Prepaid credits')} · QRIS / VA / e-wallet
         </p>
       </div>
 
-      {/* ── Right form panel ─────────────────────────────────────────── */}
+      {/* Right form panel */}
       <div className="flex-1 relative flex flex-col app-canvas overflow-hidden">
         <div className="absolute inset-0 overflow-hidden" aria-hidden>
           {PAPERS.map((style, i) => (
@@ -281,7 +233,7 @@ export default function LoginPage() {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Kembali ke beranda
+            {t('Kembali ke beranda', 'Back to home')}
           </Link>
           <LangToggle />
         </div>
@@ -289,33 +241,38 @@ export default function LoginPage() {
         <div className="relative flex-1 flex items-center justify-center px-6 pb-10">
           <div className="glass rounded-[22px] p-7 w-full max-w-[420px]">
             <h2 className="text-[22px] font-extrabold text-ink">
-              {tab === 'login' ? 'Masuk ke DocGen' : 'Buat akun DocGen'}
+              {tab === 'login'
+                ? t('Masuk ke DocGen', 'Sign in to DocGen')
+                : t('Buat akun DocGen', 'Create your DocGen account')}
             </h2>
             <p className="text-[13px] text-mut mt-1">
               {tab === 'login'
-                ? 'Lanjutkan ke dasbormu.'
-                : `${bonus} kredit gratis saat daftar.`}
+                ? t('Lanjutkan ke dasbormu.', 'Continue to your dashboard.')
+                : t(
+                    `${bonus} kredit gratis saat daftar.`,
+                    `${bonus} free credits on sign-up.`,
+                  )}
             </p>
 
-            {/* Tabs */}
             <div className="flex mt-5 mb-4 glass-soft rounded-full p-1 gap-1">
-              {(['login', 'register'] as const).map((t) => (
+              {(['login', 'register'] as const).map((x) => (
                 <button
-                  key={t}
+                  key={x}
                   type="button"
-                  onClick={() => switchTab(t)}
+                  onClick={() => switchTab(x)}
                   className={`flex-1 py-2 text-[13px] font-bold rounded-full transition-all ${
-                    tab === t
+                    tab === x
                       ? 'bg-grad text-white shadow-[0_4px_12px_rgba(155,93,229,0.35)]'
                       : 'text-mut hover:text-ink'
                   }`}
                 >
-                  {t === 'login' ? 'Masuk' : 'Daftar'}
+                  {x === 'login'
+                    ? t('Masuk', 'Sign in')
+                    : t('Daftar', 'Sign up')}
                 </button>
               ))}
             </div>
 
-            {/* Google */}
             <button
               type="button"
               onClick={handleGoogle}
@@ -339,13 +296,13 @@ export default function LoginPage() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Lanjutkan dengan Google
+              {t('Lanjutkan dengan Google', 'Continue with Google')}
             </button>
 
             <div className="relative my-4">
               <hr className="border-white/50" />
               <span className="num absolute left-1/2 -translate-x-1/2 -top-2 px-2 text-[10.5px] text-mut bg-white/50 backdrop-blur-sm rounded">
-                atau
+                {t('atau', 'or')}
               </span>
             </div>
 
@@ -369,15 +326,13 @@ export default function LoginPage() {
             )}
 
             <form
-              onSubmit={(e) =>
-                void (tab === 'login' ? handleLogin(e) : handleRegister(e))
-              }
+              onSubmit={(e) => void handleSubmit(e)}
               className="space-y-3.5"
             >
               {tab === 'register' && (
                 <div>
                   <label className="block text-[10.5px] font-bold uppercase tracking-wider text-mut mb-1.5">
-                    Nama / perusahaan
+                    {t('Nama / perusahaan', 'Name / company')}
                   </label>
                   <input
                     type="text"
@@ -392,7 +347,7 @@ export default function LoginPage() {
               )}
               <div>
                 <label className="block text-[10.5px] font-bold uppercase tracking-wider text-mut mb-1.5">
-                  Email kerja
+                  {t('Email kerja', 'Work email')}
                 </label>
                 <input
                   type="email"
@@ -407,7 +362,7 @@ export default function LoginPage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-[10.5px] font-bold uppercase tracking-wider text-mut">
-                    Kata sandi
+                    {t('Kata sandi', 'Password')}
                   </label>
                   {tab === 'login' && (
                     <button
@@ -415,7 +370,7 @@ export default function LoginPage() {
                       onClick={() => setForgotOpen((v) => !v)}
                       className="text-[11.5px] font-bold text-brand-purple hover:opacity-80 transition-opacity"
                     >
-                      Lupa sandi?
+                      {t('Lupa sandi?', 'Forgot password?')}
                     </button>
                   )}
                 </div>
@@ -439,7 +394,10 @@ export default function LoginPage() {
                 </div>
                 {forgotOpen && tab === 'login' && (
                   <p className="mt-2 text-[11.5px] text-mut bg-white/50 border border-white/50 rounded-lg px-3 py-2 leading-relaxed">
-                    Reset mandiri belum tersedia. Pakai akun demo, atau hubungi{' '}
+                    {t(
+                      'Reset mandiri belum tersedia. Pakai akun demo, atau hubungi ',
+                      'Self-service reset is not available yet. Use the demo account, or contact ',
+                    )}
                     <a
                       href="mailto:support@docgen.razornez.net"
                       className="font-semibold text-brand-purple"
@@ -459,7 +417,7 @@ export default function LoginPage() {
                     onChange={(e) => setRemember(e.target.checked)}
                     className="w-4 h-4 rounded accent-[#9b5de5]"
                   />
-                  Ingat saya
+                  {t('Ingat saya', 'Remember me')}
                 </label>
               )}
 
@@ -470,11 +428,14 @@ export default function LoginPage() {
               >
                 {loading
                   ? tab === 'login'
-                    ? 'Masuk…'
-                    : 'Membuat akun…'
+                    ? t('Masuk…', 'Signing in…')
+                    : t('Membuat akun…', 'Creating account…')
                   : tab === 'login'
-                    ? 'Masuk'
-                    : `Daftar — ${bonus} kredit gratis`}
+                    ? t('Masuk', 'Sign in')
+                    : t(
+                        `Daftar — ${bonus} kredit gratis`,
+                        `Sign up — ${bonus} free credits`,
+                      )}
                 {!loading && (
                   <svg
                     className="w-4 h-4"
@@ -495,7 +456,9 @@ export default function LoginPage() {
 
             <div className="mt-4 flex items-center justify-between gap-2">
               <p className="text-[12.5px] text-mut">
-                {tab === 'login' ? 'Belum punya akun? ' : 'Sudah punya akun? '}
+                {tab === 'login'
+                  ? t('Belum punya akun? ', "Don't have an account? ")
+                  : t('Sudah punya akun? ', 'Already have an account? ')}
                 <button
                   type="button"
                   onClick={() =>
@@ -503,7 +466,9 @@ export default function LoginPage() {
                   }
                   className="font-bold text-brand-purple hover:opacity-80"
                 >
-                  {tab === 'login' ? 'Daftar' : 'Masuk'}
+                  {tab === 'login'
+                    ? t('Daftar', 'Sign up')
+                    : t('Masuk', 'Sign in')}
                 </button>
               </p>
               <button
@@ -512,7 +477,7 @@ export default function LoginPage() {
                 className="text-[11.5px] font-semibold text-mut hover:text-ink transition-colors"
                 title={`${DEMO_EMAIL} / ${DEMO_PASSWORD}`}
               >
-                Pakai akun demo
+                {t('Pakai akun demo', 'Use demo account')}
               </button>
             </div>
           </div>
