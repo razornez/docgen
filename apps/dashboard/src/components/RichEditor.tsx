@@ -203,10 +203,99 @@ export default function RichEditor({
     [editor],
   );
 
+  // Impor DOCX/PDF → konversi → ganti isi editor.
+  const docFileRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const openImport = useCallback(() => docFileRef.current?.click(), []);
+
+  const importFile = useCallback(
+    async (file: File) => {
+      if (!editor) return;
+      const hasContent = editor.getText().trim().length > 0;
+      if (
+        hasContent &&
+        !window.confirm('Ganti seluruh isi editor dengan dokumen ini?')
+      )
+        return;
+      setImporting(true);
+      setImgStatus(`Mengonversi ${file.name}…`);
+      try {
+        // Lazy-load konverter (mammoth + pdfjs) hanya saat dibutuhkan.
+        const { importDocumentToHtml } = await import('../lib/docimport.js');
+        const res = await importDocumentToHtml(file);
+        editor.commands.setContent(res.html || '<p></p>');
+        const html = editor.getHTML();
+        setSourceHtml(html);
+        onChange(html);
+        const note =
+          res.kind === 'pdf'
+            ? `PDF dikonversi (${res.pages ?? '?'} hlm)`
+            : 'DOCX dikonversi';
+        setImgStatus(res.warnings[0] ? `${note} · ${res.warnings[0]}` : note);
+        window.setTimeout(() => setImgStatus(''), 4500);
+      } catch (err) {
+        setImgStatus(
+          err instanceof Error ? err.message : 'Gagal mengonversi dokumen',
+        );
+        window.setTimeout(() => setImgStatus(''), 5000);
+      } finally {
+        setImporting(false);
+      }
+    },
+    [editor, onChange],
+  );
+
+  const handleDocInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (file) void importFile(file);
+    },
+    [importFile],
+  );
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      setDragOver(false);
+      const file = Array.from(e.dataTransfer.files).find((f) =>
+        /\.(docx|pdf)$/i.test(f.name),
+      );
+      if (file) {
+        e.preventDefault();
+        void importFile(file);
+      }
+    },
+    [importFile],
+  );
+
   if (!editor) return null;
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500">
+    <div
+      className="relative border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500"
+      onDragOver={(e) => {
+        if (Array.from(e.dataTransfer.types).includes('Files')) {
+          e.preventDefault();
+          setDragOver(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragOver(false);
+      }}
+      onDrop={onDrop}
+    >
+      {dragOver && (
+        <div className="absolute inset-0 z-40 bg-indigo-50/95 border-2 border-dashed border-indigo-400 rounded-lg flex flex-col items-center justify-center pointer-events-none">
+          <Icon
+            d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+            size={30}
+          />
+          <p className="mt-2 text-sm font-semibold text-indigo-700">
+            Lepas untuk impor DOCX / PDF
+          </p>
+        </div>
+      )}
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50">
         {/* Undo/Redo */}
@@ -406,6 +495,28 @@ export default function RichEditor({
 
         <Sep />
 
+        {/* Impor DOCX / PDF */}
+        <button
+          type="button"
+          onClick={openImport}
+          disabled={importing}
+          title="Impor dokumen Word/PDF → HTML"
+          className={[
+            'inline-flex items-center gap-1 px-2 h-7 rounded text-xs font-semibold transition-colors',
+            importing
+              ? 'bg-indigo-100 text-indigo-400 cursor-wait'
+              : 'bg-indigo-600 text-white hover:bg-indigo-700',
+          ].join(' ')}
+        >
+          <Icon
+            d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+            size={13}
+          />
+          {importing ? 'Mengonversi…' : 'Impor DOCX/PDF'}
+        </button>
+
+        <Sep />
+
         {/* Highlight */}
         <ToolbarBtn
           title="Sorot teks"
@@ -487,6 +598,14 @@ export default function RichEditor({
         accept="image/*"
         className="hidden"
         onChange={(e) => void handleImageFile(e)}
+      />
+      {/* Input file tersembunyi untuk impor DOCX/PDF */}
+      <input
+        ref={docFileRef}
+        type="file"
+        accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        className="hidden"
+        onChange={handleDocInput}
       />
 
       {/* Editor area */}
