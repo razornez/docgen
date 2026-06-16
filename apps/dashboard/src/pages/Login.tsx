@@ -84,6 +84,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [searchParams] = useSearchParams();
   const verified = searchParams.get('verified');
+  const oauthError = searchParams.get('error');
   const pricing = useQuery({
     queryKey: ['public-pricing'],
     queryFn: getPublicPricing,
@@ -152,7 +153,7 @@ export default function LoginPage() {
             'linear-gradient(160deg, #271847 0%, #3a2566 52%, #4a2c6e 100%)',
         }}
       >
-        <div className="absolute inset-0 overflow-hidden opacity-[0.18]">
+        <div className="absolute inset-0 overflow-hidden opacity-[0.18] pointer-events-none">
           {PAPERS.map((style, i) => (
             <div
               key={i}
@@ -221,7 +222,10 @@ export default function LoginPage() {
 
       {/* Right form panel */}
       <div className="flex-1 relative flex flex-col app-canvas overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden" aria-hidden>
+        <div
+          className="absolute inset-0 overflow-hidden pointer-events-none"
+          aria-hidden
+        >
           {PAPERS.map((style, i) => (
             <div
               key={i}
@@ -327,6 +331,15 @@ export default function LoginPage() {
                 {t('atau', 'or')}
               </span>
             </div>
+
+            {oauthError === 'oauth_failed' && (
+              <div className="mb-3 text-[12.5px] rounded-xl px-3 py-2.5 border text-rose-700 bg-rose-50/80 border-rose-200">
+                {t(
+                  'Login dengan Google gagal. Silakan coba lagi.',
+                  'Google sign-in failed. Please try again.',
+                )}
+              </div>
+            )}
 
             {verified && (
               <div
@@ -556,7 +569,10 @@ export default function LoginPage() {
                 type="button"
                 onClick={fillDemo}
                 className="text-[11.5px] font-semibold text-mut hover:text-ink transition-colors"
-                title={`${DEMO_EMAIL} / ${DEMO_PASSWORD}`}
+                title={t(
+                  'Isi otomatis akun demo',
+                  'Auto-fill the demo account',
+                )}
               >
                 {t('Pakai akun demo', 'Use demo account')}
               </button>
