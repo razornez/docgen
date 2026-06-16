@@ -2,45 +2,55 @@ import { useQuery } from '@tanstack/react-query';
 import { getOwnerRender, type OwnerRender } from '../../api/client.js';
 import { useLang } from '../../i18n/index.js';
 
-const JOB_CFG: Record<string, { label: string; cls: string; dot: string }> = {
+const JOB_CFG: Record<
+  string,
+  { label: { id: string; en: string }; cls: string; dot: string }
+> = {
   completed: {
-    label: 'Selesai',
+    label: { id: 'Selesai', en: 'Completed' },
     cls: 'text-emerald-700 bg-emerald-100/70',
     dot: 'bg-emerald-500',
   },
   processing: {
-    label: 'Proses',
+    label: { id: 'Proses', en: 'Processing' },
     cls: 'text-blue-700 bg-blue-100/70',
     dot: 'bg-blue-500',
   },
   failed: {
-    label: 'Gagal',
+    label: { id: 'Gagal', en: 'Failed' },
     cls: 'text-rose-600 bg-rose-100/70',
     dot: 'bg-rose-500',
   },
   queued: {
-    label: 'Antrian',
+    label: { id: 'Antrian', en: 'Queued' },
     cls: 'text-slate-600 bg-slate-200/70',
     dot: 'bg-slate-400',
   },
 };
 
-function durationText(status: string, dur: number | null): string {
-  if (status === 'failed') return 'durasi timeout';
+function durationText(
+  status: string,
+  dur: number | null,
+  t: (id: string, en: string) => string,
+): string {
+  if (status === 'failed') return t('durasi timeout', 'duration timeout');
   if (status === 'completed' && dur != null)
-    return `durasi ${dur.toLocaleString('id-ID', { maximumFractionDigits: 1 })}s`;
-  return 'durasi —';
+    return `${t('durasi', 'duration')} ${dur.toLocaleString('id-ID', { maximumFractionDigits: 1 })}s`;
+  return t('durasi —', 'duration —');
 }
 
 function ThroughputCard({ d }: { d: OwnerRender }) {
-  const { fmtNum } = useLang();
+  const { fmtNum, lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const max = Math.max(...d.throughput.days14, 1);
   return (
     <div className="glass rounded-glass px-6 py-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[14.5px] font-bold text-ink">Throughput 14 hari</h2>
+        <h2 className="text-[14.5px] font-bold text-ink">
+          {t('Throughput 14 hari', 'Throughput 14 days')}
+        </h2>
         <span className="num text-[11px] text-mut">
-          {fmtNum(d.throughput.per_day)} dok/hari
+          {fmtNum(d.throughput.per_day)} {t('dok/hari', 'docs/day')}
         </span>
       </div>
       <div className="mt-5 flex items-end justify-between gap-2 h-[150px]">
@@ -51,7 +61,7 @@ function ThroughputCard({ d }: { d: OwnerRender }) {
             <div
               key={i}
               className="flex-1 flex flex-col items-center justify-end gap-1.5"
-              title={`${fmtNum(v)} dok`}
+              title={`${fmtNum(v)} ${t('dok', 'docs')}`}
             >
               <span
                 className={`num text-[8.5px] font-semibold leading-none ${isLast ? 'text-brand-purple' : 'text-mut'}`}
@@ -71,16 +81,17 @@ function ThroughputCard({ d }: { d: OwnerRender }) {
 }
 
 export default function OwnerSystem() {
-  const { fmtNum } = useLang();
+  const { fmtNum, lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const q = useQuery({ queryKey: ['owner-render'], queryFn: getOwnerRender });
   const d = q.data;
 
   const stats = d
     ? [
-        { label: 'Worker', value: fmtNum(d.stats.workers) },
-        { label: 'Berjalan', value: fmtNum(d.stats.running) },
-        { label: 'Antri', value: fmtNum(d.stats.queued) },
-        { label: 'P95', value: `${d.stats.p95}s` },
+        { label: t('Worker', 'Workers'), value: fmtNum(d.stats.workers) },
+        { label: t('Berjalan', 'Running'), value: fmtNum(d.stats.running) },
+        { label: t('Antri', 'Queued'), value: fmtNum(d.stats.queued) },
+        { label: t('P95', 'P95'), value: `${d.stats.p95}s` },
       ]
     : [];
 
@@ -90,9 +101,14 @@ export default function OwnerSystem() {
       <div className="glass rounded-glass overflow-hidden">
         <div className="flex items-start justify-between gap-4 px-6 py-5">
           <div>
-            <h1 className="text-[17px] font-bold text-ink">Render</h1>
+            <h1 className="text-[17px] font-bold text-ink">
+              {t('Render', 'Render')}
+            </h1>
             <p className="text-[12.5px] text-mut mt-0.5">
-              Worker Chromium, throughput, dan job render terbaru.
+              {t(
+                'Worker Chromium, throughput, dan job render terbaru.',
+                'Chromium workers, throughput, and latest render jobs.',
+              )}
             </p>
           </div>
           {d && (
@@ -102,7 +118,9 @@ export default function OwnerSystem() {
               <span
                 className={`w-1.5 h-1.5 rounded-full ${d.status_ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
               />
-              {d.status_ok ? 'Semua sistem normal' : 'Ada gangguan'}
+              {d.status_ok
+                ? t('Semua sistem normal', 'All systems normal')
+                : t('Ada gangguan', 'Disruption detected')}
             </span>
           )}
         </div>
@@ -135,7 +153,7 @@ export default function OwnerSystem() {
           <div className="glass rounded-glass overflow-hidden">
             <div className="px-6 py-4 border-b border-white/40">
               <h2 className="text-[14.5px] font-bold text-ink">
-                Job render terbaru
+                {t('Job render terbaru', 'Latest render jobs')}
               </h2>
             </div>
             <div className="divide-y divide-white/40">
@@ -166,21 +184,21 @@ export default function OwnerSystem() {
                         {j.tenant}
                       </p>
                       <p className="num text-[11px] text-mut truncate">
-                        {j.template} · {durationText(j.status, j.duration_s)}
+                        {j.template} · {durationText(j.status, j.duration_s, t)}
                       </p>
                     </div>
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold flex-shrink-0 ${cfg.cls}`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                      {cfg.label}
+                      {lang === 'en' ? cfg.label.en : cfg.label.id}
                     </span>
                   </div>
                 );
               })}
               {d.recent_jobs.length === 0 && (
                 <p className="px-6 py-10 text-center text-[13px] text-mut">
-                  Belum ada job render.
+                  {t('Belum ada job render.', 'No render jobs yet.')}
                 </p>
               )}
             </div>

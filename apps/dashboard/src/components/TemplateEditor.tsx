@@ -8,6 +8,7 @@ import {
   type TemplateItem,
 } from '../api/client.js';
 import { extractVars, buildDummyJson } from '../lib/templateData.js';
+import { useLang } from '../i18n/index.js';
 
 /** Render klien sederhana (mesin polos {{ }} / {{{ }}}) untuk preview instan. */
 function esc(s: string): string {
@@ -31,6 +32,8 @@ export function TemplateEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const [tab, setTab] = useState<'html' | 'data'>('data');
   const [body, setBody] = useState('');
   const [data, setData] = useState<Record<string, string>>({});
@@ -59,7 +62,13 @@ export function TemplateEditor({
         const v = extractVars(res.version.body);
         setData(JSON.parse(buildDummyJson(v)) as Record<string, string>);
       } catch {
-        if (alive) setError('Gagal memuat konten template');
+        if (alive)
+          setError(
+            t(
+              'Gagal memuat konten template',
+              'Failed to load template content',
+            ),
+          );
       } finally {
         if (alive) setLoading(false);
       }
@@ -87,7 +96,11 @@ export function TemplateEditor({
       onSaved();
       window.setTimeout(() => setSaveState('idle'), 2500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal menyimpan versi');
+      setError(
+        e instanceof Error
+          ? e.message
+          : t('Gagal menyimpan versi', 'Failed to save version'),
+      );
       setSaveState('idle');
     }
   }
@@ -113,7 +126,10 @@ export function TemplateEditor({
       const docs = await getBatchDocuments(b.id);
       const doc = docs.data[0];
       if (!doc || doc.status !== 'completed' || !doc.output_url)
-        throw new Error(doc?.error ?? 'Dokumen gagal diproses');
+        throw new Error(
+          doc?.error ??
+            t('Dokumen gagal diproses', 'Document failed to process'),
+        );
       // Ambil lewat path relatif (proxy same-origin) agar tak kena CORS.
       const u = new URL(doc.output_url, window.location.origin);
       const resp = await fetch(u.pathname + u.search);
@@ -129,7 +145,10 @@ export function TemplateEditor({
     } catch (e) {
       setPdf({
         loading: false,
-        error: e instanceof Error ? e.message : 'Gagal generate PDF',
+        error:
+          e instanceof Error
+            ? e.message
+            : t('Gagal generate PDF', 'Failed to generate PDF'),
       });
       return;
     }
@@ -149,7 +168,7 @@ export function TemplateEditor({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Kembali"
+              aria-label={t('Kembali', 'Back')}
               className="w-9 h-9 rounded-full glass-soft flex items-center justify-center text-mut hover:text-ink transition-colors flex-shrink-0"
             >
               <svg
@@ -187,7 +206,7 @@ export function TemplateEditor({
               </p>
               <p className="num text-[11px] text-mut truncate">
                 {template.id} · v{template.current_version} · {vars.length}{' '}
-                variabel
+                {t('variabel', 'variables')}
               </p>
             </div>
           </div>
@@ -212,20 +231,27 @@ export function TemplateEditor({
                     d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
                   />
                 </svg>
-                Tips
+                {t('Tips', 'Tips')}
               </button>
               {showTips && (
                 <div className="absolute right-0 top-full mt-2 w-64 glass rounded-2xl p-3.5 z-20 text-[11.5px] text-ink space-y-2">
                   <p className="font-semibold text-[12px]">
-                    Tips template HTML
+                    {t('Tips template HTML', 'HTML template tips')}
                   </p>
                   {[
-                    ['Variabel', '{{nama}} diganti dari data'],
-                    ['Raw HTML', '{{{konten}}} tanpa escape'],
+                    [
+                      t('Variabel', 'Variable'),
+                      '{{nama}} ' +
+                        t('diganti dari data', 'replaced from data'),
+                    ],
+                    [
+                      'Raw HTML',
+                      '{{{konten}}} ' + t('tanpa escape', 'without escaping'),
+                    ],
                     ['Page break', 'page-break-after: always'],
-                    ['Ukuran', '@page { size: A4 }'],
-                  ].map(([k, v]) => (
-                    <div key={k}>
+                    [t('Ukuran', 'Size'), '@page { size: A4 }'],
+                  ].map(([k, v], i) => (
+                    <div key={i}>
                       <span className="font-semibold">{k}</span> —{' '}
                       <code className="num text-[10.5px] text-brand-purple">
                         {v}
@@ -242,10 +268,10 @@ export function TemplateEditor({
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-full glass-soft text-[12.5px] font-semibold text-ink hover:bg-white/60 disabled:opacity-50 transition-colors"
             >
               {saveState === 'saved'
-                ? '✓ Tersimpan'
+                ? t('✓ Tersimpan', '✓ Saved')
                 : saveState === 'saving'
-                  ? 'Menyimpan…'
-                  : 'Simpan versi'}
+                  ? t('Menyimpan…', 'Saving…')
+                  : t('Simpan versi', 'Save version')}
             </button>
             <button
               type="button"
@@ -256,7 +282,9 @@ export function TemplateEditor({
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z" />
               </svg>
-              {pdf.loading ? 'Membuat…' : 'Generate PDF'}
+              {pdf.loading
+                ? t('Membuat…', 'Generating…')
+                : t('Generate PDF', 'Generate PDF')}
             </button>
           </div>
         </div>
@@ -308,12 +336,18 @@ export function TemplateEditor({
                     <span className="num text-brand-purple font-semibold">
                       {'{}'}
                     </span>{' '}
-                    <b>{vars.length} variabel</b> terdeteksi dari template. Isi
-                    nilai contoh untuk preview.
+                    <b>
+                      {vars.length} {t('variabel', 'variables')}
+                    </b>{' '}
+                    {t(
+                      'terdeteksi dari template. Isi nilai contoh untuk preview.',
+                      'detected in the template. Enter sample values for preview.',
+                    )}
                   </div>
                   {vars.length === 0 ? (
                     <p className="text-[12px] text-mut text-center py-8">
-                      Tidak ada variabel {'{{...}}'} pada template.
+                      {t('Tidak ada variabel', 'No')} {'{{...}}'}{' '}
+                      {t('pada template.', 'variables in the template.')}
                     </p>
                   ) : (
                     <div className="space-y-2.5">
@@ -330,7 +364,7 @@ export function TemplateEditor({
                             onChange={(e) =>
                               setData((d) => ({ ...d, [v]: e.target.value }))
                             }
-                            placeholder={`nilai ${v}`}
+                            placeholder={t(`nilai ${v}`, `${v} value`)}
                             className="flex-1 min-w-0 bg-transparent text-[12.5px] text-ink placeholder:text-mut focus:outline-none"
                           />
                         </div>
@@ -349,7 +383,7 @@ export function TemplateEditor({
           <div className="flex flex-col min-h-0">
             <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-white/40">
               <span className="text-[10px] font-bold uppercase tracking-wider text-mut flex-shrink-0">
-                Preview langsung
+                {t('Preview langsung', 'Live preview')}
               </span>
               <div className="flex items-center gap-1 flex-wrap justify-end overflow-hidden">
                 {vars.slice(0, 4).map((v) => (
@@ -361,7 +395,7 @@ export function TemplateEditor({
                   </span>
                 ))}
                 <span className="num text-[10px] text-mut ml-1 flex-shrink-0">
-                  A4 · 1 hlm
+                  {t('A4 · 1 hlm', 'A4 · 1 page')}
                 </span>
               </div>
             </div>
@@ -388,14 +422,15 @@ export function TemplateEditor({
 
             <div className="flex items-center justify-between px-4 py-2.5 border-t border-white/40 bg-white/30">
               <span className="num text-[11px] text-mut flex items-center gap-1.5">
-                <span className="text-brand-purple">✦</span> 1 kredit / dokumen
+                <span className="text-brand-purple">✦</span>{' '}
+                {t('1 kredit / dokumen', '1 credit / document')}
               </span>
               {pdf.error ? (
                 <span className="text-[11px] text-rose-600">{pdf.error}</span>
               ) : (
                 <span className="text-[11px] text-emerald-600 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  sinkron
+                  {t('sinkron', 'synced')}
                 </span>
               )}
             </div>

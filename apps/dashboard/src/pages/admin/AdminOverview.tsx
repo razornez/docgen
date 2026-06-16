@@ -19,10 +19,22 @@ function isThisMonth(iso: string): boolean {
   return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
 }
 
-const ROLE_CFG: Record<string, { label: string; cls: string }> = {
-  owner: { label: 'Pemilik', cls: 'bg-indigo-100 text-brand-purple' },
-  admin: { label: 'Admin', cls: 'bg-blue-100 text-blue-700' },
-  member: { label: 'Anggota', cls: 'bg-slate-200/70 text-slate-600' },
+const ROLE_CFG: Record<
+  string,
+  { label: { id: string; en: string }; cls: string }
+> = {
+  owner: {
+    label: { id: 'Pemilik', en: 'Owner' },
+    cls: 'bg-indigo-100 text-brand-purple',
+  },
+  admin: {
+    label: { id: 'Admin', en: 'Admin' },
+    cls: 'bg-blue-100 text-blue-700',
+  },
+  member: {
+    label: { id: 'Anggota', en: 'Member' },
+    cls: 'bg-slate-200/70 text-slate-600',
+  },
 };
 
 const AVATAR_TINT = [
@@ -36,15 +48,18 @@ function MemberRow({
   m,
   i,
   manage,
+  lang,
   onRole,
   onRemove,
 }: {
   m: TeamMember;
   i: number;
   manage: boolean;
+  lang: 'id' | 'en';
   onRole: (role: 'admin' | 'member') => void;
   onRemove: () => void;
 }) {
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const role = ROLE_CFG[m.role] ?? ROLE_CFG.member!;
   const initials = m.name.slice(0, 2).toUpperCase();
   const editable = manage && m.role !== 'owner';
@@ -68,14 +83,14 @@ function MemberRow({
             onChange={(e) => onRole(e.target.value as 'admin' | 'member')}
             className="glass-soft rounded-lg px-2 py-1 text-[12px] text-ink focus:outline-none"
           >
-            <option value="admin">Admin</option>
-            <option value="member">Anggota</option>
+            <option value="admin">{t('Admin', 'Admin')}</option>
+            <option value="member">{t('Anggota', 'Member')}</option>
           </select>
           <button
             type="button"
             onClick={onRemove}
-            aria-label="Keluarkan anggota"
-            title="Keluarkan"
+            aria-label={t('Keluarkan anggota', 'Remove member')}
+            title={t('Keluarkan', 'Remove')}
             className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-rose-500 transition-colors"
           >
             <svg
@@ -97,7 +112,7 @@ function MemberRow({
         <span
           className={`text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-md flex-shrink-0 ${role.cls}`}
         >
-          {role.label}
+          {role.label[lang]}
         </span>
       )}
     </div>
@@ -106,7 +121,8 @@ function MemberRow({
 
 export default function AdminOverview() {
   const qc = useQueryClient();
-  const { fmtNum } = useLang();
+  const { fmtNum, lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const me = useQuery({ queryKey: ['me'], queryFn: getMe });
   const batches = useQuery({ queryKey: ['batches'], queryFn: getBatches });
   const templates = useQuery({
@@ -139,8 +155,8 @@ export default function AdminOverview() {
       const msg = e instanceof Error ? e.message : '';
       setIError(
         /sudah terdaftar/i.test(msg)
-          ? 'Email sudah terdaftar.'
-          : msg || 'Gagal mengundang anggota.',
+          ? t('Email sudah terdaftar.', 'Email is already registered.')
+          : msg || t('Gagal mengundang anggota.', 'Failed to invite member.'),
       );
     },
   });
@@ -163,18 +179,24 @@ export default function AdminOverview() {
     .reduce((s, b) => s + b.completed, 0);
   const members = team.data?.data ?? [];
   const joined = tenant?.created_at
-    ? new Date(tenant.created_at).toLocaleDateString('id-ID', {
-        month: 'short',
-        year: 'numeric',
-      })
+    ? new Date(tenant.created_at).toLocaleDateString(
+        lang === 'en' ? 'en-US' : 'id-ID',
+        {
+          month: 'short',
+          year: 'numeric',
+        },
+      )
     : '—';
 
   const stats = [
-    { label: 'Dokumen bln ini', value: fmtNum(docsThisMonth) },
-    { label: 'Kredit tersisa', value: fmtNum(balance) },
-    { label: 'Anggota tim', value: fmtNum(members.length) },
     {
-      label: 'Template aktif',
+      label: t('Dokumen bln ini', 'Docs this month'),
+      value: fmtNum(docsThisMonth),
+    },
+    { label: t('Kredit tersisa', 'Credits remaining'), value: fmtNum(balance) },
+    { label: t('Anggota tim', 'Team members'), value: fmtNum(members.length) },
+    {
+      label: t('Template aktif', 'Active templates'),
       value: fmtNum(templates.data?.data.length ?? 0),
     },
   ];
@@ -192,7 +214,8 @@ export default function AdminOverview() {
               {tenantName}
             </h1>
             <p className="num text-[11.5px] text-mut mt-0.5">
-              Prepaid · {tenant?.country ?? '—'} · Bergabung {joined}
+              Prepaid · {tenant?.country ?? '—'} · {t('Bergabung', 'Joined')}{' '}
+              {joined}
             </p>
           </div>
           <button
@@ -217,7 +240,7 @@ export default function AdminOverview() {
                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
               />
             </svg>
-            {manage ? 'Selesai' : 'Kelola'}
+            {manage ? t('Selesai', 'Done') : t('Kelola', 'Manage')}
           </button>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-white/40 sm:divide-x divide-white/40">
@@ -238,10 +261,10 @@ export default function AdminOverview() {
       <div className="glass rounded-glass overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/40">
           <h2 className="text-[15px] font-bold text-ink">
-            Tim{' '}
+            {t('Tim', 'Team')}{' '}
             {manage && (
               <span className="text-[11px] font-semibold text-brand-purple">
-                · mode kelola
+                · {t('mode kelola', 'manage mode')}
               </span>
             )}
           </h2>
@@ -266,12 +289,12 @@ export default function AdminOverview() {
                 d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
               />
             </svg>
-            Undang anggota
+            {t('Undang anggota', 'Invite member')}
           </button>
         </div>
         {members.length === 0 ? (
           <p className="px-6 py-10 text-center text-[13px] text-mut">
-            Belum ada anggota tim.
+            {t('Belum ada anggota tim.', 'No team members yet.')}
           </p>
         ) : (
           <div className="divide-y divide-white/40">
@@ -281,6 +304,7 @@ export default function AdminOverview() {
                 m={m}
                 i={i}
                 manage={manage}
+                lang={lang}
                 onRole={(role) => roleMut.mutate({ id: m.id, role })}
                 onRemove={() => setRemoveTarget(m)}
               />
@@ -297,16 +321,21 @@ export default function AdminOverview() {
             onClick={() => setInviteOpen(false)}
           />
           <div className="relative z-10 w-full max-w-[420px] glass rounded-[20px] p-6">
-            <h3 className="text-[15px] font-bold text-ink">Undang anggota</h3>
+            <h3 className="text-[15px] font-bold text-ink">
+              {t('Undang anggota', 'Invite member')}
+            </h3>
             <p className="text-[12px] text-mut mt-0.5 mb-4">
-              Anggota dapat mengakses workspace setelah menerima undangan.
+              {t(
+                'Anggota dapat mengakses workspace setelah menerima undangan.',
+                'Members can access the workspace after accepting the invitation.',
+              )}
             </p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 setIError('');
                 if (!iEmail.trim()) {
-                  setIError('Email wajib diisi.');
+                  setIError(t('Email wajib diisi.', 'Email is required.'));
                   return;
                 }
                 invite.mutate({
@@ -319,18 +348,18 @@ export default function AdminOverview() {
             >
               <div>
                 <label className="block text-[12px] font-semibold text-ink mb-1.5">
-                  Nama
+                  {t('Nama', 'Name')}
                 </label>
                 <input
                   value={iName}
                   onChange={(e) => setIName(e.target.value)}
-                  placeholder="cth: Andi Wijaya"
+                  placeholder={t('cth: Andi Wijaya', 'e.g. Andi Wijaya')}
                   className="w-full glass-soft rounded-xl px-3.5 py-2.5 text-[13px] text-ink placeholder:text-mut focus:outline-none"
                 />
               </div>
               <div>
                 <label className="block text-[12px] font-semibold text-ink mb-1.5">
-                  Email
+                  {t('Email', 'Email')}
                 </label>
                 <input
                   type="email"
@@ -343,7 +372,7 @@ export default function AdminOverview() {
               </div>
               <div>
                 <label className="block text-[12px] font-semibold text-ink mb-1.5">
-                  Peran
+                  {t('Peran', 'Role')}
                 </label>
                 <select
                   value={iRole}
@@ -352,8 +381,8 @@ export default function AdminOverview() {
                   }
                   className="w-full glass-soft rounded-xl px-3.5 py-2.5 text-[13px] text-ink focus:outline-none"
                 >
-                  <option value="member">Anggota</option>
-                  <option value="admin">Admin</option>
+                  <option value="member">{t('Anggota', 'Member')}</option>
+                  <option value="admin">{t('Admin', 'Admin')}</option>
                 </select>
               </div>
               {iError && <p className="text-[12px] text-rose-600">{iError}</p>}
@@ -363,14 +392,16 @@ export default function AdminOverview() {
                   disabled={invite.isPending}
                   className="px-5 py-2.5 text-[13px] font-bold rounded-full text-white bg-grad shadow-[0_4px_14px_rgba(155,93,229,0.4)] disabled:opacity-50 hover:opacity-90 transition-all"
                 >
-                  {invite.isPending ? 'Mengundang…' : 'Kirim undangan'}
+                  {invite.isPending
+                    ? t('Mengundang…', 'Inviting…')
+                    : t('Kirim undangan', 'Send invitation')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setInviteOpen(false)}
                   className="px-5 py-2.5 text-[13px] font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
                 >
-                  Batal
+                  {t('Batal', 'Cancel')}
                 </button>
               </div>
             </form>
@@ -380,9 +411,12 @@ export default function AdminOverview() {
 
       <ConfirmModal
         isOpen={removeTarget !== null}
-        title="Keluarkan anggota?"
-        message={`${removeTarget?.name ?? 'Anggota'} akan kehilangan akses ke workspace ini.`}
-        confirmLabel="Ya, keluarkan"
+        title={t('Keluarkan anggota?', 'Remove member?')}
+        message={t(
+          `${removeTarget?.name ?? 'Anggota'} akan kehilangan akses ke workspace ini.`,
+          `${removeTarget?.name ?? 'This member'} will lose access to this workspace.`,
+        )}
+        confirmLabel={t('Ya, keluarkan', 'Yes, remove')}
         danger
         onConfirm={() => {
           if (removeTarget) removeMut.mutate(removeTarget.id);

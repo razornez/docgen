@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clearOwnerToken } from '../../api/client.js';
+import { useLang } from '../../i18n/index.js';
+
+type Lang = 'id' | 'en';
+const pick = (lang: Lang, label: { id: string; en: string }) =>
+  lang === 'en' ? label.en : label.id;
 
 const PAPERS: Array<React.CSSProperties & { '--r': string }> = [
   { top: '10%', right: '6%', width: 92, height: 120, '--r': '10deg' },
@@ -38,7 +43,7 @@ function Flower({ className = 'w-8 h-8' }: { className?: string }) {
 
 type NavItem = {
   to?: string;
-  label: string;
+  label: { id: string; en: string };
   icon: JSX.Element;
   soon?: boolean;
 };
@@ -46,7 +51,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   {
     to: '/owner',
-    label: 'Ringkasan',
+    label: { id: 'Ringkasan', en: 'Overview' },
     icon: (
       <path
         strokeLinecap="round"
@@ -57,7 +62,7 @@ const NAV: NavItem[] = [
   },
   {
     to: '/owner/tenants',
-    label: 'Tenant',
+    label: { id: 'Tenant', en: 'Tenants' },
     icon: (
       <path
         strokeLinecap="round"
@@ -68,7 +73,7 @@ const NAV: NavItem[] = [
   },
   {
     to: '/owner/render',
-    label: 'Render',
+    label: { id: 'Render', en: 'Render' },
     icon: (
       <path
         strokeLinecap="round"
@@ -79,7 +84,7 @@ const NAV: NavItem[] = [
   },
   {
     to: '/owner/billing',
-    label: 'Tagihan',
+    label: { id: 'Tagihan', en: 'Billing' },
     icon: (
       <path
         strokeLinecap="round"
@@ -90,7 +95,7 @@ const NAV: NavItem[] = [
   },
   {
     to: '/owner/health',
-    label: 'Sistem',
+    label: { id: 'Sistem', en: 'System' },
     icon: (
       <path
         strokeLinecap="round"
@@ -101,7 +106,7 @@ const NAV: NavItem[] = [
   },
   {
     to: '/owner/settings',
-    label: 'Pengaturan',
+    label: { id: 'Pengaturan', en: 'Settings' },
     icon: (
       <>
         <path
@@ -119,7 +124,7 @@ const NAV: NavItem[] = [
   },
   {
     to: '/owner/content',
-    label: 'Konten',
+    label: { id: 'Konten', en: 'Content' },
     icon: (
       <path
         strokeLinecap="round"
@@ -130,7 +135,15 @@ const NAV: NavItem[] = [
   },
 ];
 
-function NavRow({ item, onNav }: { item: NavItem; onNav: () => void }) {
+function NavRow({
+  item,
+  onNav,
+  lang,
+}: {
+  item: NavItem;
+  onNav: () => void;
+  lang: Lang;
+}) {
   const icon = (active: boolean) => (
     <span
       className={`flex items-center justify-center ${active ? 'text-brand-purple' : 'text-mut group-hover:text-ink'}`}
@@ -150,12 +163,12 @@ function NavRow({ item, onNav }: { item: NavItem; onNav: () => void }) {
     return (
       <div
         className="group flex items-center gap-3 px-3 py-2 rounded-xl text-[13.5px] font-semibold text-mut/60 cursor-default"
-        title="Segera"
+        title={lang === 'en' ? 'Soon' : 'Segera'}
       >
         {icon(false)}
-        <span className="flex-1">{item.label}</span>
+        <span className="flex-1">{pick(lang, item.label)}</span>
         <span className="text-[9px] font-bold uppercase tracking-wide text-mut/60 bg-white/40 rounded px-1.5 py-0.5">
-          segera
+          {lang === 'en' ? 'soon' : 'segera'}
         </span>
       </div>
     );
@@ -176,7 +189,7 @@ function NavRow({ item, onNav }: { item: NavItem; onNav: () => void }) {
       {({ isActive }) => (
         <>
           {icon(isActive)}
-          <span>{item.label}</span>
+          <span>{pick(lang, item.label)}</span>
         </>
       )}
     </NavLink>
@@ -185,6 +198,8 @@ function NavRow({ item, onNav }: { item: NavItem; onNav: () => void }) {
 
 export default function OwnerLayout() {
   const navigate = useNavigate();
+  const { lang, setLang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const [open, setOpen] = useState(false);
   function logout() {
     clearOwnerToken();
@@ -226,7 +241,7 @@ export default function OwnerLayout() {
                 docgen
               </p>
               <p className="num mt-1 text-[10px] text-brand-purple font-bold uppercase tracking-wider">
-                Owner Console
+                {t('Owner Console', 'Owner Console')}
               </p>
             </div>
           </div>
@@ -234,20 +249,41 @@ export default function OwnerLayout() {
 
         <nav className="flex-1 px-3 py-1 overflow-y-auto">
           <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-mut/80">
-            Platform
+            {t('Platform', 'Platform')}
           </p>
           <div className="space-y-1">
-            {NAV.map((item) => (
+            {NAV.map((item, i) => (
               <NavRow
-                key={item.label}
+                key={item.to ?? i}
                 item={item}
                 onNav={() => setOpen(false)}
+                lang={lang}
               />
             ))}
           </div>
         </nav>
 
         <div className="px-3 pb-4 pt-2">
+          <div className="mb-2 flex items-center justify-center gap-0.5 glass-soft rounded-full p-0.5">
+            <button
+              type="button"
+              onClick={() => setLang('id')}
+              className={`flex-1 rounded-full py-1 text-[11px] font-bold uppercase transition-colors ${
+                lang === 'id' ? 'bg-grad text-white' : 'text-mut'
+              }`}
+            >
+              ID
+            </button>
+            <button
+              type="button"
+              onClick={() => setLang('en')}
+              className={`flex-1 rounded-full py-1 text-[11px] font-bold uppercase transition-colors ${
+                lang === 'en' ? 'bg-grad text-white' : 'text-mut'
+              }`}
+            >
+              EN
+            </button>
+          </div>
           <div className="flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl glass-soft">
             <div className="w-8 h-8 rounded-lg bg-grad flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0">
               OW
@@ -257,14 +293,14 @@ export default function OwnerLayout() {
                 Owner
               </p>
               <p className="num text-[11px] text-mut truncate">
-                Platform admin
+                {t('Platform admin', 'Platform admin')}
               </p>
             </div>
             <button
               type="button"
               onClick={logout}
-              title="Keluar"
-              aria-label="Keluar"
+              title={t('Keluar', 'Sign out')}
+              aria-label={t('Keluar', 'Sign out')}
               className="flex-shrink-0 p-1 rounded-md text-mut hover:text-ink hover:bg-white/50 transition-colors"
             >
               <svg
@@ -292,7 +328,7 @@ export default function OwnerLayout() {
             type="button"
             onClick={() => setOpen(true)}
             className="p-1.5 rounded-lg text-mut hover:bg-white/50 transition-colors"
-            aria-label="Buka menu"
+            aria-label={t('Buka menu', 'Open menu')}
           >
             <svg
               className="w-5 h-5"
@@ -308,7 +344,9 @@ export default function OwnerLayout() {
               />
             </svg>
           </button>
-          <span className="text-[15px] font-bold text-ink">Owner Console</span>
+          <span className="text-[15px] font-bold text-ink">
+            {t('Owner Console', 'Owner Console')}
+          </span>
         </header>
         <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-7">
           <div className="mx-auto w-full max-w-[1080px]">

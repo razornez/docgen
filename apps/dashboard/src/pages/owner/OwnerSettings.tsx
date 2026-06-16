@@ -5,6 +5,7 @@ import {
   saveOwnerSettings,
   type OwnerSettings,
 } from '../../api/client.js';
+import { useLang } from '../../i18n/index.js';
 
 type HL = 'none' | 'popular' | 'hemat';
 interface Row {
@@ -16,10 +17,10 @@ interface Row {
   highlight: HL;
 }
 
-const HL_OPTIONS: { value: HL; label: string }[] = [
-  { value: 'none', label: 'Tidak' },
-  { value: 'popular', label: 'Populer' },
-  { value: 'hemat', label: 'Hemat' },
+const HL_OPTIONS: { value: HL; id: string; en: string }[] = [
+  { value: 'none', id: 'Tidak', en: 'No' },
+  { value: 'popular', id: 'Populer', en: 'Popular' },
+  { value: 'hemat', id: 'Hemat', en: 'Value' },
 ];
 
 const num = (s: string) => {
@@ -29,6 +30,8 @@ const num = (s: string) => {
 const idr = (n: number) => n.toLocaleString('id-ID');
 
 export default function OwnerSettings() {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ['owner-settings'],
@@ -80,7 +83,11 @@ export default function OwnerSettings() {
       setTimeout(() => setSaved(false), 2500);
     },
     onError: (e) =>
-      setError(e instanceof Error ? e.message : 'Gagal menyimpan pengaturan'),
+      setError(
+        e instanceof Error
+          ? e.message
+          : t('Gagal menyimpan pengaturan', 'Failed to save settings'),
+      ),
   });
 
   const setRow = (key: string, patch: Partial<Row>) =>
@@ -101,7 +108,12 @@ export default function OwnerSettings() {
 
   const onSave = () => {
     if (rows.some((r) => num(r.credits) <= 0)) {
-      setError('Setiap paket harus punya kredit lebih dari 0.');
+      setError(
+        t(
+          'Setiap paket harus punya kredit lebih dari 0.',
+          'Each package must have more than 0 credits.',
+        ),
+      );
       return;
     }
     save.mutate();
@@ -115,11 +127,13 @@ export default function OwnerSettings() {
       {/* ── Saldo gratis pendaftar baru ──────────────────────────────── */}
       <div className="glass rounded-glass px-6 py-5">
         <h1 className="text-[16px] font-bold text-ink">
-          Saldo gratis pendaftar baru
+          {t('Saldo gratis pendaftar baru', 'New signup free credits')}
         </h1>
         <p className="text-[12.5px] text-mut mt-0.5">
-          Diberikan otomatis saat tenant baru mendaftar. Tampil di halaman
-          publik.
+          {t(
+            'Diberikan otomatis saat tenant baru mendaftar. Tampil di halaman publik.',
+            'Granted automatically when a new tenant signs up. Shown on the public page.',
+          )}
         </p>
         <div className="mt-4 flex items-center gap-3">
           <input
@@ -129,9 +143,9 @@ export default function OwnerSettings() {
             onChange={(e) => setBonus(e.target.value)}
             className="num w-[150px] bg-white/70 border border-white/60 rounded-xl px-4 py-3 text-[24px] font-extrabold text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
           />
-          <span className="text-[13px] text-mut">kredit</span>
+          <span className="text-[13px] text-mut">{t('kredit', 'credits')}</span>
           <span className="num ml-auto text-[12px] text-mut">
-            ≈ {idr(num(bonus))} dok
+            ≈ {idr(num(bonus))} {t('dok', 'docs')}
           </span>
         </div>
       </div>
@@ -140,9 +154,14 @@ export default function OwnerSettings() {
       <div className="glass rounded-glass overflow-hidden">
         <div className="flex items-start justify-between gap-4 px-6 py-5">
           <div>
-            <h2 className="text-[16px] font-bold text-ink">Paket harga</h2>
+            <h2 className="text-[16px] font-bold text-ink">
+              {t('Paket harga', 'Pricing packages')}
+            </h2>
             <p className="text-[12.5px] text-mut mt-0.5">
-              Dipakai di halaman publik &amp; dompet.
+              {t(
+                'Dipakai di halaman publik & dompet.',
+                'Used on the public page & wallet.',
+              )}
             </p>
           </div>
           <button
@@ -163,7 +182,7 @@ export default function OwnerSettings() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Tambah paket
+            {t('Tambah paket', 'Add package')}
           </button>
         </div>
 
@@ -171,11 +190,19 @@ export default function OwnerSettings() {
           <table className="w-full min-w-[760px]">
             <thead>
               <tr className="text-[10.5px] text-mut uppercase tracking-wider text-left border-y border-white/40">
-                <th className="px-6 py-2.5 font-bold">Kredit</th>
-                <th className="px-3 py-2.5 font-bold">Bonus</th>
-                <th className="px-3 py-2.5 font-bold">Harga (Rp)</th>
-                <th className="px-3 py-2.5 font-bold text-right">/Dok</th>
-                <th className="px-3 py-2.5 font-bold">Sorot</th>
+                <th className="px-6 py-2.5 font-bold">
+                  {t('Kredit', 'Credits')}
+                </th>
+                <th className="px-3 py-2.5 font-bold">{t('Bonus', 'Bonus')}</th>
+                <th className="px-3 py-2.5 font-bold">
+                  {t('Harga (Rp)', 'Price (Rp)')}
+                </th>
+                <th className="px-3 py-2.5 font-bold text-right">
+                  {t('/Dok', '/Doc')}
+                </th>
+                <th className="px-3 py-2.5 font-bold">
+                  {t('Sorot', 'Highlight')}
+                </th>
                 <th className="px-6 py-2.5 font-bold" />
               </tr>
             </thead>
@@ -231,7 +258,7 @@ export default function OwnerSettings() {
                       >
                         {HL_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>
-                            {o.label}
+                            {t(o.id, o.en)}
                           </option>
                         ))}
                       </select>
@@ -240,7 +267,7 @@ export default function OwnerSettings() {
                       <button
                         type="button"
                         onClick={() => delRow(r.key)}
-                        aria-label="Hapus paket"
+                        aria-label={t('Hapus paket', 'Delete package')}
                         className="p-2 rounded-lg bg-white/55 text-mut hover:text-rose-600 hover:bg-white/75 transition-colors"
                       >
                         <svg
@@ -267,7 +294,10 @@ export default function OwnerSettings() {
                     colSpan={6}
                     className="px-6 py-10 text-center text-[13px] text-mut"
                   >
-                    Belum ada paket. Tambah paket baru.
+                    {t(
+                      'Belum ada paket. Tambah paket baru.',
+                      'No packages yet. Add a new package.',
+                    )}
                   </td>
                 </tr>
               )}
@@ -283,7 +313,7 @@ export default function OwnerSettings() {
       <div className="flex items-center justify-end gap-3">
         {saved && (
           <span className="text-[12.5px] font-semibold text-emerald-600">
-            Tersimpan ✓
+            {t('Tersimpan ✓', 'Saved ✓')}
           </span>
         )}
         <button
@@ -304,7 +334,7 @@ export default function OwnerSettings() {
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          Reset
+          {t('Reset', 'Reset')}
         </button>
         <button
           type="button"
@@ -325,7 +355,9 @@ export default function OwnerSettings() {
               d="M5 13l4 4L19 7"
             />
           </svg>
-          {save.isPending ? 'Menyimpan…' : 'Simpan pengaturan'}
+          {save.isPending
+            ? t('Menyimpan…', 'Saving…')
+            : t('Simpan pengaturan', 'Save settings')}
         </button>
       </div>
     </div>

@@ -5,6 +5,7 @@ import {
   saveOwnerContent,
   type OwnerSiteContent,
 } from '../../api/client.js';
+import { useLang } from '../../i18n/index.js';
 
 interface LocS {
   id: string;
@@ -65,6 +66,8 @@ function LocRow({
 }
 
 export default function OwnerContent() {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['owner-content'], queryFn: getOwnerContent });
   const [tab, setTab] = useState<Tab>('pages');
@@ -129,21 +132,32 @@ export default function OwnerContent() {
       setTimeout(() => setSaved(false), 2500);
     },
     onError: (e) =>
-      setError(e instanceof Error ? e.message : 'Gagal menyimpan konten'),
+      setError(
+        e instanceof Error
+          ? e.message
+          : t('Gagal menyimpan konten', 'Failed to save content'),
+      ),
   });
 
   const onSave = () => {
     if (pages.some((p) => !/^[a-z0-9-]+$/.test(p.slug.trim()))) {
-      setError('Slug halaman hanya boleh huruf kecil, angka, dan strip.');
+      setError(
+        t(
+          'Slug halaman hanya boleh huruf kecil, angka, dan strip.',
+          'Page slug may only contain lowercase letters, numbers, and dashes.',
+        ),
+      );
       return;
     }
     const slugs = pages.map((p) => p.slug.trim());
     if (new Set(slugs).size !== slugs.length) {
-      setError('Slug halaman harus unik.');
+      setError(t('Slug halaman harus unik.', 'Page slugs must be unique.'));
       return;
     }
     if (cols.some((c) => !c.head.id.trim())) {
-      setError('Judul kolom (ID) wajib diisi.');
+      setError(
+        t('Judul kolom (ID) wajib diisi.', 'Column title (ID) is required.'),
+      );
       return;
     }
     save.mutate();
@@ -194,16 +208,20 @@ export default function OwnerContent() {
   return (
     <div className="space-y-5">
       <div className="glass rounded-glass px-6 py-5">
-        <h1 className="text-[16px] font-bold text-ink">Konten publik</h1>
+        <h1 className="text-[16px] font-bold text-ink">
+          {t('Konten publik', 'Public content')}
+        </h1>
         <p className="text-[12.5px] text-mut mt-0.5">
-          Halaman & footer landing — dwibahasa (ID / EN). Perubahan langsung
-          live.
+          {t(
+            'Halaman & footer landing — dwibahasa (ID / EN). Perubahan langsung live.',
+            'Landing pages & footer — bilingual (ID / EN). Changes go live instantly.',
+          )}
         </p>
         <div className="flex mt-4 glass-soft rounded-full p-1 gap-1 w-fit">
           {(
             [
-              ['pages', 'Halaman'],
-              ['footer', 'Footer'],
+              ['pages', t('Halaman', 'Pages')],
+              ['footer', t('Footer', 'Footer')],
             ] as const
           ).map(([v, l]) => (
             <button
@@ -228,19 +246,19 @@ export default function OwnerContent() {
               <div className="flex items-center gap-2">
                 <div className="flex-1">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-mut mb-1">
-                    Slug · URL: /p/{p.slug || '…'}
+                    {t('Slug', 'Slug')} · URL: /p/{p.slug || '…'}
                   </p>
                   <input
                     value={p.slug}
                     onChange={(e) => patchPage(p.key, { slug: e.target.value })}
-                    placeholder="contoh-halaman"
+                    placeholder={t('contoh-halaman', 'example-page')}
                     className={`num ${inputCls}`}
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => delPage(p.key)}
-                  aria-label="Hapus halaman"
+                  aria-label={t('Hapus halaman', 'Delete page')}
                   className="self-end p-2 rounded-lg bg-white/55 text-mut hover:text-rose-600 hover:bg-white/75 transition-colors"
                 >
                   <svg
@@ -259,13 +277,16 @@ export default function OwnerContent() {
                 </button>
               </div>
               <LocRow
-                label="Judul"
+                label={t('Judul', 'Title')}
                 value={p.title}
                 onChange={(v) => patchPage(p.key, { title: v })}
               />
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-mut mb-1">
-                  Isi (markdown polos, pisah paragraf dgn baris baru)
+                  {t(
+                    'Isi (markdown polos, pisah paragraf dgn baris baru)',
+                    'Content (plain markdown, separate paragraphs with new lines)',
+                  )}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {(['id', 'en'] as const).map((l) => (
@@ -291,7 +312,7 @@ export default function OwnerContent() {
             onClick={addPage}
             className="text-[13px] font-semibold text-brand-purple hover:opacity-80"
           >
-            + Tambah halaman
+            {t('+ Tambah halaman', '+ Add page')}
           </button>
         </div>
       )}
@@ -300,7 +321,11 @@ export default function OwnerContent() {
       {tab === 'footer' && (
         <div className="space-y-4">
           <div className="glass rounded-glass p-5">
-            <LocRow label="Tagline" value={tagline} onChange={setTagline} />
+            <LocRow
+              label={t('Tagline', 'Tagline')}
+              value={tagline}
+              onChange={setTagline}
+            />
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {cols.map((c) => (
@@ -308,7 +333,7 @@ export default function OwnerContent() {
                 <div className="flex items-start gap-2">
                   <div className="flex-1">
                     <LocRow
-                      label="Judul kolom"
+                      label={t('Judul kolom', 'Column title')}
                       value={c.head}
                       onChange={(v) => patchCol(c.key, { head: v })}
                     />
@@ -318,7 +343,7 @@ export default function OwnerContent() {
                     onClick={() =>
                       setCols((cs) => cs.filter((x) => x.key !== c.key))
                     }
-                    aria-label="Hapus kolom"
+                    aria-label={t('Hapus kolom', 'Delete column')}
                     className="mt-5 p-2 rounded-lg bg-white/55 text-mut hover:text-rose-600 flex-shrink-0"
                   >
                     <svg
@@ -343,7 +368,7 @@ export default function OwnerContent() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-mut">
-                        Tautan
+                        {t('Tautan', 'Link')}
                       </span>
                       <button
                         type="button"
@@ -354,11 +379,11 @@ export default function OwnerContent() {
                         }
                         className="text-[11px] text-mut hover:text-rose-600"
                       >
-                        hapus
+                        {t('hapus', 'remove')}
                       </button>
                     </div>
                     <LocRow
-                      label="Label"
+                      label={t('Label', 'Label')}
                       value={it.label}
                       onChange={(v) => patchLink(c.key, it.key, { label: v })}
                     />
@@ -367,7 +392,10 @@ export default function OwnerContent() {
                       onChange={(e) =>
                         patchLink(c.key, it.key, { href: e.target.value })
                       }
-                      placeholder="/p/slug atau https://…"
+                      placeholder={t(
+                        '/p/slug atau https://…',
+                        '/p/slug or https://…',
+                      )}
                       className={`num ${inputCls}`}
                     />
                   </div>
@@ -386,7 +414,7 @@ export default function OwnerContent() {
                   }
                   className="text-[12px] font-semibold text-brand-purple hover:opacity-80"
                 >
-                  + Tautan
+                  {t('+ Tautan', '+ Link')}
                 </button>
               </div>
             ))}
@@ -396,7 +424,7 @@ export default function OwnerContent() {
             onClick={addCol}
             className="text-[13px] font-semibold text-brand-purple hover:opacity-80"
           >
-            + Tambah kolom
+            {t('+ Tambah kolom', '+ Add column')}
           </button>
         </div>
       )}
@@ -408,7 +436,7 @@ export default function OwnerContent() {
       <div className="flex items-center justify-end gap-3">
         {saved && (
           <span className="text-[12.5px] font-semibold text-emerald-600">
-            Tersimpan ✓
+            {t('Tersimpan ✓', 'Saved ✓')}
           </span>
         )}
         <button
@@ -416,7 +444,7 @@ export default function OwnerContent() {
           onClick={() => q.data && seed(q.data)}
           className="px-4 py-2.5 text-[13px] font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
         >
-          Reset
+          {t('Reset', 'Reset')}
         </button>
         <button
           type="button"
@@ -424,7 +452,9 @@ export default function OwnerContent() {
           disabled={save.isPending}
           className="px-5 py-2.5 text-[13px] font-bold rounded-full text-white bg-grad shadow-[0_4px_14px_rgba(155,93,229,0.4)] disabled:opacity-50 hover:opacity-90 transition-all"
         >
-          {save.isPending ? 'Menyimpan…' : 'Simpan konten'}
+          {save.isPending
+            ? t('Menyimpan…', 'Saving…')
+            : t('Simpan konten', 'Save content')}
         </button>
       </div>
     </div>

@@ -17,6 +17,7 @@ import { ApiGuideModal } from '../components/ApiGuideModal.js';
 import { TemplateEditor } from '../components/TemplateEditor.js';
 import { TemplateCreator } from '../components/TemplateCreator.js';
 import { formatDate } from '../lib/format.js';
+import { useLang } from '../i18n/index.js';
 
 type Panel =
   | { type: 'none' }
@@ -42,6 +43,8 @@ function DocIcon({ cls }: { cls?: string }) {
 }
 
 export default function TemplatesPage() {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const qc = useQueryClient();
   const templates = useQuery({
     queryKey: ['templates'],
@@ -126,7 +129,7 @@ export default function TemplatesPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari template…"
+            placeholder={t('Cari template…', 'Search templates…')}
             className="w-full pl-9 pr-8 py-2 glass-soft rounded-full text-sm text-ink focus:outline-none placeholder:text-mut"
           />
           {search && (
@@ -161,7 +164,7 @@ export default function TemplatesPage() {
                 : 'glass-soft text-mut hover:text-ink'
             }`}
           >
-            Semua
+            {t('Semua', 'All')}
           </button>
           {categories.map((cat) => {
             const active = filterCat === cat;
@@ -191,7 +194,7 @@ export default function TemplatesPage() {
           <button
             type="button"
             onClick={() => setViewMode('grid')}
-            aria-label="Mode kartu"
+            aria-label={t('Mode kartu', 'Grid view')}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${viewMode === 'grid' ? 'bg-grad text-white shadow-sm' : 'text-mut hover:text-ink'}`}
           >
             <svg
@@ -211,7 +214,7 @@ export default function TemplatesPage() {
           <button
             type="button"
             onClick={() => setViewMode('list')}
-            aria-label="Mode daftar"
+            aria-label={t('Mode daftar', 'List view')}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${viewMode === 'list' ? 'bg-grad text-white shadow-sm' : 'text-mut hover:text-ink'}`}
           >
             <svg
@@ -251,7 +254,9 @@ export default function TemplatesPage() {
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
               />
             </svg>
-            {importMut.isPending ? 'Mengimpor…' : 'Impor default'}
+            {importMut.isPending
+              ? t('Mengimpor…', 'Importing…')
+              : t('Impor default', 'Import defaults')}
           </button>
         )}
         <button
@@ -275,18 +280,18 @@ export default function TemplatesPage() {
               d="M12 4v16m8-8H4"
             />
           </svg>
-          Template baru
+          {t('Template baru', 'New template')}
         </button>
       </div>
 
       {/* ── Count hint ───────────────────────────────────────────────── */}
       {allTemplates.length > 0 && (
         <p className="text-[12px] text-slate-400">
-          {filtered.length} template
+          {filtered.length} {t('template', 'templates')}
           {search && (
             <span>
               {' '}
-              untuk{' '}
+              {t('untuk', 'for')}{' '}
               <span className="font-semibold text-slate-600">
                 &ldquo;{search}&rdquo;
               </span>
@@ -295,7 +300,7 @@ export default function TemplatesPage() {
           {filterCat && !search && (
             <span>
               {' '}
-              dalam kategori{' '}
+              {t('dalam kategori', 'in category')}{' '}
               <span className="font-semibold text-slate-600">{filterCat}</span>
             </span>
           )}
@@ -338,8 +343,8 @@ export default function TemplatesPage() {
           <DocIcon cls="w-8 h-8 text-mut/50 mx-auto mb-3" />
           <p className="text-[13px] font-medium text-mut">
             {importMut.isPending
-              ? 'Memuat template default…'
-              : 'Belum ada template'}
+              ? t('Memuat template default…', 'Loading default templates…')
+              : t('Belum ada template', 'No templates yet')}
           </p>
         </div>
       )}
@@ -363,7 +368,7 @@ export default function TemplatesPage() {
               />
             </svg>
             <p className="text-[13px] font-medium text-mut">
-              Tidak ada template yang cocok
+              {t('Tidak ada template yang cocok', 'No matching templates')}
             </p>
             <button
               onClick={() => {
@@ -372,7 +377,7 @@ export default function TemplatesPage() {
               }}
               className="mt-3 text-[12px] font-semibold text-brand-purple hover:opacity-80 transition-opacity"
             >
-              Reset filter
+              {t('Reset filter', 'Reset filters')}
             </button>
           </div>
         )}
@@ -380,11 +385,11 @@ export default function TemplatesPage() {
       {/* ── Galeri (large icon) ─────────────────────────────────────── */}
       {!templates.isLoading && filtered.length > 0 && viewMode === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((t) => {
-            const thumb = CATEGORY_THUMB[t.category] ?? CATEGORY_THUMB.Umum!;
+          {filtered.map((tpl) => {
+            const thumb = CATEGORY_THUMB[tpl.category] ?? CATEGORY_THUMB.Umum!;
             return (
               <div
-                key={t.id}
+                key={tpl.id}
                 className="group glass rounded-glass overflow-hidden flex flex-col"
               >
                 <div
@@ -403,25 +408,28 @@ export default function TemplatesPage() {
                   <div className="absolute inset-0 flex items-center justify-center gap-2 bg-ink/10 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
-                      onClick={() => setPanel({ type: 'edit', template: t })}
+                      onClick={() => setPanel({ type: 'edit', template: tpl })}
                       className="px-3 py-1.5 rounded-lg bg-white/90 text-[12px] font-semibold text-ink shadow hover:bg-white transition-colors"
                     >
-                      Pratinjau
+                      {t('Pratinjau', 'Preview')}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         closePanel();
-                        setPanel({ type: 'edit', template: t });
+                        setPanel({ type: 'edit', template: tpl });
                       }}
                       className="px-3 py-1.5 rounded-lg bg-grad text-white text-[12px] font-semibold shadow"
                     >
-                      Ubah
+                      {t('Ubah', 'Edit')}
                     </button>
                     <button
                       type="button"
-                      title="Panduan integrasi API"
-                      onClick={() => void openApiGuide(t)}
+                      title={t(
+                        'Panduan integrasi API',
+                        'API integration guide',
+                      )}
+                      onClick={() => void openApiGuide(tpl)}
                       className="w-8 h-8 rounded-lg bg-white/90 flex items-center justify-center text-ink hover:bg-white transition-colors"
                     >
                       <svg
@@ -444,17 +452,17 @@ export default function TemplatesPage() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-white bg-grad">
                       <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
-                      {t.category}
+                      {tpl.category}
                     </span>
                     <span className="num text-[11px] text-mut">
-                      v{t.current_version}
+                      v{tpl.current_version}
                     </span>
                   </div>
                   <p className="text-[14px] font-bold text-ink leading-snug">
-                    {t.name}
+                    {tpl.name}
                   </p>
                   <p className="num text-[11px] text-mut mt-auto">
-                    Diperbarui {formatDate(t.updated_at)}
+                    {t('Diperbarui', 'Updated')} {formatDate(tpl.updated_at)}
                   </p>
                 </div>
               </div>
@@ -486,9 +494,11 @@ export default function TemplatesPage() {
               </svg>
             </span>
             <p className="text-[13px] font-bold text-ink mt-1">
-              Template kosong
+              {t('Template kosong', 'Blank template')}
             </p>
-            <p className="text-[11px] text-mut">Mulai dari HTML kosong</p>
+            <p className="text-[11px] text-mut">
+              {t('Mulai dari HTML kosong', 'Start from empty HTML')}
+            </p>
           </button>
         </div>
       )}
@@ -496,11 +506,11 @@ export default function TemplatesPage() {
       {/* ── Daftar (list) ───────────────────────────────────────────── */}
       {!templates.isLoading && filtered.length > 0 && viewMode === 'list' && (
         <div className="glass rounded-glass overflow-hidden divide-y divide-white/40">
-          {filtered.map((t) => {
-            const thumb = CATEGORY_THUMB[t.category] ?? CATEGORY_THUMB.Umum!;
+          {filtered.map((tpl) => {
+            const thumb = CATEGORY_THUMB[tpl.category] ?? CATEGORY_THUMB.Umum!;
             return (
               <div
-                key={t.id}
+                key={tpl.id}
                 className="group flex items-center gap-4 px-5 py-3.5 hover:bg-white/30 transition-colors"
               >
                 <div
@@ -511,40 +521,40 @@ export default function TemplatesPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13.5px] font-semibold text-ink truncate">
-                    {t.name}
+                    {tpl.name}
                   </p>
                   <span className="flex items-center gap-1.5 mt-0.5 text-[11px] text-mut">
                     <span
-                      className={`w-1.5 h-1.5 rounded-full ${CATEGORY_DOT[t.category] ?? 'bg-slate-300'}`}
+                      className={`w-1.5 h-1.5 rounded-full ${CATEGORY_DOT[tpl.category] ?? 'bg-slate-300'}`}
                     />
-                    {t.category} · v{t.current_version}
+                    {tpl.category} · v{tpl.current_version}
                   </span>
                 </div>
                 <span className="num text-[11.5px] text-mut hidden sm:block flex-shrink-0">
-                  {formatDate(t.updated_at)}
+                  {formatDate(tpl.updated_at)}
                 </span>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => {
                       closePanel();
-                      setPanel({ type: 'edit', template: t });
+                      setPanel({ type: 'edit', template: tpl });
                     }}
                     className="px-3 py-1.5 text-[12px] font-semibold rounded-lg text-brand-purple hover:bg-white/50 transition-colors"
                   >
-                    Ubah
+                    {t('Ubah', 'Edit')}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPanel({ type: 'edit', template: t })}
+                    onClick={() => setPanel({ type: 'edit', template: tpl })}
                     className="px-3 py-1.5 text-[12px] font-semibold rounded-lg text-mut hover:text-ink hover:bg-white/50 transition-colors"
                   >
-                    Pratinjau
+                    {t('Pratinjau', 'Preview')}
                   </button>
                   <button
                     type="button"
-                    title="Panduan integrasi API"
-                    onClick={() => void openApiGuide(t)}
+                    title={t('Panduan integrasi API', 'API integration guide')}
+                    onClick={() => void openApiGuide(tpl)}
                     className="px-2.5 py-1.5 rounded-lg text-mut hover:text-brand-purple hover:bg-white/50 transition-colors"
                   >
                     <svg

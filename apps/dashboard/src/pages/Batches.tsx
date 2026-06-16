@@ -19,15 +19,16 @@ const PLACEHOLDER_ITEMS = `[
 const inputCls =
   'w-full glass-soft rounded-2xl px-4 py-2.5 text-sm text-ink focus:outline-none placeholder:text-mut';
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, lang: 'id' | 'en'): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'baru saja';
-  if (m < 60) return `${m} menit lalu`;
+  if (m < 1) return lang === 'en' ? 'just now' : 'baru saja';
+  if (m < 60) return lang === 'en' ? `${m} min ago` : `${m} menit lalu`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam lalu`;
+  if (h < 24) return lang === 'en' ? `${h} hr ago` : `${h} jam lalu`;
   const d = Math.floor(h / 24);
-  return d === 1 ? 'kemarin' : `${d} hari lalu`;
+  if (d === 1) return lang === 'en' ? 'yesterday' : 'kemarin';
+  return lang === 'en' ? `${d} days ago` : `${d} hari lalu`;
 }
 function isThisMonth(iso: string): boolean {
   const d = new Date(iso);
@@ -43,12 +44,30 @@ const ICON_TINT: Record<string, string> = {
   queued: 'bg-slate-200/70 text-slate-500',
 };
 
-function DocStatusBadge({ status }: { status: string }) {
+function DocStatusBadge({
+  status,
+  lang,
+}: {
+  status: string;
+  lang: 'id' | 'en';
+}) {
   const cfg: Record<string, { cls: string; label: string }> = {
-    completed: { cls: 'bg-emerald-100/70 text-emerald-700', label: 'Selesai' },
-    failed: { cls: 'bg-rose-100/70 text-rose-600', label: 'Gagal' },
-    processing: { cls: 'bg-blue-100/70 text-blue-700', label: 'Proses' },
-    queued: { cls: 'bg-slate-200/70 text-slate-500', label: 'Antrian' },
+    completed: {
+      cls: 'bg-emerald-100/70 text-emerald-700',
+      label: lang === 'en' ? 'Done' : 'Selesai',
+    },
+    failed: {
+      cls: 'bg-rose-100/70 text-rose-600',
+      label: lang === 'en' ? 'Failed' : 'Gagal',
+    },
+    processing: {
+      cls: 'bg-blue-100/70 text-blue-700',
+      label: lang === 'en' ? 'Processing' : 'Proses',
+    },
+    queued: {
+      cls: 'bg-slate-200/70 text-slate-500',
+      label: lang === 'en' ? 'Queued' : 'Antrian',
+    },
   };
   const { cls, label } = cfg[status] ?? {
     cls: 'bg-slate-200/70 text-slate-500',
@@ -63,7 +82,13 @@ function DocStatusBadge({ status }: { status: string }) {
   );
 }
 
-function BatchDocumentsPanel({ batchId }: { batchId: string }) {
+function BatchDocumentsPanel({
+  batchId,
+  lang,
+}: {
+  batchId: string;
+  lang: 'id' | 'en';
+}) {
   const docs = useQuery({
     queryKey: ['batch-documents', batchId],
     queryFn: () => getBatchDocuments(batchId),
@@ -91,8 +116,12 @@ function BatchDocumentsPanel({ batchId }: { batchId: string }) {
             <tr className="text-[10.5px] text-mut uppercase tracking-wider text-left border-b border-white/50">
               <th className="pb-2 pr-4 font-semibold">Ref</th>
               <th className="pb-2 pr-4 font-semibold">Status</th>
-              <th className="pb-2 pr-4 text-center font-semibold">Halaman</th>
-              <th className="pb-2 text-right font-semibold">Aksi</th>
+              <th className="pb-2 pr-4 text-center font-semibold">
+                {lang === 'en' ? 'Pages' : 'Halaman'}
+              </th>
+              <th className="pb-2 text-right font-semibold">
+                {lang === 'en' ? 'Action' : 'Aksi'}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/40">
@@ -104,7 +133,7 @@ function BatchDocumentsPanel({ batchId }: { batchId: string }) {
                   </span>
                 </td>
                 <td className="py-2 pr-4">
-                  <DocStatusBadge status={doc.status} />
+                  <DocStatusBadge status={doc.status} lang={lang} />
                   {doc.error && (
                     <p
                       className="text-[11px] text-rose-500 mt-0.5 max-w-xs truncate"
@@ -157,10 +186,12 @@ function BatchRow({
   b,
   open,
   onToggle,
+  lang,
 }: {
   b: BatchItem;
   open: boolean;
   onToggle: () => void;
+  lang: 'id' | 'en';
 }) {
   const pct = b.total > 0 ? (b.completed / b.total) * 100 : 0;
   const done = b.status === 'completed' || b.status === 'partially_failed';
@@ -192,7 +223,7 @@ function BatchRow({
             {b.id}
           </p>
           <p className="num text-[11px] text-mut mt-0.5">
-            {b.completed}/{b.total} · {relativeTime(b.created_at)}
+            {b.completed}/{b.total} · {relativeTime(b.created_at, lang)}
           </p>
         </div>
         <StatusBadge status={b.status} />
@@ -200,7 +231,7 @@ function BatchRow({
           <button
             type="button"
             onClick={onToggle}
-            aria-label="Lihat dokumen"
+            aria-label={lang === 'en' ? 'View documents' : 'Lihat dokumen'}
             className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-ink transition-colors flex-shrink-0"
           >
             {failed ? (
@@ -241,14 +272,15 @@ function BatchRow({
           style={{ width: `${pct}%` }}
         />
       </div>
-      {open && <BatchDocumentsPanel batchId={b.id} />}
+      {open && <BatchDocumentsPanel batchId={b.id} lang={lang} />}
     </div>
   );
 }
 
 export default function BatchesPage() {
   const qc = useQueryClient();
-  const { fmtNum } = useLang();
+  const { fmtNum, lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const batches = useQuery({
     queryKey: ['batches'],
     queryFn: getBatches,
@@ -296,7 +328,11 @@ export default function BatchesPage() {
       setSelectedBatchId(res.id);
     },
     onError: (e) =>
-      setFormError(e instanceof Error ? e.message : 'Gagal membuat batch'),
+      setFormError(
+        e instanceof Error
+          ? e.message
+          : t('Gagal membuat batch', 'Failed to create batch'),
+      ),
   });
 
   function handleSubmit(e: React.FormEvent) {
@@ -305,11 +341,15 @@ export default function BatchesPage() {
     let items: { ref: string; data: Record<string, unknown> }[];
     try {
       const parsed = JSON.parse(itemsJson) as unknown;
-      if (!Array.isArray(parsed)) throw new Error('Harus berupa array JSON');
+      if (!Array.isArray(parsed))
+        throw new Error(t('Harus berupa array JSON', 'Must be a JSON array'));
       items = parsed as typeof items;
     } catch {
       setFormError(
-        'Format JSON tidak valid. Pastikan berupa array [ { "ref": "...", "data": {...} }, ... ]',
+        t(
+          'Format JSON tidak valid. Pastikan berupa array [ { "ref": "...", "data": {...} }, ... ]',
+          'Invalid JSON format. Make sure it is an array [ { "ref": "...", "data": {...} }, ... ]',
+        ),
       );
       return;
     }
@@ -321,9 +361,18 @@ export default function BatchesPage() {
   }
 
   const stats = [
-    { label: 'Batch bulan ini', value: fmtNum(batchesThisMonth) },
-    { label: 'Dokumen tercetak', value: fmtNum(docsPrinted) },
-    { label: 'Tingkat sukses', value: `${successRate.toFixed(1)}%` },
+    {
+      label: t('Batch bulan ini', 'Batches this month'),
+      value: fmtNum(batchesThisMonth),
+    },
+    {
+      label: t('Dokumen tercetak', 'Documents generated'),
+      value: fmtNum(docsPrinted),
+    },
+    {
+      label: t('Tingkat sukses', 'Success rate'),
+      value: `${successRate.toFixed(1)}%`,
+    },
   ];
 
   return (
@@ -334,7 +383,10 @@ export default function BatchesPage() {
           <div>
             <h1 className="text-[17px] font-bold text-ink">Batch</h1>
             <p className="text-[12.5px] text-mut mt-0.5">
-              Generate banyak dokumen sekaligus dari satu template + data.
+              {t(
+                'Generate banyak dokumen sekaligus dari satu template + data.',
+                'Generate many documents at once from a single template + data.',
+              )}
             </p>
           </div>
           <button
@@ -358,7 +410,7 @@ export default function BatchesPage() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Buat batch
+            {t('Buat batch', 'New batch')}
           </button>
         </div>
         <div className="grid grid-cols-3 border-t border-white/40 divide-x divide-white/40">
@@ -380,7 +432,7 @@ export default function BatchesPage() {
         <div className="glass rounded-glass p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-[14.5px] font-bold text-ink">
-              Buat batch baru
+              {t('Buat batch baru', 'Create a new batch')}
             </h2>
             <button
               type="button"
@@ -408,7 +460,7 @@ export default function BatchesPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-[12.5px] font-semibold text-ink mb-1.5">
-                Template
+                {t('Template', 'Template')}
               </label>
               <select
                 value={templateId}
@@ -416,7 +468,9 @@ export default function BatchesPage() {
                 required
                 className={inputCls}
               >
-                <option value="">-- Pilih template --</option>
+                <option value="">
+                  {t('-- Pilih template --', '-- Select template --')}
+                </option>
                 {templates.data?.data.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} (v{t.current_version})
@@ -426,9 +480,12 @@ export default function BatchesPage() {
             </div>
             <div>
               <label className="block text-[12.5px] font-semibold text-ink mb-1.5">
-                Data items{' '}
+                {t('Data items', 'Data items')}{' '}
                 <span className="font-normal text-mut">
-                  (JSON array, maks. 500 item)
+                  {t(
+                    '(JSON array, maks. 500 item)',
+                    '(JSON array, max. 500 items)',
+                  )}
                 </span>
               </label>
               <textarea
@@ -442,7 +499,9 @@ export default function BatchesPage() {
             <div>
               <label className="block text-[12.5px] font-semibold text-ink mb-1.5">
                 Webhook URL{' '}
-                <span className="font-normal text-mut">(opsional)</span>
+                <span className="font-normal text-mut">
+                  {t('(opsional)', '(optional)')}
+                </span>
               </label>
               <input
                 type="url"
@@ -476,7 +535,9 @@ export default function BatchesPage() {
                 disabled={create.isPending}
                 className="px-5 py-2.5 text-sm font-bold rounded-full text-white bg-grad shadow-[0_4px_14px_rgba(155,93,229,0.4)] disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition-all"
               >
-                {create.isPending ? 'Membuat…' : 'Buat batch'}
+                {create.isPending
+                  ? t('Membuat…', 'Creating…')
+                  : t('Buat batch', 'Create batch')}
               </button>
               <button
                 type="button"
@@ -486,7 +547,7 @@ export default function BatchesPage() {
                 }}
                 className="px-5 py-2.5 text-sm font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
               >
-                Batal
+                {t('Batal', 'Cancel')}
               </button>
             </div>
           </form>
@@ -497,7 +558,10 @@ export default function BatchesPage() {
       <div className="glass rounded-glass overflow-hidden divide-y divide-white/40">
         {list.length === 0 ? (
           <p className="px-6 py-12 text-center text-[13px] text-mut">
-            Belum ada batch. Klik "Buat batch" untuk mulai.
+            {t(
+              'Belum ada batch. Klik "Buat batch" untuk mulai.',
+              'No batches yet. Click "New batch" to get started.',
+            )}
           </p>
         ) : (
           list.map((b) => (
@@ -508,6 +572,7 @@ export default function BatchesPage() {
               onToggle={() =>
                 setSelectedBatchId(selectedBatchId === b.id ? null : b.id)
               }
+              lang={lang}
             />
           ))
         )}

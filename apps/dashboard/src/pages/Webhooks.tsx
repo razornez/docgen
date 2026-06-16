@@ -7,6 +7,7 @@ import {
   type WebhookEndpoint,
 } from '../api/client.js';
 import ConfirmModal from '../components/ConfirmModal.js';
+import { useLang } from '../i18n/index.js';
 
 const EVENTS = [
   'batch.completed',
@@ -28,9 +29,11 @@ function maskSecret(s: string): string {
 function EndpointRow({
   w,
   onDelete,
+  t,
 }: {
   w: WebhookEndpoint;
   onDelete: () => void;
+  t: (id: string, en: string) => string;
 }) {
   return (
     <div className="group flex items-center gap-4 px-6 py-4">
@@ -68,13 +71,13 @@ function EndpointRow({
           ))}
         </div>
         <p className="num text-[10.5px] text-mut mt-1.5">
-          Secret: {maskSecret(w.id)}
+          {t('Secret', 'Secret')}: {maskSecret(w.id)}
         </p>
       </div>
       <span
         className={`flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-wide flex-shrink-0 ${w.active ? 'text-emerald-600' : 'text-mut'}`}
       >
-        {w.active ? 'Aktif' : 'Nonaktif'}
+        {w.active ? t('Aktif', 'Active') : t('Nonaktif', 'Inactive')}
         <span
           className={`w-9 h-5 rounded-full p-0.5 flex ${w.active ? 'bg-grad justify-end' : 'bg-slate-300 justify-start'}`}
         >
@@ -84,8 +87,8 @@ function EndpointRow({
       <button
         type="button"
         onClick={onDelete}
-        aria-label="Hapus endpoint"
-        title="Hapus endpoint"
+        aria-label={t('Hapus endpoint', 'Delete endpoint')}
+        title={t('Hapus endpoint', 'Delete endpoint')}
         className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-rose-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
       >
         <svg
@@ -107,6 +110,8 @@ function EndpointRow({
 }
 
 export default function WebhooksPage() {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const qc = useQueryClient();
   const webhooks = useQuery({ queryKey: ['webhooks'], queryFn: getWebhooks });
 
@@ -127,7 +132,8 @@ export default function WebhooksPage() {
       setShowForm(false);
       setUrl('');
     },
-    onError: (e) => setFormError(e instanceof Error ? e.message : 'Gagal'),
+    onError: (e) =>
+      setFormError(e instanceof Error ? e.message : t('Gagal', 'Failed')),
   });
 
   const del = useMutation({
@@ -148,7 +154,10 @@ export default function WebhooksPage() {
     const trimmed = url.trim();
     if (!/^https:\/\//i.test(trimmed)) {
       setFormError(
-        'URL harus diawali https:// (endpoint webhook wajib HTTPS).',
+        t(
+          'URL harus diawali https:// (endpoint webhook wajib HTTPS).',
+          'URL must start with https:// (webhook endpoints require HTTPS).',
+        ),
       );
       return;
     }
@@ -165,7 +174,10 @@ export default function WebhooksPage() {
           <div>
             <h1 className="text-[17px] font-bold text-ink">Webhooks</h1>
             <p className="text-[12.5px] text-mut mt-0.5">
-              Terima notifikasi saat dokumen atau batch selesai.
+              {t(
+                'Terima notifikasi saat dokumen atau batch selesai.',
+                'Receive notifications when a document or batch finishes.',
+              )}
             </p>
           </div>
           <button
@@ -189,7 +201,7 @@ export default function WebhooksPage() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Tambah endpoint
+            {t('Tambah endpoint', 'Add endpoint')}
           </button>
         </div>
 
@@ -201,7 +213,7 @@ export default function WebhooksPage() {
           >
             <div>
               <label className="block text-[11.5px] font-semibold text-ink mb-1.5">
-                URL (HTTPS)
+                {t('URL (HTTPS)', 'URL (HTTPS)')}
               </label>
               <input
                 type="url"
@@ -214,7 +226,7 @@ export default function WebhooksPage() {
             </div>
             <div>
               <p className="text-[11.5px] font-semibold text-ink mb-2">
-                Events
+                {t('Events', 'Events')}
               </p>
               <div className="flex flex-wrap gap-2">
                 {EVENTS.map((ev) => (
@@ -246,14 +258,16 @@ export default function WebhooksPage() {
                 disabled={create.isPending || selectedEvents.length === 0}
                 className="px-4 py-2 rounded-full bg-grad text-white text-[12.5px] font-bold disabled:opacity-50 hover:opacity-90 transition-opacity"
               >
-                {create.isPending ? 'Menambahkan…' : 'Tambah endpoint'}
+                {create.isPending
+                  ? t('Menambahkan…', 'Adding…')
+                  : t('Tambah endpoint', 'Add endpoint')}
               </button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
                 className="px-4 py-2 rounded-full glass-soft text-ink text-[12.5px] font-semibold hover:bg-white/60 transition-colors"
               >
-                Batal
+                {t('Batal', 'Cancel')}
               </button>
             </div>
           </form>
@@ -266,7 +280,10 @@ export default function WebhooksPage() {
             style={{ background: 'linear-gradient(135deg,#fffbeb,#fefce8)' }}
           >
             <p className="text-[12.5px] font-semibold text-amber-800 mb-1.5">
-              Signing secret — simpan sekarang, tidak akan ditampilkan lagi.
+              {t(
+                'Signing secret — simpan sekarang, tidak akan ditampilkan lagi.',
+                'Signing secret — save it now, it won’t be shown again.',
+              )}
             </p>
             <code className="num text-[12px] text-amber-900 break-all bg-amber-100/60 rounded-xl px-3 py-2 block">
               {secret}
@@ -278,7 +295,7 @@ export default function WebhooksPage() {
         <div className="divide-y divide-white/40 border-t border-white/40">
           {list.length === 0 ? (
             <p className="px-6 py-10 text-center text-[13px] text-mut">
-              Belum ada webhook endpoint.
+              {t('Belum ada webhook endpoint.', 'No webhook endpoints yet.')}
             </p>
           ) : (
             list.map((w) => (
@@ -286,6 +303,7 @@ export default function WebhooksPage() {
                 key={w.id}
                 w={w}
                 onDelete={() => setDeleteTarget(w.id)}
+                t={t}
               />
             ))
           )}
@@ -312,14 +330,20 @@ export default function WebhooksPage() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-ink mb-1">
-              Verifikasi signature
+              {t('Verifikasi signature', 'Verify signature')}
             </p>
             <p className="text-[12.5px] text-mut leading-relaxed">
-              Setiap request menyertakan header{' '}
+              {t(
+                'Setiap request menyertakan header',
+                'Every request includes the header',
+              )}{' '}
               <code className="num bg-white/60 px-1.5 py-0.5 rounded-lg text-[11.5px]">
                 X-Docgen-Signature-256
               </code>{' '}
-              — HMAC-SHA256 dari body payload memakai secret endpoint Anda.
+              {t(
+                '— HMAC-SHA256 dari body payload memakai secret endpoint Anda.',
+                '— HMAC-SHA256 of the payload body using your endpoint secret.',
+              )}
             </p>
           </div>
         </div>
@@ -327,9 +351,12 @@ export default function WebhooksPage() {
 
       <ConfirmModal
         isOpen={deleteTarget !== null}
-        title="Hapus webhook endpoint?"
-        message="Endpoint yang dihapus tidak akan menerima notifikasi lagi. Tindakan ini tidak bisa dibatalkan."
-        confirmLabel="Ya, hapus"
+        title={t('Hapus webhook endpoint?', 'Delete webhook endpoint?')}
+        message={t(
+          'Endpoint yang dihapus tidak akan menerima notifikasi lagi. Tindakan ini tidak bisa dibatalkan.',
+          'A deleted endpoint will no longer receive notifications. This action cannot be undone.',
+        )}
+        confirmLabel={t('Ya, hapus', 'Yes, delete')}
         danger
         onConfirm={() => {
           if (deleteTarget) del.mutate(deleteTarget);

@@ -7,15 +7,16 @@ const idNum = (n: number, dec = 1) =>
 const jt = (idr: number) => idNum(idr / 1_000_000);
 const rb = (n: number) => idNum(n / 1000);
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, lang: 'id' | 'en'): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'baru saja';
-  if (m < 60) return `${m} menit lalu`;
+  if (m < 1) return lang === 'en' ? 'just now' : 'baru saja';
+  if (m < 60) return lang === 'en' ? `${m} min ago` : `${m} menit lalu`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam lalu`;
+  if (h < 24) return lang === 'en' ? `${h} hr ago` : `${h} jam lalu`;
   const d = Math.floor(h / 24);
-  return d === 1 ? 'kemarin' : `${d} hari lalu`;
+  if (d === 1) return lang === 'en' ? 'yesterday' : 'kemarin';
+  return lang === 'en' ? `${d} days ago` : `${d} hari lalu`;
 }
 
 const TINT = [
@@ -26,12 +27,15 @@ const TINT = [
   'bg-gradient-to-br from-[#9b5de5] to-[#6366f1]',
 ];
 
-function RevenueCard({ s }: { s: OwnerSummary }) {
+function RevenueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const max = Math.max(...s.revenue.days14, 1);
   const up = s.revenue.delta_pct >= 0;
   return (
     <div className="glass rounded-glass px-6 py-5">
-      <h2 className="text-[14.5px] font-bold text-ink">Pendapatan 14 hari</h2>
+      <h2 className="text-[14.5px] font-bold text-ink">
+        {t('Pendapatan 14 hari', '14-day revenue')}
+      </h2>
       <div className="mt-3 flex flex-col sm:flex-row sm:items-end gap-6">
         <div className="flex-shrink-0">
           <p className="text-ink leading-none">
@@ -41,13 +45,14 @@ function RevenueCard({ s }: { s: OwnerSummary }) {
             <span className="text-[16px] font-bold text-mut ml-1">jt</span>
           </p>
           <p className="text-[10.5px] font-bold uppercase tracking-wider text-mut mt-1.5">
-            Juta minggu ini
+            {t('Juta minggu ini', 'Million this week')}
           </p>
           <span
             className={`inline-flex items-center gap-1 mt-2.5 px-2 py-1 rounded-lg text-[11px] font-semibold ${up ? 'bg-emerald-100/70 text-emerald-700' : 'bg-rose-100/70 text-rose-600'}`}
           >
             {up ? '↑' : '↓'} {up ? '+' : ''}
-            {idNum(s.revenue.delta_pct, 0)}% vs minggu lalu
+            {idNum(s.revenue.delta_pct, 0)}%{' '}
+            {t('vs minggu lalu', 'vs last week')}
           </span>
         </div>
         <div className="flex-1 flex items-end justify-between gap-1.5 h-[110px]">
@@ -59,7 +64,7 @@ function RevenueCard({ s }: { s: OwnerSummary }) {
                 key={i}
                 className={`flex-1 rounded-t origin-bottom animate-growBar ${isMax ? 'bg-grad' : 'bg-brand-purple/25'}`}
                 style={{ height: `${h}%`, animationDelay: `${i * 40}ms` }}
-                title={`Rp ${jt(amt)} jt`}
+                title={`Rp ${jt(amt)} ${t('jt', 'M')}`}
               />
             );
           })}
@@ -69,35 +74,38 @@ function RevenueCard({ s }: { s: OwnerSummary }) {
   );
 }
 
-function QueueCard({ s }: { s: OwnerSummary }) {
+function QueueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const q = s.queue;
   const stats = [
-    { label: 'Worker', value: String(q.workers) },
-    { label: 'Berjalan', value: String(q.running) },
-    { label: 'Antri', value: String(q.queued) },
+    { label: t('Worker', 'Workers'), value: String(q.workers) },
+    { label: t('Berjalan', 'Running'), value: String(q.running) },
+    { label: t('Antri', 'Queued'), value: String(q.queued) },
     { label: 'P95', value: `${q.p95}s` },
   ];
   const rows = [
     {
       name: 'Render engine',
-      meta: `p95 ${q.p95} dtk · ${q.workers} worker`,
+      meta: `p95 ${q.p95} ${t('dtk', 'sec')} · ${q.workers} ${t('worker', 'workers')}`,
       dot: 'bg-emerald-500',
     },
     {
       name: 'API gateway',
-      meta: `${s.uptime}% · 12k req/mnt`,
+      meta: `${s.uptime}% · 12k ${t('req/mnt', 'req/min')}`,
       dot: 'bg-emerald-500',
     },
     {
-      name: 'Antrian (BullMQ)',
-      meta: `${q.queued} antri · ${q.running} jalan`,
+      name: t('Antrian (BullMQ)', 'Queue (BullMQ)'),
+      meta: `${q.queued} ${t('antri', 'queued')} · ${q.running} ${t('jalan', 'running')}`,
       dot: q.queued > 0 ? 'bg-brand-pink' : 'bg-emerald-500',
     },
   ];
   return (
     <div className="glass rounded-glass overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4">
-        <h2 className="text-[14.5px] font-bold text-ink">Antrian render</h2>
+        <h2 className="text-[14.5px] font-bold text-ink">
+          {t('Antrian render', 'Render queue')}
+        </h2>
         <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> live
         </span>
@@ -130,18 +138,25 @@ function QueueCard({ s }: { s: OwnerSummary }) {
 }
 
 export default function OwnerConsole() {
-  const { fmtNum } = useLang();
+  const { lang, fmtNum } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const q = useQuery({ queryKey: ['owner-summary'], queryFn: getOwnerSummary });
   const s = q.data;
 
   const stats = s
     ? [
-        { label: 'Tenant aktif', value: fmtNum(s.tenants_active) },
         {
-          label: 'Pendapatan / bln',
-          value: `Rp ${jt(s.revenue_month_idr)} jt`,
+          label: t('Tenant aktif', 'Active tenants'),
+          value: fmtNum(s.tenants_active),
         },
-        { label: 'Dokumen (30 hr)', value: `${rb(s.documents_30d)} rb` },
+        {
+          label: t('Pendapatan / bln', 'Revenue / mo'),
+          value: `Rp ${jt(s.revenue_month_idr)} ${t('jt', 'M')}`,
+        },
+        {
+          label: t('Dokumen (30 hr)', 'Documents (30d)'),
+          value: `${rb(s.documents_30d)} ${t('rb', 'k')}`,
+        },
         { label: 'Uptime', value: `${s.uptime}%` },
       ]
     : [];
@@ -151,10 +166,13 @@ export default function OwnerConsole() {
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="glass rounded-glass px-7 py-6">
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-mut">
-          Owner console · 30 hari terakhir
+          {t(
+            'Owner console · 30 hari terakhir',
+            'Owner console · last 30 days',
+          )}
         </p>
         <h1 className="text-[24px] font-extrabold text-ink mt-1.5">
-          Ringkasan platform
+          {t('Ringkasan platform', 'Platform overview')}
         </h1>
       </div>
 
@@ -184,8 +202,8 @@ export default function OwnerConsole() {
         <>
           {/* ── Revenue + Queue ──────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <RevenueCard s={s} />
-            <QueueCard s={s} />
+            <RevenueCard s={s} lang={lang} />
+            <QueueCard s={s} lang={lang} />
           </div>
 
           {/* ── Top tenants + Recent signups ─────────────────────────── */}
@@ -194,33 +212,33 @@ export default function OwnerConsole() {
             <div className="glass rounded-glass overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-white/40">
                 <h2 className="text-[14.5px] font-bold text-ink">
-                  Tenant teratas
+                  {t('Tenant teratas', 'Top tenants')}
                 </h2>
                 <span className="text-[10.5px] font-bold uppercase tracking-wider text-mut">
-                  dok
+                  {t('dok', 'docs')}
                 </span>
               </div>
               <div className="divide-y divide-white/40">
-                {s.top_tenants.map((t, i) => (
+                {s.top_tenants.map((tn, i) => (
                   <div
-                    key={t.id}
+                    key={tn.id}
                     className="flex items-center gap-3 px-6 py-3.5"
                   >
                     <div
                       className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 ${TINT[i % TINT.length]}`}
                     >
-                      {t.name.slice(0, 2).toUpperCase()}
+                      {tn.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[13.5px] font-semibold text-ink truncate">
-                        {t.name}
+                        {tn.name}
                       </p>
                       <p className="num text-[11px] text-mut">
-                        Prepaid · Rp {jt(t.revenue_idr)} jt
+                        Prepaid · Rp {jt(tn.revenue_idr)} {t('jt', 'M')}
                       </p>
                     </div>
                     <span className="num text-[14px] font-bold text-ink flex-shrink-0">
-                      {fmtNum(t.docs)}
+                      {fmtNum(tn.docs)}
                     </span>
                   </div>
                 ))}
@@ -231,15 +249,15 @@ export default function OwnerConsole() {
             <div className="glass rounded-glass overflow-hidden">
               <div className="px-6 py-4 border-b border-white/40">
                 <h2 className="text-[14.5px] font-bold text-ink">
-                  Pendaftar baru
+                  {t('Pendaftar baru', 'Recent signups')}
                 </h2>
               </div>
               <div className="divide-y divide-white/40">
-                {s.recent_signups.map((t) => {
-                  const trial = t.plan === 'trial';
+                {s.recent_signups.map((tn) => {
+                  const trial = tn.plan === 'trial';
                   return (
                     <div
-                      key={t.id}
+                      key={tn.id}
                       className="flex items-center gap-3 px-6 py-3.5"
                     >
                       <div className="w-9 h-9 rounded-lg bg-white/60 flex items-center justify-center text-brand-purple flex-shrink-0">
@@ -259,10 +277,10 @@ export default function OwnerConsole() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13.5px] font-semibold text-ink truncate">
-                          {t.name}
+                          {tn.name}
                         </p>
                         <p className="num text-[11px] text-mut">
-                          {relativeTime(t.created_at)}
+                          {relativeTime(tn.created_at, lang)}
                         </p>
                       </div>
                       <span

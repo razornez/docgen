@@ -8,16 +8,19 @@ import {
 } from '../api/client.js';
 import ConfirmModal from '../components/ConfirmModal.js';
 import { formatDate } from '../lib/format.js';
+import { useLang } from '../i18n/index.js';
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, lang: 'id' | 'en'): string {
+  const en = lang === 'en';
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'baru saja';
-  if (m < 60) return `${m} menit lalu`;
+  if (m < 1) return en ? 'just now' : 'baru saja';
+  if (m < 60) return en ? `${m} min ago` : `${m} menit lalu`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam lalu`;
+  if (h < 24) return en ? `${h} hr ago` : `${h} jam lalu`;
   const d = Math.floor(h / 24);
-  return d === 1 ? 'kemarin' : `${d} hari lalu`;
+  if (d === 1) return en ? 'yesterday' : 'kemarin';
+  return en ? `${d} days ago` : `${d} hari lalu`;
 }
 
 function KeyRow({
@@ -25,11 +28,15 @@ function KeyRow({
   onCopy,
   copied,
   onRevoke,
+  t,
+  lang,
 }: {
   k: ApiKeyItem;
   onCopy: () => void;
   copied: boolean;
   onRevoke: () => void;
+  t: (id: string, en: string) => string;
+  lang: 'id' | 'en';
 }) {
   const live = k.mode === 'live';
   const revoked = k.status !== 'active';
@@ -68,17 +75,17 @@ function KeyRow({
           </span>
         </div>
         <p className="num text-[11px] text-mut mt-0.5">
-          Dibuat {formatDate(k.created_at)}
+          {t('Dibuat', 'Created')} {formatDate(k.created_at)}
           {k.last_used_at
-            ? ` · ${relativeTime(k.last_used_at)} dipakai`
-            : ' · belum dipakai'}
+            ? ` · ${relativeTime(k.last_used_at, lang)} ${t('dipakai', 'used')}`
+            : t(' · belum dipakai', ' · never used')}
         </p>
       </div>
       <button
         type="button"
         onClick={onCopy}
-        aria-label="Salin referensi key"
-        title="Salin referensi key"
+        aria-label={t('Salin referensi key', 'Copy key reference')}
+        title={t('Salin referensi key', 'Copy key reference')}
         className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-ink transition-colors flex-shrink-0"
       >
         {copied ? (
@@ -115,8 +122,8 @@ function KeyRow({
         <button
           type="button"
           onClick={onRevoke}
-          aria-label="Cabut key"
-          title="Cabut key"
+          aria-label={t('Cabut key', 'Revoke key')}
+          title={t('Cabut key', 'Revoke key')}
           className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-rose-500 transition-colors flex-shrink-0"
         >
           <svg
@@ -139,6 +146,8 @@ function KeyRow({
 }
 
 export default function ApiKeysPage() {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const qc = useQueryClient();
   const keys = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys });
 
@@ -156,7 +165,8 @@ export default function ApiKeysPage() {
       setNewKey(data.api_key.key);
       setShowForm(false);
     },
-    onError: (e) => setCreateError(e instanceof Error ? e.message : 'Gagal'),
+    onError: (e) =>
+      setCreateError(e instanceof Error ? e.message : t('Gagal', 'Failed')),
   });
 
   const revoke = useMutation({
@@ -181,7 +191,10 @@ export default function ApiKeysPage() {
           <div>
             <h1 className="text-[17px] font-bold text-ink">API Keys</h1>
             <p className="text-[12.5px] text-mut mt-0.5">
-              Kunci untuk integrasi server-ke-server. Jaga kerahasiaannya.
+              {t(
+                'Kunci untuk integrasi server-ke-server. Jaga kerahasiaannya.',
+                'Keys for server-to-server integration. Keep them secret.',
+              )}
             </p>
           </div>
           <button
@@ -206,7 +219,7 @@ export default function ApiKeysPage() {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Buat API key
+            {t('Buat API key', 'Create API key')}
           </button>
         </div>
 
@@ -215,15 +228,19 @@ export default function ApiKeysPage() {
           <div className="mx-6 mb-4 p-4 rounded-2xl glass-soft flex flex-wrap items-end gap-3">
             <div>
               <label className="block text-[11.5px] font-semibold text-ink mb-1.5">
-                Mode
+                {t('Mode', 'Mode')}
               </label>
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as 'live' | 'test')}
                 className="glass-soft rounded-xl px-3 py-2 text-[13px] text-ink focus:outline-none"
               >
-                <option value="live">Live (produksi)</option>
-                <option value="test">Test (uji coba)</option>
+                <option value="live">
+                  {t('Live (produksi)', 'Live (production)')}
+                </option>
+                <option value="test">
+                  {t('Test (uji coba)', 'Test (sandbox)')}
+                </option>
               </select>
             </div>
             <button
@@ -235,7 +252,9 @@ export default function ApiKeysPage() {
               disabled={create.isPending}
               className="px-4 py-2 rounded-full bg-grad text-white text-[12.5px] font-bold disabled:opacity-50 hover:opacity-90 transition-opacity"
             >
-              {create.isPending ? 'Membuat…' : 'Buat key'}
+              {create.isPending
+                ? t('Membuat…', 'Creating…')
+                : t('Buat key', 'Create key')}
             </button>
             {createError && (
               <span className="text-[12px] text-rose-600">{createError}</span>
@@ -250,7 +269,10 @@ export default function ApiKeysPage() {
             style={{ background: 'linear-gradient(135deg,#fffbeb,#fefce8)' }}
           >
             <p className="text-[12.5px] font-semibold text-amber-800 mb-1.5">
-              Simpan key ini sekarang — tidak akan ditampilkan lagi.
+              {t(
+                'Simpan key ini sekarang — tidak akan ditampilkan lagi.',
+                'Save this key now — it won’t be shown again.',
+              )}
             </p>
             <code className="num text-[12px] text-amber-900 break-all bg-amber-100/60 rounded-xl px-3 py-2 block">
               {newKey}
@@ -259,14 +281,14 @@ export default function ApiKeysPage() {
         )}
 
         <p className="px-6 text-[10.5px] font-bold uppercase tracking-wider text-mut">
-          {activeCount} kunci aktif
+          {activeCount} {t('kunci aktif', 'active keys')}
         </p>
 
         {/* Keys list */}
         <div className="mt-2 divide-y divide-white/40 border-t border-white/40">
           {list.length === 0 ? (
             <p className="px-6 py-10 text-center text-[13px] text-mut">
-              Belum ada API key.
+              {t('Belum ada API key.', 'No API keys yet.')}
             </p>
           ) : (
             list.map((k) => (
@@ -276,6 +298,8 @@ export default function ApiKeysPage() {
                 copied={copied === k.id}
                 onCopy={() => copyRef(k)}
                 onRevoke={() => setRevokeTarget(k.id)}
+                t={t}
+                lang={lang}
               />
             ))
           )}
@@ -284,9 +308,12 @@ export default function ApiKeysPage() {
 
       <ConfirmModal
         isOpen={revokeTarget !== null}
-        title="Cabut API key?"
-        message="Key yang sudah dicabut tidak bisa diaktifkan kembali. Pastikan tidak ada sistem yang masih menggunakannya."
-        confirmLabel="Ya, cabut"
+        title={t('Cabut API key?', 'Revoke API key?')}
+        message={t(
+          'Key yang sudah dicabut tidak bisa diaktifkan kembali. Pastikan tidak ada sistem yang masih menggunakannya.',
+          'A revoked key cannot be reactivated. Make sure no system is still using it.',
+        )}
+        confirmLabel={t('Ya, cabut', 'Yes, revoke')}
         danger
         onConfirm={() => {
           if (revokeTarget) revoke.mutate(revokeTarget);

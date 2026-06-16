@@ -8,6 +8,7 @@ import {
   VARIABLE_CATALOG,
   extractVars,
 } from '../lib/templateData.js';
+import { useLang } from '../i18n/index.js';
 
 const STARTER =
   '<h1>Judul Dokumen</h1>' +
@@ -24,6 +25,8 @@ export function TemplateCreator({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Umum');
   const [body, setBody] = useState(STARTER);
@@ -76,10 +79,17 @@ export function TemplateCreator({
       const msg = e instanceof Error ? e.message : '';
       setError(
         /already exists/i.test(msg)
-          ? 'Nama template sudah dipakai — pilih nama lain.'
+          ? t(
+              'Nama template sudah dipakai — pilih nama lain.',
+              'Template name already in use — choose another.',
+            )
           : /at least 1 character|name/i.test(msg)
-            ? 'Nama template wajib diisi.'
-            : msg || 'Gagal menyimpan template. Coba lagi.',
+            ? t('Nama template wajib diisi.', 'Template name is required.')
+            : msg ||
+              t(
+                'Gagal menyimpan template. Coba lagi.',
+                'Failed to save template. Try again.',
+              ),
       );
     },
   });
@@ -95,7 +105,7 @@ export function TemplateCreator({
   function save() {
     setError('');
     if (!name.trim()) {
-      setError('Nama template wajib diisi');
+      setError(t('Nama template wajib diisi', 'Template name is required'));
       return;
     }
     create.mutate({ name: name.trim(), category, body: body.trim() });
@@ -113,7 +123,7 @@ export function TemplateCreator({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Kembali"
+            aria-label={t('Kembali', 'Back')}
             className="w-9 h-9 rounded-full glass-soft flex items-center justify-center text-mut hover:text-ink transition-colors flex-shrink-0"
           >
             <svg
@@ -153,7 +163,7 @@ export function TemplateCreator({
               setName(e.target.value);
               if (error) setError('');
             }}
-            placeholder="Nama template…"
+            placeholder={t('Nama template…', 'Template name…')}
             className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl glass-soft text-[14px] text-ink placeholder:text-mut focus:outline-none ${
               error ? 'ring-1 ring-rose-400' : ''
             }`}
@@ -199,7 +209,9 @@ export function TemplateCreator({
                 d="M5 13l4 4L19 7"
               />
             </svg>
-            {create.isPending ? 'Menyimpan…' : 'Simpan template'}
+            {create.isPending
+              ? t('Menyimpan…', 'Saving…')
+              : t('Simpan template', 'Save template')}
           </button>
         </div>
 
@@ -243,11 +255,17 @@ export function TemplateCreator({
             <div className="glass rounded-glass p-4 flex flex-col min-h-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="num text-brand-purple font-bold">{'{}'}</span>
-                <h2 className="text-[14px] font-bold text-ink">Variabel</h2>
+                <h2 className="text-[14px] font-bold text-ink">
+                  {t('Variabel', 'Variables')}
+                </h2>
               </div>
               <p className="text-[11.5px] text-mut mt-1 leading-snug">
-                Klik untuk <b>menyisipkan</b> di posisi kursor · ikon salin
-                untuk copy.
+                {t('Klik untuk', 'Click to')}{' '}
+                <b>{t('menyisipkan', 'insert')}</b>{' '}
+                {t(
+                  'di posisi kursor · ikon salin untuk copy.',
+                  'at the cursor · copy icon to copy.',
+                )}
               </p>
               <div className="relative mt-3">
                 <svg
@@ -272,7 +290,10 @@ export function TemplateCreator({
                       addNewVar();
                     }
                   }}
-                  placeholder="cari / ketik variabel baru…"
+                  placeholder={t(
+                    'cari / ketik variabel baru…',
+                    'search / type a new variable…',
+                  )}
                   className="num w-full pl-9 pr-3 py-2 rounded-xl glass-soft text-[12px] text-ink placeholder:text-mut focus:outline-none"
                 />
               </div>
@@ -297,7 +318,7 @@ export function TemplateCreator({
                       />
                     </svg>
                     <span className="num truncate">
-                      Tambah {`{{${newVarKey}}}`}
+                      {t('Tambah', 'Add')} {`{{${newVarKey}}}`}
                     </span>
                   </button>
                 )}
@@ -310,15 +331,15 @@ export function TemplateCreator({
                       type="button"
                       onClick={() => insertVar(v)}
                       className="num text-[12px] text-brand-purple text-left flex-1 truncate"
-                      title="Sisipkan di kursor"
+                      title={t('Sisipkan di kursor', 'Insert at cursor')}
                     >
                       {`{{${v}}}`}
                     </button>
                     <button
                       type="button"
                       onClick={() => copyVar(v)}
-                      aria-label={`Salin ${v}`}
-                      title="Salin"
+                      aria-label={t(`Salin ${v}`, `Copy ${v}`)}
+                      title={t('Salin', 'Copy')}
                       className="ml-2 p-1 rounded-md text-mut hover:text-ink hover:bg-white/60 transition-colors flex-shrink-0"
                     >
                       {copied === v ? (
@@ -355,7 +376,7 @@ export function TemplateCreator({
                 ))}
                 {catalog.length === 0 && (
                   <p className="text-[12px] text-mut text-center py-6">
-                    Tidak ada variabel cocok.
+                    {t('Tidak ada variabel cocok.', 'No matching variables.')}
                   </p>
                 )}
               </div>
@@ -364,14 +385,19 @@ export function TemplateCreator({
             {/* Dipakai */}
             <div className="glass rounded-glass p-4 flex-shrink-0">
               <div className="flex items-center justify-between">
-                <h3 className="text-[13px] font-bold text-ink">Dipakai</h3>
+                <h3 className="text-[13px] font-bold text-ink">
+                  {t('Dipakai', 'Used')}
+                </h3>
                 <span className="num text-[11px] font-bold text-brand-purple bg-white/50 rounded-full w-6 h-6 flex items-center justify-center">
                   {used.length}
                 </span>
               </div>
               {used.length === 0 ? (
                 <p className="text-[11.5px] text-mut mt-2">
-                  Belum ada variabel pada dokumen.
+                  {t(
+                    'Belum ada variabel pada dokumen.',
+                    'No variables in the document yet.',
+                  )}
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-1.5 mt-2.5">

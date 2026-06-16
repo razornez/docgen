@@ -14,15 +14,16 @@ import {
 import { useLang } from '../i18n/index.js';
 
 /* ── Helpers ───────────────────────────────────────────────────────── */
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, lang: 'id' | 'en'): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'baru saja';
-  if (m < 60) return `${m} menit lalu`;
+  if (m < 1) return lang === 'en' ? 'just now' : 'baru saja';
+  if (m < 60) return lang === 'en' ? `${m} min ago` : `${m} menit lalu`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam lalu`;
+  if (h < 24) return lang === 'en' ? `${h} hr ago` : `${h} jam lalu`;
   const d = Math.floor(h / 24);
-  return d === 1 ? 'kemarin' : `${d} hari lalu`;
+  if (d === 1) return lang === 'en' ? 'yesterday' : 'kemarin';
+  return lang === 'en' ? `${d} days ago` : `${d} hari lalu`;
 }
 
 function isThisMonth(iso: string): boolean {
@@ -31,33 +32,41 @@ function isThisMonth(iso: string): boolean {
   return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
 }
 
-const CAT_LABEL: Record<string, string> = {
-  topup: 'Top-up',
-  debit: 'Pemakaian',
-  refund: 'Refund',
-  signup_bonus: 'Bonus',
-  adjustment: 'Penyesuaian',
-};
+type Translate = (id: string, en: string) => string;
+
+function catLabel(type: string, t: Translate): string {
+  const map: Record<string, string> = {
+    topup: 'Top-up',
+    debit: t('Pemakaian', 'Usage'),
+    refund: 'Refund',
+    signup_bonus: t('Bonus', 'Bonus'),
+    adjustment: t('Penyesuaian', 'Adjustment'),
+  };
+  return map[type] ?? type;
+}
 
 /** Judul transaksi manusiawi, mis. "Batch — Slip gaji Juni". */
-function txTitle(tx: TxItem): string {
+function txTitle(tx: TxItem, t: Translate): string {
   const d = tx.detail ?? {};
   if (tx.type === 'topup') return `Top-up — ${d.method ?? d.gateway ?? 'QRIS'}`;
   if (tx.type === 'refund')
-    return `Refund — ${(d as { reason?: string }).reason ?? 'dana kembali'}`;
-  if (tx.type === 'signup_bonus') return 'Bonus pendaftaran';
-  if (d.item_ref) return `Dokumen tunggal — ${d.template_name ?? 'Invoice'}`;
+    return `Refund — ${(d as { reason?: string }).reason ?? t('dana kembali', 'refunded')}`;
+  if (tx.type === 'signup_bonus') return t('Bonus pendaftaran', 'Signup bonus');
+  if (d.item_ref)
+    return `${t('Dokumen tunggal', 'Single document')} — ${d.template_name ?? 'Invoice'}`;
   if (d.template_name) return `Batch — ${d.template_name}`;
-  return 'Dokumen dibuat';
+  return t('Dokumen dibuat', 'Document created');
 }
 
-const FILTERS = [
-  { key: 'all', label: 'Semua' },
-  { key: 'topup', label: 'Top-up' },
-  { key: 'debit', label: 'Pemakaian' },
-  { key: 'refund', label: 'Refund' },
-] as const;
-type FilterKey = (typeof FILTERS)[number]['key'];
+type FilterKey = 'all' | 'topup' | 'debit' | 'refund';
+function filters(t: Translate): { key: FilterKey; label: string }[] {
+  return [
+    { key: 'all', label: t('Semua', 'All') },
+    { key: 'topup', label: 'Top-up' },
+    { key: 'debit', label: t('Pemakaian', 'Usage') },
+    { key: 'refund', label: 'Refund' },
+  ];
+}
 
 // Fallback bila endpoint metode bayar belum tersedia (mis. Midtrans belum
 // dikonfigurasi di lingkungan ini) — agar segmented tetap tampil.
@@ -102,9 +111,9 @@ function loadSnap(clientKey: string): Promise<SnapApi> {
     s.setAttribute('data-snap', '1');
     s.onload = () => {
       if (window.snap) resolve(window.snap);
-      else reject(new Error('Snap tidak tersedia setelah load'));
+      else reject(new Error('Snap unavailable after load'));
     };
-    s.onerror = () => reject(new Error('Gagal memuat Snap'));
+    s.onerror = () => reject(new Error('Failed to load Snap'));
     if (!existing) document.body.appendChild(s);
   });
 }
@@ -115,7 +124,8 @@ const CONFIRM_POLL_MAX_TRIES = 30;
 /* ── UI ────────────────────────────────────────────────────────────── */
 export default function WalletPage() {
   const qc = useQueryClient();
-  const { fmtNum } = useLang();
+  const { fmtNum, lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: getWallet });
   const txs = useQuery({
     queryKey: ['transactions'],
@@ -152,6 +162,7 @@ export default function WalletPage() {
   const selPkg = pkgList.find((p) => p.id === effPkgId);
   const selMethodName =
     methodList.find((m) => m.code === effMethod)?.name ?? 'QRIS';
+  const filterList = filters(t);
 
   const balance = wallet.data?.balance ?? 0;
   const usageThisMonth = (batchesQ.data?.data ?? [])
@@ -167,7 +178,12 @@ export default function WalletPage() {
   function pollConfirm(paymentId: string) {
     if (pollRef.current) window.clearInterval(pollRef.current);
     setConfirming(true);
-    setConfirmMsg('Pembayaran diterima — mengonfirmasi & memasukkan saldo…');
+    setConfirmMsg(
+      t(
+        'Pembayaran diterima — mengonfirmasi & memasukkan saldo…',
+        'Payment received — confirming & adding balance…',
+      ),
+    );
     let tries = 0;
     const tick = () => {
       tries += 1;
@@ -178,7 +194,12 @@ export default function WalletPage() {
             pollRef.current = null;
             setConfirming(false);
             refreshWallet();
-            setConfirmMsg('Pembayaran berhasil — saldo sudah masuk.');
+            setConfirmMsg(
+              t(
+                'Pembayaran berhasil — saldo sudah masuk.',
+                'Payment successful — balance added.',
+              ),
+            );
             window.setTimeout(() => setConfirmMsg(''), 6000);
           } else if (tries >= CONFIRM_POLL_MAX_TRIES) {
             if (pollRef.current) window.clearInterval(pollRef.current);
@@ -186,7 +207,10 @@ export default function WalletPage() {
             setConfirming(false);
             refreshWallet();
             setConfirmMsg(
-              'Pembayaran sedang diproses. Saldo akan masuk otomatis — aman meski halaman ditutup.',
+              t(
+                'Pembayaran sedang diproses. Saldo akan masuk otomatis — aman meski halaman ditutup.',
+                'Payment is being processed. Your balance will be added automatically — safe to close this page.',
+              ),
             );
           }
         })
@@ -207,7 +231,10 @@ export default function WalletPage() {
             onSuccess: () => pollConfirm(paymentId),
             onPending: () => pollConfirm(paymentId),
             onClose: () => undefined,
-            onError: () => setTopupError('Pembayaran gagal di Snap.'),
+            onError: () =>
+              setTopupError(
+                t('Pembayaran gagal di Snap.', 'Payment failed in Snap.'),
+              ),
           });
           return;
         } catch {
@@ -215,10 +242,18 @@ export default function WalletPage() {
         }
       }
       if (data.payment_url) window.open(data.payment_url, '_blank');
-      else setTopupError('Gateway tidak mengembalikan token pembayaran.');
+      else
+        setTopupError(
+          t(
+            'Gateway tidak mengembalikan token pembayaran.',
+            'Gateway did not return a payment token.',
+          ),
+        );
     },
     onError: (e) =>
-      setTopupError(e instanceof Error ? e.message : 'Top-up gagal'),
+      setTopupError(
+        e instanceof Error ? e.message : t('Top-up gagal', 'Top-up failed'),
+      ),
   });
 
   function handleTopup() {
@@ -239,20 +274,23 @@ export default function WalletPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-mut">
-              Saldo kredit
+              {t('Saldo kredit', 'Credit balance')}
             </p>
             <p className="num mt-2 text-[44px] font-extrabold text-ink leading-none">
               {fmtNum(balance)}
               <span className="text-[18px] font-bold text-mut ml-1">
-                kredit
+                {t('kredit', 'credits')}
               </span>
             </p>
             <p className="num mt-3 text-[12.5px] text-mut">
-              ≈ {fmtNum(balance)} dokumen · {me.data?.tenant.name ?? '…'}
+              ≈ {fmtNum(balance)} {t('dokumen', 'documents')} ·{' '}
+              {me.data?.tenant.name ?? '…'}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[11px] text-mut">Pemakaian bln ini</p>
+            <p className="text-[11px] text-mut">
+              {t('Pemakaian bln ini', 'Usage this month')}
+            </p>
             <p className="num mt-1 text-[22px] font-bold text-brand-purple">
               {fmtNum(usageThisMonth)}
             </p>
@@ -263,9 +301,14 @@ export default function WalletPage() {
       {/* ── Isi ulang ───────────────────────────────────────────────── */}
       <div className="glass rounded-glass px-6 py-6 sm:px-7">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold text-ink">Isi ulang</h2>
+          <h2 className="text-[15px] font-bold text-ink">
+            {t('Isi ulang', 'Top up')}
+          </h2>
           <p className="num text-[11.5px] text-mut">
-            1 kredit = 1 dokumen (≤ 5 hlm)
+            {t(
+              '1 kredit = 1 dokumen (≤ 5 hlm)',
+              '1 credit = 1 document (≤ 5 pages)',
+            )}
           </p>
         </div>
 
@@ -274,7 +317,11 @@ export default function WalletPage() {
           {pkgList.map((pkg, i) => {
             const active = pkg.id === effPkgId;
             const badge =
-              i === 1 ? 'POPULER' : i === pkgList.length - 1 ? 'HEMAT' : null;
+              i === 1
+                ? t('POPULER', 'POPULAR')
+                : i === pkgList.length - 1
+                  ? t('HEMAT', 'BEST VALUE')
+                  : null;
             return (
               <button
                 key={pkg.id}
@@ -302,7 +349,7 @@ export default function WalletPage() {
           })}
           {pkgList.length === 0 && (
             <p className="col-span-full text-[13px] text-mut">
-              Paket belum tersedia.
+              {t('Paket belum tersedia.', 'No packages available yet.')}
             </p>
           )}
         </div>
@@ -326,7 +373,10 @@ export default function WalletPage() {
             ))}
           </div>
           <p className="text-[12px] text-mut">
-            Scan sekali — semua bank &amp; e-wallet
+            {t(
+              'Scan sekali — semua bank & e-wallet',
+              'Scan once — all banks & e-wallets',
+            )}
           </p>
         </div>
 
@@ -358,7 +408,8 @@ export default function WalletPage() {
               Rp {fmtNum(selPkg?.price_idr ?? 0)}
             </p>
             <p className="num text-[12px] text-mut mt-1.5">
-              {fmtNum(selPkg?.credits ?? 0)} kredit · via {selMethodName}
+              {fmtNum(selPkg?.credits ?? 0)} {t('kredit', 'credits')} ·{' '}
+              {t('via', 'via')} {selMethodName}
             </p>
           </div>
           <button
@@ -388,7 +439,7 @@ export default function WalletPage() {
                     d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"
                   />
                 </svg>
-                Membuka…
+                {t('Membuka…', 'Opening…')}
               </>
             ) : (
               <>
@@ -399,7 +450,7 @@ export default function WalletPage() {
                 >
                   <path d="M13 2L3 14h7l-1 8 10-12h-7z" />
                 </svg>
-                Bayar sekarang
+                {t('Bayar sekarang', 'Pay now')}
               </>
             )}
           </button>
@@ -436,9 +487,11 @@ export default function WalletPage() {
       {/* ── Riwayat transaksi ───────────────────────────────────────── */}
       <div className="glass rounded-glass overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/40">
-          <h2 className="text-[15px] font-bold text-ink">Riwayat transaksi</h2>
+          <h2 className="text-[15px] font-bold text-ink">
+            {t('Riwayat transaksi', 'Transaction history')}
+          </h2>
           <div className="flex items-center p-0.5 rounded-full glass-soft">
-            {FILTERS.map((f) => (
+            {filterList.map((f) => (
               <button
                 key={f.key}
                 type="button"
@@ -457,7 +510,7 @@ export default function WalletPage() {
 
         {shownTx.length === 0 ? (
           <p className="px-6 py-12 text-center text-[13px] text-mut">
-            Belum ada transaksi.
+            {t('Belum ada transaksi.', 'No transactions yet.')}
           </p>
         ) : (
           <ul className="divide-y divide-white/40">
@@ -470,11 +523,11 @@ export default function WalletPage() {
                 >
                   <div className="min-w-0">
                     <p className="text-[13.5px] font-semibold text-ink truncate">
-                      {txTitle(tx)}
+                      {txTitle(tx, t)}
                     </p>
                     <p className="num text-[11px] text-mut mt-0.5 truncate">
-                      {CAT_LABEL[tx.type] ?? tx.type} · {tx.ref_id} ·{' '}
-                      {relativeTime(tx.created_at)}
+                      {catLabel(tx.type, t)} · {tx.ref_id} ·{' '}
+                      {relativeTime(tx.created_at, lang)}
                     </p>
                   </div>
                   <span

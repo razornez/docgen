@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { getOwnerHealth } from '../../api/client.js';
+import { useLang } from '../../i18n/index.js';
 
 export default function OwnerHealth() {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const q = useQuery({ queryKey: ['owner-health'], queryFn: getOwnerHealth });
   const d = q.data;
 
@@ -11,9 +14,14 @@ export default function OwnerHealth() {
       <div className="glass rounded-glass overflow-hidden">
         <div className="flex items-start justify-between gap-4 px-6 py-5">
           <div>
-            <h1 className="text-[17px] font-bold text-ink">Kesehatan sistem</h1>
+            <h1 className="text-[17px] font-bold text-ink">
+              {t('Kesehatan sistem', 'System health')}
+            </h1>
             <p className="text-[12.5px] text-mut mt-0.5">
-              Worker render, API, antrian, penyimpanan, dan gateway bayar.
+              {t(
+                'Worker render, API, antrian, penyimpanan, dan gateway bayar.',
+                'Render workers, API, queue, storage, and payment gateway.',
+              )}
             </p>
           </div>
           {d && (
@@ -23,7 +31,9 @@ export default function OwnerHealth() {
               <span
                 className={`w-1.5 h-1.5 rounded-full ${d.status_ok ? 'bg-emerald-500' : 'bg-rose-500'}`}
               />
-              {d.status_ok ? 'Semua sistem normal' : 'Ada gangguan'}
+              {d.status_ok
+                ? t('Semua sistem normal', 'All systems normal')
+                : t('Ada gangguan', 'Disruption detected')}
             </span>
           )}
         </div>
@@ -57,7 +67,9 @@ export default function OwnerHealth() {
 
       {/* ── Insiden terbaru ──────────────────────────────────────────── */}
       <div className="glass rounded-glass px-6 py-5">
-        <h2 className="text-[14.5px] font-bold text-ink">Insiden terbaru</h2>
+        <h2 className="text-[14.5px] font-bold text-ink">
+          {t('Insiden terbaru', 'Recent incidents')}
+        </h2>
         {d && d.incidents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-12 h-12 rounded-xl bg-grad flex items-center justify-center text-white shadow-[0_4px_14px_rgba(155,93,229,0.35)]">
@@ -76,7 +88,10 @@ export default function OwnerHealth() {
               </svg>
             </div>
             <p className="mt-3 text-[13px] text-mut">
-              Tidak ada insiden 90 hari terakhir.
+              {t(
+                'Tidak ada insiden 90 hari terakhir.',
+                'No incidents in the last 90 days.',
+              )}
             </p>
           </div>
         ) : (
