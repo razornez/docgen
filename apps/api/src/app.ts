@@ -19,6 +19,7 @@ import { registerDocumentRoutes } from './documents/document.route.js';
 import { registerFileRoutes } from './files/file.route.js';
 import { RenderQueue } from './infra/render-queue.js';
 import { createBrevoMailer } from './infra/brevo-mailer.js';
+import { makeEmailSender } from './email/send.js';
 import { HealthRepository } from './health/health.repository.js';
 import { HealthService } from './health/health.service.js';
 import { registerHealthRoutes } from './health/health.route.js';
@@ -117,6 +118,9 @@ export function buildApp(config: AppConfig): FastifyInstance {
       })
     : null;
 
+  // Pengirim email transaksional terkelola owner (no-op bila SMTP belum diisi).
+  const emailSender = makeEmailSender(pool, mailer, config);
+
   const renderQueue = new RenderQueue(config.REDIS_URL);
   app.addHook('onClose', async () => {
     await renderQueue.close();
@@ -157,6 +161,7 @@ export function buildApp(config: AppConfig): FastifyInstance {
     templateService,
     mailer,
     config,
+    emailSender,
   );
   const paymentService = new PaymentService(
     pool,
@@ -203,7 +208,14 @@ export function buildApp(config: AppConfig): FastifyInstance {
         templateService,
       );
       registerSessionRoutes(instance, sessionService);
-      registerEmailAuthRoutes(instance, pool, userRepo, mailer, config);
+      registerEmailAuthRoutes(
+        instance,
+        pool,
+        userRepo,
+        mailer,
+        config,
+        emailSender,
+      );
       registerPublicRoutes(instance, pool);
       if (fsStorage) registerFileRoutes(instance, fsStorage);
     },
@@ -248,13 +260,20 @@ export function buildApp(config: AppConfig): FastifyInstance {
         }
       });
       registerMeRoutes(instance, accountService);
-      registerTeamRoutes(instance, pool);
+      registerTeamRoutes(instance, pool, emailSender, config);
       registerApiKeyRoutes(instance, apiKeyService);
       registerTemplateRoutes(instance, templateService);
       registerDocumentRoutes(instance, renderService);
       registerBatchRoutes(instance, batchService, storage);
       registerWebhookRoutes(instance, new PgWebhookRepository(pool));
-      registerPaymentRoutes(instance, paymentService, idGen);
+      registerPaymentRoutes(
+        instance,
+        paymentService,
+        idGen,
+        emailSender,
+        pool,
+        config,
+      );
       registerWalletRoutes(instance, walletRepo, pool);
     },
     { prefix: '/v1' },

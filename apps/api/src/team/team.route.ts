@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { randomBase62 } from '@docgen/shared';
+import type { AppConfig } from '@docgen/config';
 import { requireAuth } from '../auth/auth-context.js';
+import type { EmailSender } from '../email/send.js';
 
 interface UserRow {
   id: string;
@@ -37,7 +39,12 @@ function present(r: UserRow) {
  * GET daftar · POST undang · PATCH ubah peran · DELETE keluarkan.
  * Pemilik (owner) tidak boleh diubah/dihapus.
  */
-export function registerTeamRoutes(app: FastifyInstance, pool: Pool): void {
+export function registerTeamRoutes(
+  app: FastifyInstance,
+  pool: Pool,
+  emailSender: EmailSender,
+  config: AppConfig,
+): void {
   app.get('/team', async (request) => {
     const ctx = requireAuth(request);
     const { rows } = await pool.query<UserRow>(
@@ -81,6 +88,26 @@ export function registerTeamRoutes(app: FastifyInstance, pool: Pool): void {
       [id, ctx.tenantId, body.email, name, body.role],
     );
     reply.code(201);
+    // Email undangan ke anggota (best-effort).
+    void (async () => {
+      try {
+        const tn = await pool.query<{ name: string }>(
+          `SELECT name FROM tenants WHERE id=$1`,
+          [ctx.tenantId],
+        );
+        const team = tn.rows[0]?.name ?? 'DocGen';
+        await emailSender('team_invite', {
+          to: body.email,
+          vars: {
+            inviter: team,
+            team,
+            action_url: `${config.DASHBOARD_URL}/login`,
+          },
+        });
+      } catch {
+        // best-effort
+      }
+    })();
     return { member: present(rows[0]!) };
   });
 

@@ -27,6 +27,7 @@ const OwnerBillingPage = lazy(() => import('./pages/owner/OwnerBilling.js'));
 const OwnerHealthPage = lazy(() => import('./pages/owner/OwnerHealth.js'));
 const OwnerSettingsPage = lazy(() => import('./pages/owner/OwnerSettings.js'));
 const OwnerContentPage = lazy(() => import('./pages/owner/OwnerContent.js'));
+const OwnerEmailsPage = lazy(() => import('./pages/owner/OwnerEmails.js'));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -234,6 +235,14 @@ export default function App() {
             element={
               <Suspense fallback={<PageLoader />}>
                 <OwnerContentPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="emails"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <OwnerEmailsPage />
               </Suspense>
             }
           />

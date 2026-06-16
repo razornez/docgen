@@ -343,6 +343,41 @@ export function getPublicPage(slug: string): Promise<CmsPage> {
   return request(`/public/page/${slug}`, {}, '');
 }
 
+export interface OwnerEmailTemplate {
+  key: string;
+  name: Loc;
+  description: Loc;
+  variables: string[];
+  subject: Loc;
+  body: Loc;
+  enabled: boolean;
+}
+
+export function getOwnerEmails(): Promise<{ templates: OwnerEmailTemplate[] }> {
+  return request('/owner/emails', {}, getOwnerToken() ?? '');
+}
+
+export function saveOwnerEmails(
+  templates: Pick<OwnerEmailTemplate, 'key' | 'subject' | 'body' | 'enabled'>[],
+): Promise<{ saved: boolean }> {
+  return request(
+    '/owner/emails',
+    { method: 'PUT', body: JSON.stringify({ templates }) },
+    getOwnerToken() ?? '',
+  );
+}
+
+export function getOwnerEmailPreview(
+  key: string,
+  lang: 'id' | 'en',
+): Promise<{ subject: string; html: string }> {
+  return request(
+    `/owner/emails/preview?key=${encodeURIComponent(key)}&lang=${lang}`,
+    {},
+    getOwnerToken() ?? '',
+  );
+}
+
 export function getOwnerContent(): Promise<OwnerSiteContent> {
   return request('/owner/content', {}, getOwnerToken() ?? '');
 }

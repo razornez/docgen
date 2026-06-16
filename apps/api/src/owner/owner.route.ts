@@ -6,6 +6,11 @@ import { z } from 'zod';
 import { randomBase62 } from '@docgen/shared';
 import type { AppConfig } from '@docgen/config';
 import { readSiteContent } from '../site-content.js';
+import {
+  readEmailTemplates,
+  renderEmail,
+  type Lang,
+} from '../email/email-templates.js';
 
 const LoginSchema = z.object({
   email: z.string().trim().min(1),
@@ -65,6 +70,56 @@ const ContentSchema = z.object({
     )
     .max(40),
 });
+const EmailSubject = z.object({
+  id: z.string().trim().max(300),
+  en: z.string().trim().max(300),
+});
+const EmailBody = z.object({
+  id: z.string().max(20000),
+  en: z.string().max(20000),
+});
+const EmailTemplatesSchema = z.object({
+  templates: z
+    .array(
+      z.object({
+        key: z.string().trim().min(1).max(60),
+        subject: EmailSubject,
+        body: EmailBody,
+        enabled: z.boolean(),
+      }),
+    )
+    .max(40),
+});
+
+/** Variabel contoh untuk pratinjau tiap template. */
+const SAMPLE_VARS: Record<string, Record<string, string>> = {
+  email_verification: { name: 'Budi', action_url: 'https://docgen.id/verify' },
+  welcome: {
+    name: 'Budi',
+    credits: '100',
+    action_url: 'https://docgen.id/app',
+  },
+  password_reset: { name: 'Budi', action_url: 'https://docgen.id/reset' },
+  password_changed: { name: 'Budi', action_url: 'https://docgen.id/app' },
+  topup_success: {
+    name: 'Budi',
+    credits: '5.000',
+    amount: '649.000',
+    balance: '5.420',
+    method: 'QRIS',
+    action_url: 'https://docgen.id/app/wallet',
+  },
+  team_invite: {
+    inviter: 'Andi',
+    team: 'PT Maju Bersama',
+    action_url: 'https://docgen.id/login',
+  },
+  low_balance: {
+    name: 'Budi',
+    balance: '120',
+    action_url: 'https://docgen.id/app/wallet',
+  },
+};
 
 /** Verifikasi token owner (JWT klaim owner:true). */
 function isOwnerToken(token: string | undefined, secret: string): boolean {
@@ -718,5 +773,55 @@ export function registerOwnerRoutes(
       [JSON.stringify(body)],
     );
     return { saved: true };
+  });
+
+  // ── Email transaksional (terkelola owner) ─────────────────────────────
+  app.get('/owner/emails', async (request, reply) => {
+    const denied = ownerGuard(request, reply, config.SESSION_SECRET);
+    if (denied) return denied;
+    return { templates: await readEmailTemplates(pool) };
+  });
+
+  app.put('/owner/emails', async (request, reply) => {
+    const denied = ownerGuard(request, reply, config.SESSION_SECRET);
+    if (denied) return denied;
+    const body = EmailTemplatesSchema.parse(request.body ?? {});
+    const override: Record<string, unknown> = {};
+    for (const t of body.templates) {
+      override[t.key] = {
+        subject: t.subject,
+        body: t.body,
+        enabled: t.enabled,
+      };
+    }
+    await pool.query(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES ('email_templates', $1::jsonb, now())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+      [JSON.stringify(override)],
+    );
+    return { saved: true };
+  });
+
+  // Pratinjau render email (HTML) dengan variabel contoh.
+  app.get('/owner/emails/preview', async (request, reply) => {
+    const denied = ownerGuard(request, reply, config.SESSION_SECRET);
+    if (denied) return denied;
+    const { key, lang } = request.query as { key?: string; lang?: string };
+    const all = await readEmailTemplates(pool);
+    const tpl = all.find((t) => t.key === key);
+    if (!tpl) {
+      reply.code(404);
+      return {
+        error: {
+          type: 'not_found',
+          message: 'Template tidak ditemukan',
+          request_id: request.id,
+        },
+      };
+    }
+    const l: Lang = lang === 'en' ? 'en' : 'id';
+    const { subject, html } = renderEmail(tpl, l, SAMPLE_VARS[tpl.key] ?? {});
+    return { subject, html };
   });
 }

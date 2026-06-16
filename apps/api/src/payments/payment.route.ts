@@ -1,8 +1,63 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { Pool } from 'pg';
 import { z } from 'zod';
 import { requireAuth } from '../auth/auth-context.js';
 import type { PaymentService } from './payment.service.js';
 import type { IdGenerator } from '@docgen/shared';
+import type { AppConfig } from '@docgen/config';
+import type { EmailSender } from '../email/send.js';
+
+const METHOD_LABEL: Record<string, string> = {
+  qris: 'QRIS',
+  va: 'Virtual Account',
+  ewallet: 'E-Wallet',
+  card: 'Kartu',
+};
+
+/** Kirim kuitansi top-up (best-effort) setelah saldo masuk. */
+async function notifyTopup(
+  pool: Pool,
+  emailSender: EmailSender,
+  config: AppConfig,
+  tenantId: string,
+  paymentId: string,
+  balance: number,
+): Promise<void> {
+  try {
+    const pay = await pool.query<{
+      amount_idr: string;
+      credits: string;
+      method: string | null;
+    }>(`SELECT amount_idr, credits, method FROM payments WHERE id=$1`, [
+      paymentId,
+    ]);
+    const usr = await pool.query<{
+      email: string;
+      display_name: string | null;
+    }>(
+      `SELECT email, display_name FROM users WHERE tenant_id=$1
+        ORDER BY created_at ASC LIMIT 1`,
+      [tenantId],
+    );
+    const p = pay.rows[0];
+    const u = usr.rows[0];
+    if (!p || !u?.email) return;
+    const fmt = (n: string | number) => Number(n).toLocaleString('id-ID');
+    await emailSender('topup_success', {
+      to: u.email,
+      vars: {
+        name: u.display_name || u.email.split('@')[0] || 'there',
+        credits: fmt(p.credits),
+        amount: fmt(p.amount_idr),
+        balance: fmt(balance),
+        method: (p.method && METHOD_LABEL[p.method]) || p.method || 'QRIS',
+        action_url: `${config.DASHBOARD_URL}/dashboard/wallet`,
+      },
+    });
+  } catch {
+    // best-effort
+  }
+}
 
 const TopupBody = z.object({
   package: z.string().trim().min(1),
@@ -19,6 +74,9 @@ export function registerPaymentRoutes(
   app: FastifyInstance,
   service: PaymentService,
   _idGen: IdGenerator,
+  emailSender: EmailSender,
+  pool: Pool,
+  config: AppConfig,
 ): void {
   // Daftar paket kredit yang tersedia.
   app.get('/wallet/packages', async (request) => {
@@ -66,6 +124,16 @@ export function registerPaymentRoutes(
     const ctx = requireAuth(request);
     const { id } = request.params as { id: string };
     const result = await service.confirmTopup(ctx.tenantId, id);
+    if (result.credited) {
+      void notifyTopup(
+        pool,
+        emailSender,
+        config,
+        ctx.tenantId,
+        id,
+        result.balance,
+      );
+    }
     return {
       status: result.status,
       credited: result.credited,
