@@ -32,7 +32,8 @@ export async function importDocumentToHtml(file: File): Promise<ImportResult> {
   throw new Error('Format tidak didukung. Unggah berkas .docx atau .pdf.');
 }
 
-/** DOCX → HTML (mammoth) — pertahankan heading, daftar, tabel, gambar base64. */
+// ── DOCX ───────────────────────────────────────────────────────────────────
+/** DOCX → HTML (mammoth) — pertahankan heading, daftar, tabel, gambar, lalu rapikan. */
 async function convertDocx(file: File): Promise<ImportResult> {
   const arrayBuffer = await file.arrayBuffer();
   const styleMap = [
@@ -42,28 +43,58 @@ async function convertDocx(file: File): Promise<ImportResult> {
     "p[style-name='Heading 2'] => h2:fresh",
     "p[style-name='Heading 3'] => h3:fresh",
     "p[style-name='Heading 4'] => h4:fresh",
+    "p[style-name='Quote'] => blockquote:fresh",
     "r[style-name='Strong'] => strong",
     'b => strong',
     'i => em',
+    'u => u',
   ];
-  const result = await mammoth.convertToHtml({ arrayBuffer }, { styleMap });
+  const result = await mammoth.convertToHtml(
+    { arrayBuffer },
+    { styleMap, includeDefaultStyleMap: true },
+  );
   return {
     kind: 'docx',
-    html: tidy(result.value),
+    html: cleanDocxHtml(result.value),
     warnings: dedupe(result.messages.map((m) => m.message)),
   };
 }
 
-/** PDF → HTML (pdfjs) — rekonstruksi baris→paragraf via posisi, deteksi heading. */
+/** Rapikan HTML mammoth: buang paragraf kosong, beri gaya tabel yang konsisten. */
+function cleanDocxHtml(html: string): string {
+  return html
+    .replace(/<p>(\s|&nbsp;)*<\/p>/g, '')
+    .replace(
+      /<table>/g,
+      '<table style="border-collapse:collapse;width:100%;margin:10px 0">',
+    )
+    .replace(
+      /<td>/g,
+      '<td style="border:1px solid #d1d5db;padding:6px 9px;vertical-align:top">',
+    )
+    .replace(
+      /<th>/g,
+      '<th style="border:1px solid #d1d5db;padding:6px 9px;text-align:left;background:#f8f7fc">',
+    )
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}
+
+// ── PDF ────────────────────────────────────────────────────────────────────
+/** PDF → HTML (pdfjs) — rekonstruksi struktur: heading, paragraf, daftar, alignment. */
 async function convertPdf(file: File): Promise<ImportResult> {
   const data = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data }).promise;
   const blocks: string[] = [];
+  let textPages = 0;
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageHtml = pageToHtml(content);
-    if (pageHtml) blocks.push(pageHtml);
+    const html = pageToHtml(content);
+    if (html) {
+      blocks.push(html);
+      textPages++;
+    }
     if (i < pdf.numPages) blocks.push('<hr />');
     page.cleanup();
   }
@@ -72,8 +103,8 @@ async function convertPdf(file: File): Promise<ImportResult> {
     pages: pdf.numPages,
     html: blocks.join('\n') || '<p></p>',
     warnings:
-      pdf.numPages > 0 && blocks.every((b) => b === '<hr />')
-        ? ['PDF tampaknya hasil scan (tanpa teks). Hanya teks yang dikonversi.']
+      textPages === 0
+        ? ['PDF tampaknya hasil scan (tanpa teks). OCR belum didukung.']
         : [],
   };
 }
@@ -82,41 +113,58 @@ interface Tok {
   x: number;
   y: number;
   h: number;
+  w: number;
   s: string;
 }
+interface Line {
+  y: number;
+  h: number;
+  text: string;
+  x0: number;
+  x1: number;
+}
+type Align = 'left' | 'center' | 'right';
 
 function pageToHtml(content: { items: unknown[] }): string {
+  // 1) Kumpulkan token teks.
   const toks: Tok[] = [];
   for (const raw of content.items) {
     const it = raw as {
       str?: string;
       transform?: number[];
       height?: number;
+      width?: number;
     };
     if (typeof it.str !== 'string' || !it.transform) continue;
+    const h = it.height || Math.abs(it.transform[3] ?? 0) || 10;
     toks.push({
       x: it.transform[4] ?? 0,
       y: it.transform[5] ?? 0,
-      h: it.height || Math.abs(it.transform[3] ?? 0) || 10,
+      h,
+      w: it.width ?? it.str.length * h * 0.5,
       s: it.str,
     });
   }
   if (!toks.length) return '';
 
-  // Urut atas→bawah, kiri→kanan.
+  // 2) Urut atas→bawah, kiri→kanan; gabung jadi baris.
   toks.sort((a, b) => (Math.abs(a.y - b.y) > 2 ? b.y - a.y : a.x - b.x));
-
-  // Gabung token sebaris (selisih y kecil).
-  const lines: { y: number; h: number; text: string }[] = [];
+  const lines: Line[] = [];
   for (const tk of toks) {
     const last = lines[lines.length - 1];
     if (last && Math.abs(last.y - tk.y) <= Math.max(last.h, tk.h) * 0.6) {
+      const gap = tk.x - last.x1;
       const space =
-        last.text.endsWith(' ') || tk.s.startsWith(' ') || !tk.s ? '' : ' ';
+        last.text.endsWith(' ') || tk.s.startsWith(' ') || !tk.s
+          ? ''
+          : gap > tk.h * 0.25
+            ? ' '
+            : '';
       last.text += space + tk.s;
       last.h = Math.max(last.h, tk.h);
+      last.x1 = Math.max(last.x1, tk.x + tk.w);
     } else if (tk.s.trim()) {
-      lines.push({ y: tk.y, h: tk.h, text: tk.s });
+      lines.push({ y: tk.y, h: tk.h, text: tk.s, x0: tk.x, x1: tk.x + tk.w });
     }
   }
   const valid = lines
@@ -124,37 +172,90 @@ function pageToHtml(content: { items: unknown[] }): string {
     .filter((l) => l.text);
   if (!valid.length) return '';
 
-  // Tinggi median → ambang heading.
-  const sorted = valid.map((l) => l.h).sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)] ?? 10;
+  // 3) Margin & median tinggi untuk alignment + heading.
+  const left = Math.min(...valid.map((l) => l.x0));
+  const right = Math.max(...valid.map((l) => l.x1));
+  const fullW = Math.max(right - left, 1);
+  const center = (left + right) / 2;
+  const med = median(valid.map((l) => l.h));
+  const tol = Math.max(12, med * 0.8);
 
-  const out: string[] = [];
-  let para: string[] = [];
-  const flushPara = () => {
-    if (para.length) out.push(`<p>${esc(para.join(' '))}</p>`);
-    para = [];
+  const alignOf = (l: Line): Align => {
+    const cx = (l.x0 + l.x1) / 2;
+    const short = l.x1 - l.x0 < fullW * 0.85;
+    const indented = l.x0 - left > tol;
+    if (short && indented && Math.abs(cx - center) < tol) return 'center';
+    if (short && indented && right - l.x1 < tol) return 'right';
+    return 'left';
   };
-  for (let i = 0; i < valid.length; i++) {
+  const styleOf = (a: Align) =>
+    a === 'left' ? '' : ` style="text-align:${a}"`;
+
+  // 4) Bangun blok: heading, daftar, paragraf.
+  const out: string[] = [];
+  let i = 0;
+  while (i < valid.length) {
     const l = valid[i]!;
-    const prev = valid[i - 1];
-    const gap = prev ? prev.y - l.y : 0; // y mengecil ke bawah
-    const isHeading = l.h > median * 1.35 && l.text.length < 90;
-    if (prev && gap > Math.max(prev.h, l.h) * 1.8) flushPara();
-    if (isHeading) {
-      flushPara();
-      const tag = l.h > median * 1.8 ? 'h1' : 'h2';
-      out.push(`<${tag}>${esc(l.text)}</${tag}>`);
+    const align = alignOf(l);
+
+    // Heading: font jauh lebih besar dari median + baris pendek.
+    if (l.h > med * 1.35 && l.text.length < 90) {
+      const tag = l.h > med * 1.8 ? 'h1' : 'h2';
+      out.push(`<${tag}${styleOf(align)}>${esc(l.text)}</${tag}>`);
+      i++;
       continue;
     }
-    para.push(l.text);
+
+    // Daftar: bullet atau bernomor.
+    const listType = listKind(l.text);
+    if (listType) {
+      const tag = listType === 'ul' ? 'ul' : 'ol';
+      const items: string[] = [];
+      while (i < valid.length && listKind(valid[i]!.text) === listType) {
+        items.push(`<li>${esc(stripMarker(valid[i]!.text))}</li>`);
+        i++;
+      }
+      out.push(`<${tag}>${items.join('')}</${tag}>`);
+      continue;
+    }
+
+    // Paragraf: gabung baris berurutan dgn alignment sama & jarak wajar.
+    const parts = [l.text];
+    let j = i + 1;
+    while (
+      j < valid.length &&
+      l.h <= med * 1.35 &&
+      valid[j]!.h <= med * 1.35 &&
+      !listKind(valid[j]!.text) &&
+      alignOf(valid[j]!) === align &&
+      valid[j - 1]!.y - valid[j]!.y <=
+        Math.max(valid[j - 1]!.h, valid[j]!.h) * 1.7
+    ) {
+      parts.push(valid[j]!.text);
+      j++;
+    }
+    out.push(`<p${styleOf(align)}>${esc(parts.join(' '))}</p>`);
+    i = j;
   }
-  flushPara();
   return out.join('\n');
 }
 
-/** Rapikan HTML hasil mammoth: buang paragraf kosong, normalkan spasi. */
-function tidy(html: string): string {
-  return html.replace(/<p>\s*<\/p>/g, '').trim();
+function median(nums: number[]): number {
+  if (!nums.length) return 10;
+  const s = [...nums].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)]!;
+}
+
+const BULLET_RE = /^\s*[•·●◦▪‣*‐-]\s+/;
+const ORDERED_RE = /^\s*(\d{1,3}|[a-zA-Z])[.)]\s+/;
+
+function listKind(text: string): 'ul' | 'ol' | null {
+  if (BULLET_RE.test(text)) return 'ul';
+  if (ORDERED_RE.test(text)) return 'ol';
+  return null;
+}
+function stripMarker(text: string): string {
+  return text.replace(BULLET_RE, '').replace(ORDERED_RE, '').trim();
 }
 
 function dedupe(arr: string[]): string[] {
