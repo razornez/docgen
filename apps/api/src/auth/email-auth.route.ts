@@ -29,6 +29,54 @@ const ResetPasswordBody = z.object({
   password: z.string().min(8).max(128),
 });
 
+type Db = ReturnType<typeof getPool>;
+type VerifyOutcome = 'ok' | 'invalid' | 'used' | 'expired';
+
+function verificationError(outcome: VerifyOutcome): Error {
+  if (outcome === 'used') return Errors.invalidRequest('Token sudah dipakai');
+  if (outcome === 'expired')
+    return Errors.invalidRequest('Token sudah kedaluwarsa');
+  return Errors.invalidRequest('Token tidak valid');
+}
+
+/**
+ * Verifikasi token email lalu (bila sukses) kirim email selamat datang.
+ * Dipakai bersama oleh handler POST (balas JSON) & GET (redirect dari klik tautan).
+ */
+async function consumeVerificationToken(
+  pool: Db,
+  userRepo: PgUserRepository,
+  emailSender: EmailSender,
+  config: AppConfig,
+  token: string,
+): Promise<VerifyOutcome> {
+  const record = await findVerificationToken(pool, token);
+  if (!record) return 'invalid';
+  if (record.usedAt) return 'used';
+  if (record.expiresAt < new Date()) return 'expired';
+  await userRepo.markEmailVerified(record.userId);
+  await markTokenUsed(pool, record.id);
+  const vu = await pool.query<{ email: string; display_name: string | null }>(
+    `SELECT email, display_name FROM users WHERE id=$1`,
+    [record.userId],
+  );
+  const vb = await pool.query<{ value: unknown }>(
+    `SELECT value FROM app_settings WHERE key='signup_bonus_credits'`,
+  );
+  const vem = vu.rows[0]?.email;
+  if (vem) {
+    void emailSender('welcome', {
+      to: vem,
+      vars: {
+        name: vu.rows[0]?.display_name || vem.split('@')[0] || 'there',
+        credits: String(Number(vb.rows[0]?.value) || 100),
+        action_url: config.DASHBOARD_URL,
+      },
+    });
+  }
+  return 'ok';
+}
+
 export function registerEmailAuthRoutes(
   app: FastifyInstance,
   _pool: unknown,
@@ -39,35 +87,34 @@ export function registerEmailAuthRoutes(
 ): void {
   void mailer;
   app.post('/auth/verify-email', async (request) => {
-    const pool = getPool();
     const { token } = VerifyEmailBody.parse(request.body);
-    const record = await findVerificationToken(pool, token);
-    if (!record) throw Errors.invalidRequest('Token tidak valid');
-    if (record.usedAt) throw Errors.invalidRequest('Token sudah dipakai');
-    if (record.expiresAt < new Date())
-      throw Errors.invalidRequest('Token sudah kedaluwarsa');
-    await userRepo.markEmailVerified(record.userId);
-    await markTokenUsed(pool, record.id);
-    // Email selamat datang setelah verifikasi.
-    const vu = await pool.query<{ email: string; display_name: string | null }>(
-      `SELECT email, display_name FROM users WHERE id=$1`,
-      [record.userId],
+    const outcome = await consumeVerificationToken(
+      getPool(),
+      userRepo,
+      emailSender,
+      config,
+      token,
     );
-    const vb = await pool.query<{ value: unknown }>(
-      `SELECT value FROM app_settings WHERE key='signup_bonus_credits'`,
-    );
-    const vem = vu.rows[0]?.email;
-    if (vem) {
-      void emailSender('welcome', {
-        to: vem,
-        vars: {
-          name: vu.rows[0]?.display_name || vem.split('@')[0] || 'there',
-          credits: String(Number(vb.rows[0]?.value) || 100),
-          action_url: config.DASHBOARD_URL,
-        },
-      });
-    }
+    if (outcome !== 'ok') throw verificationError(outcome);
     return { message: 'Email berhasil diverifikasi' };
+  });
+
+  // Tautan verifikasi di email diklik (GET): proses token lalu redirect ke
+  // halaman masuk dengan status, supaya pengguna tidak melihat JSON / 404.
+  app.get('/auth/verify-email', async (request, reply) => {
+    const raw = (request.query as { token?: unknown }).token;
+    const token = typeof raw === 'string' ? raw : '';
+    const base = config.DASHBOARD_URL.replace(/\/$/, '');
+    if (!token) return reply.redirect(`${base}/login?verified=invalid`);
+    const outcome = await consumeVerificationToken(
+      getPool(),
+      userRepo,
+      emailSender,
+      config,
+      token,
+    );
+    const status = outcome === 'ok' ? 'success' : outcome;
+    return reply.redirect(`${base}/login?verified=${status}`);
   });
 
   app.post('/auth/resend-verification', async (request) => {

@@ -81,6 +81,25 @@ export function authLogin(
   });
 }
 
+/** Minta link reset sandi. Selalu balas pesan generik (anti enumeration). */
+export function forgotPassword(email: string): Promise<{ message: string }> {
+  return request('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+/** Set sandi baru memakai token dari email reset. */
+export function resetPassword(
+  token: string,
+  password: string,
+): Promise<{ message: string }> {
+  return request('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 /** Verify a token is still valid by calling /me with it explicitly. */
 export function verifyToken(token: string): Promise<MeResult> {
   return request('/me', {}, token);

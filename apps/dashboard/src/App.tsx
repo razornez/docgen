@@ -7,6 +7,7 @@ import LandingPage from './pages/Landing.js';
 import LoginPage from './pages/Login.js';
 import PublicPage from './pages/PublicPage.js';
 import AuthCallbackPage from './pages/AuthCallback.js';
+import ResetPasswordPage from './pages/ResetPassword.js';
 import OwnerLoginPage from './pages/owner/OwnerLogin.js';
 import OwnerLayout from './pages/owner/OwnerLayout.js';
 import { getOwnerToken } from './api/client.js';
@@ -106,6 +107,7 @@ export default function App() {
         <Route path="/p/:slug" element={<PublicPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/dashboard"
           element={

@@ -1,8 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth.js';
-import { authLogin, authRegister, getPublicPricing } from '../api/client.js';
+import {
+  authLogin,
+  authRegister,
+  forgotPassword,
+  getPublicPricing,
+} from '../api/client.js';
 import { useLang } from '../i18n/index.js';
 import { Flower, LangToggle } from '../components/PublicChrome.js';
 
@@ -72,8 +77,13 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(true);
   const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const verified = searchParams.get('verified');
   const pricing = useQuery({
     queryKey: ['public-pricing'],
     queryFn: getPublicPricing,
@@ -86,6 +96,18 @@ export default function LoginPage() {
     setTab(x);
     setError('');
     setForgotOpen(false);
+    setForgotSent(false);
+  }
+  async function handleForgot() {
+    setForgotLoading(true);
+    try {
+      await forgotPassword(forgotEmail.trim());
+    } catch {
+      // Sengaja diabaikan: balasan selalu generik (anti enumeration).
+    } finally {
+      setForgotSent(true);
+      setForgotLoading(false);
+    }
   }
   function fillDemo() {
     setTab('login');
@@ -306,6 +328,36 @@ export default function LoginPage() {
               </span>
             </div>
 
+            {verified && (
+              <div
+                className={`mb-3 text-[12.5px] rounded-xl px-3 py-2.5 border ${
+                  verified === 'success' || verified === 'used'
+                    ? 'text-emerald-700 bg-emerald-50/80 border-emerald-200'
+                    : 'text-amber-700 bg-amber-50/80 border-amber-200'
+                }`}
+              >
+                {verified === 'success'
+                  ? t(
+                      'Email berhasil diverifikasi. Silakan masuk.',
+                      'Email verified successfully. Please sign in.',
+                    )
+                  : verified === 'used'
+                    ? t(
+                        'Email sudah pernah diverifikasi. Silakan masuk.',
+                        'Email was already verified. Please sign in.',
+                      )
+                    : verified === 'expired'
+                      ? t(
+                          'Link verifikasi sudah kedaluwarsa. Masuk lalu kirim ulang dari pengaturan.',
+                          'Verification link expired. Sign in, then resend it.',
+                        )
+                      : t(
+                          'Link verifikasi tidak valid.',
+                          'Invalid verification link.',
+                        )}
+              </div>
+            )}
+
             {error && (
               <div className="mb-3 flex items-start gap-2 text-[12.5px] text-rose-700 bg-rose-50/80 border border-rose-200 rounded-xl px-3 py-2.5">
                 <svg
@@ -367,7 +419,11 @@ export default function LoginPage() {
                   {tab === 'login' && (
                     <button
                       type="button"
-                      onClick={() => setForgotOpen((v) => !v)}
+                      onClick={() => {
+                        setForgotOpen((v) => !v);
+                        setForgotEmail(email);
+                        setForgotSent(false);
+                      }}
                       className="text-[11.5px] font-bold text-brand-purple hover:opacity-80 transition-opacity"
                     >
                       {t('Lupa sandi?', 'Forgot password?')}
@@ -393,19 +449,44 @@ export default function LoginPage() {
                   />
                 </div>
                 {forgotOpen && tab === 'login' && (
-                  <p className="mt-2 text-[11.5px] text-mut bg-white/50 border border-white/50 rounded-lg px-3 py-2 leading-relaxed">
-                    {t(
-                      'Reset mandiri belum tersedia. Pakai akun demo, atau hubungi ',
-                      'Self-service reset is not available yet. Use the demo account, or contact ',
+                  <div className="mt-2 bg-white/50 border border-white/50 rounded-lg px-3 py-2.5">
+                    {forgotSent ? (
+                      <p className="text-[11.5px] text-emerald-700 leading-relaxed">
+                        {t(
+                          'Jika email terdaftar, link reset sandi sudah dikirim. Cek inbox kamu.',
+                          'If the email is registered, a reset link has been sent. Check your inbox.',
+                        )}
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-[11.5px] text-mut mb-2 leading-relaxed">
+                          {t(
+                            'Masukkan email akunmu, kami kirim link reset sandi.',
+                            'Enter your account email and we’ll send a reset link.',
+                          )}
+                        </p>
+                        <div className="flex gap-2">
+                          <input
+                            type="email"
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            placeholder="budi@perusahaan.co.id"
+                            className={`${inputCls} py-2 text-[12.5px]`}
+                          />
+                          <button
+                            type="button"
+                            disabled={forgotLoading || !forgotEmail.trim()}
+                            onClick={() => void handleForgot()}
+                            className="flex-shrink-0 px-3.5 py-2 text-[12px] font-bold rounded-lg text-white bg-grad disabled:opacity-60 hover:opacity-90 transition-all"
+                          >
+                            {forgotLoading
+                              ? t('Mengirim…', 'Sending…')
+                              : t('Kirim', 'Send')}
+                          </button>
+                        </div>
+                      </>
                     )}
-                    <a
-                      href="mailto:support@docgen.razornez.net"
-                      className="font-semibold text-brand-purple"
-                    >
-                      support@docgen.razornez.net
-                    </a>
-                    .
-                  </p>
+                  </div>
                 )}
               </div>
 
