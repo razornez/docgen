@@ -152,7 +152,6 @@ export function buildApp(config: AppConfig): FastifyInstance {
     pool,
     emailSender,
     dashboardUrl: config.DASHBOARD_URL,
-    threshold: 100, // kirim peringatan saat saldo turun di bawah 100 kredit
   });
   const sessionService = new AuthSessionService(
     config.SESSION_SECRET,

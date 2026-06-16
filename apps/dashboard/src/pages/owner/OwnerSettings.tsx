@@ -38,6 +38,7 @@ export default function OwnerSettings() {
     queryFn: getOwnerSettings,
   });
   const [bonus, setBonus] = useState('100');
+  const [lowBal, setLowBal] = useState('100');
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -45,6 +46,7 @@ export default function OwnerSettings() {
 
   const seed = (data: OwnerSettings) => {
     setBonus(String(data.signup_bonus_credits));
+    setLowBal(String(data.low_balance_threshold));
     setRows(
       data.packages.map((p) => ({
         key: `k${keyRef.current++}`,
@@ -73,6 +75,7 @@ export default function OwnerSettings() {
       }));
       return saveOwnerSettings({
         signup_bonus_credits: num(bonus),
+        low_balance_threshold: num(lowBal),
         packages,
       });
     },
@@ -147,6 +150,29 @@ export default function OwnerSettings() {
           <span className="num ml-auto text-[12px] text-mut">
             ≈ {idr(num(bonus))} {t('dok', 'docs')}
           </span>
+        </div>
+      </div>
+
+      {/* ── Ambang saldo rendah ──────────────────────────────────────── */}
+      <div className="glass rounded-glass px-6 py-5">
+        <h2 className="text-[16px] font-bold text-ink">
+          {t('Ambang saldo rendah', 'Low balance threshold')}
+        </h2>
+        <p className="text-[12.5px] text-mut mt-0.5">
+          {t(
+            'Email peringatan dikirim ke tenant saat saldo turun di bawah angka ini. Isi 0 untuk menonaktifkan.',
+            'A warning email is sent to the tenant when their balance drops below this. Set 0 to disable.',
+          )}
+        </p>
+        <div className="mt-4 flex items-center gap-3">
+          <input
+            type="number"
+            min={0}
+            value={lowBal}
+            onChange={(e) => setLowBal(e.target.value)}
+            className="num w-[150px] bg-white/70 border border-white/60 rounded-xl px-4 py-3 text-[24px] font-extrabold text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
+          />
+          <span className="text-[13px] text-mut">{t('kredit', 'credits')}</span>
         </div>
       </div>
 

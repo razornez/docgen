@@ -407,6 +407,7 @@ export interface OwnerPackage {
 }
 export interface OwnerSettings {
   signup_bonus_credits: number;
+  low_balance_threshold: number;
   packages: OwnerPackage[];
 }
 

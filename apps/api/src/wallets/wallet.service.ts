@@ -18,8 +18,6 @@ export interface LowBalanceNotify {
   pool: Pool;
   emailSender: EmailSender;
   dashboardUrl: string;
-  /** Ambang saldo (kredit) untuk mengirim peringatan. */
-  threshold: number;
 }
 
 /**
@@ -46,6 +44,25 @@ export class WalletService implements CreditGate {
     private readonly notify?: LowBalanceNotify,
   ) {}
 
+  private thrCache = 100;
+  private thrAt = 0;
+  /** Ambang saldo rendah (kredit) dari app_settings, di-cache 60 detik. */
+  private async lowBalanceThreshold(pool: Pool): Promise<number> {
+    const now = Date.now();
+    if (now - this.thrAt < 60_000) return this.thrCache;
+    try {
+      const r = await pool.query<{ value: unknown }>(
+        `SELECT value FROM app_settings WHERE key='low_balance_threshold'`,
+      );
+      const v = Number(r.rows[0]?.value);
+      this.thrCache = Number.isFinite(v) && v >= 0 ? v : 100;
+    } catch {
+      this.thrCache = 100;
+    }
+    this.thrAt = now;
+    return this.thrCache;
+  }
+
   /** Kirim peringatan saldo rendah hanya saat saldo BARU melewati ambang. */
   private async warnLowBalance(
     tenantId: TenantId,
@@ -54,9 +71,11 @@ export class WalletService implements CreditGate {
   ): Promise<void> {
     const n = this.notify;
     if (!n) return;
+    const threshold = await this.lowBalanceThreshold(n.pool);
+    if (threshold <= 0) return; // 0 = nonaktif
     const before = balanceAfter + amount;
     // Hanya saat melewati ambang ke bawah (sekali per pelintasan).
-    if (!(before >= n.threshold && balanceAfter < n.threshold)) return;
+    if (!(before >= threshold && balanceAfter < threshold)) return;
     try {
       const u = await n.pool.query<{
         email: string;

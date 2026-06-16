@@ -22,6 +22,7 @@ const CreditSchema = z.object({
 const IdParam = z.object({ id: z.string().trim().min(1) });
 const SettingsSchema = z.object({
   signup_bonus_credits: z.number().int().min(0).max(1_000_000),
+  low_balance_threshold: z.number().int().min(0).max(10_000_000),
   packages: z
     .array(
       z.object({
@@ -653,9 +654,12 @@ export function registerOwnerRoutes(
     const denied = ownerGuard(request, reply, config.SESSION_SECRET);
     if (denied) return denied;
 
-    const [setting, packs] = await Promise.all([
+    const [setting, lowbal, packs] = await Promise.all([
       pool.query<{ value: unknown }>(
         `SELECT value FROM app_settings WHERE key='signup_bonus_credits'`,
+      ),
+      pool.query<{ value: unknown }>(
+        `SELECT value FROM app_settings WHERE key='low_balance_threshold'`,
       ),
       pool.query<{
         id: string;
@@ -672,6 +676,7 @@ export function registerOwnerRoutes(
     ]);
     return {
       signup_bonus_credits: Number(setting.rows[0]?.value ?? 100),
+      low_balance_threshold: Number(lowbal.rows[0]?.value ?? 100),
       packages: packs.rows.map((r) => ({
         id: r.id,
         name: r.name,
@@ -709,6 +714,12 @@ export function registerOwnerRoutes(
          VALUES ('signup_bonus_credits', $1::jsonb, now())
          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
         [JSON.stringify(body.signup_bonus_credits)],
+      );
+      await client.query(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('low_balance_threshold', $1::jsonb, now())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+        [JSON.stringify(body.low_balance_threshold)],
       );
       // Nonaktifkan paket yang dihapus dari payload (soft-delete — paket bisa
       // direferensikan payments lama, jadi tak boleh hard-delete).
