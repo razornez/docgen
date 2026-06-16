@@ -31,6 +31,12 @@ function interpolate(text: string, vars: Record<string, string>): string {
   return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, k: string) => vars[k] ?? '');
 }
 
+/** Ambil alamat email dari string "Nama <email@x>" → "email@x". */
+function fromAddr(from: string): string {
+  const m = /<([^>]+)>/.exec(from);
+  return (m?.[1] ?? from).trim();
+}
+
 /** Bungkus konten email dengan layout bermerk (replika sisi server). */
 function wrapEmail(content: string, lang: Lang): string {
   const year = new Date().getFullYear();
@@ -159,6 +165,22 @@ export default function OwnerEmails() {
               <p className="text-[11px] text-mut mt-0.5 line-clamp-2 pl-3.5">
                 {tpl.description[uiLang]}
               </p>
+              <p className="num text-[10px] text-brand-purple/80 mt-1 pl-3.5 truncate flex items-center gap-1">
+                <svg
+                  className="w-3 h-3 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
+                </svg>
+                {fromAddr(tpl.from)}
+              </p>
             </button>
           ))}
         </div>
@@ -263,13 +285,18 @@ export default function OwnerEmails() {
 
             {/* Live preview */}
             <div className="glass rounded-glass p-5">
-              <div className="flex items-center justify-between mb-2.5">
-                <h3 className="text-[13px] font-bold text-ink">
-                  {t('Pratinjau', 'Preview')}
-                </h3>
-                <span className="num text-[11px] text-mut truncate max-w-[60%]">
-                  {previewSubject}
-                </span>
+              <div className="mb-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-[13px] font-bold text-ink flex-shrink-0">
+                    {t('Pratinjau', 'Preview')}
+                  </h3>
+                  <span className="num text-[10.5px] text-mut truncate">
+                    {t('Dari', 'From')}: {sel.from}
+                  </span>
+                </div>
+                <p className="num text-[11px] text-mut truncate mt-1">
+                  {t('Subjek', 'Subject')}: {previewSubject}
+                </p>
               </div>
               <iframe
                 title="email-preview"
