@@ -1,3 +1,4 @@
+import type { Pool } from 'pg';
 import {
   withTransaction,
   applyWalletCredit,
@@ -10,6 +11,16 @@ import type {
   IdGenerator,
   TenantId,
 } from '@docgen/shared';
+import type { EmailSender } from '../email/send.js';
+
+/** Konfigurasi notifikasi saldo rendah (opsional — tanpa ini tidak ada email). */
+export interface LowBalanceNotify {
+  pool: Pool;
+  emailSender: EmailSender;
+  dashboardUrl: string;
+  /** Ambang saldo (kredit) untuk mengirim peringatan. */
+  threshold: number;
+}
 
 /**
  * Antarmuka kredit untuk RenderService — dipisah agar testable tanpa DB.
@@ -30,7 +41,45 @@ const UNIT_PRICE = 1; // 1 kredit per dokumen (docs/03 — Unit Billing)
  * tanpa catatan ledger (prinsip inti docs/03).
  */
 export class WalletService implements CreditGate {
-  constructor(private readonly idGen: IdGenerator) {}
+  constructor(
+    private readonly idGen: IdGenerator,
+    private readonly notify?: LowBalanceNotify,
+  ) {}
+
+  /** Kirim peringatan saldo rendah hanya saat saldo BARU melewati ambang. */
+  private async warnLowBalance(
+    tenantId: TenantId,
+    balanceAfter: number,
+    amount: number,
+  ): Promise<void> {
+    const n = this.notify;
+    if (!n) return;
+    const before = balanceAfter + amount;
+    // Hanya saat melewati ambang ke bawah (sekali per pelintasan).
+    if (!(before >= n.threshold && balanceAfter < n.threshold)) return;
+    try {
+      const u = await n.pool.query<{
+        email: string;
+        display_name: string | null;
+      }>(
+        `SELECT email, display_name FROM users WHERE tenant_id=$1
+          ORDER BY created_at ASC LIMIT 1`,
+        [tenantId],
+      );
+      const em = u.rows[0]?.email;
+      if (!em) return;
+      await n.emailSender('low_balance', {
+        to: em,
+        vars: {
+          name: u.rows[0]?.display_name || em.split('@')[0] || 'there',
+          balance: balanceAfter.toLocaleString('id-ID'),
+          action_url: `${n.dashboardUrl}/dashboard/wallet`,
+        },
+      });
+    } catch {
+      // best-effort
+    }
+  }
 
   /**
    * Cadangan kredit atomik untuk satu dokumen. UPDATE saldo dengan guard
@@ -38,7 +87,7 @@ export class WalletService implements CreditGate {
    * Mengembalikan saldo sesudah reserve.
    */
   async reserve(tenantId: TenantId, documentId: DocumentId): Promise<number> {
-    return withTransaction(async (tx) => {
+    const balanceAfter = await withTransaction(async (tx) => {
       const reserved = await reserveWalletCredits(tx, {
         id: this.idGen.generate(ID_PREFIXES.transaction),
         tenantId,
@@ -51,6 +100,8 @@ export class WalletService implements CreditGate {
       if (!reserved) throw Errors.insufficientCredit();
       return reserved.balanceAfter;
     });
+    void this.warnLowBalance(tenantId, balanceAfter, UNIT_PRICE);
+    return balanceAfter;
   }
 
   /** Kembalikan kredit yang sudah dicadangkan bila render gagal. */
@@ -88,7 +139,7 @@ export class WalletService implements CreditGate {
     batchId: BatchId,
     amount: number,
   ): Promise<number> {
-    return withTransaction(async (tx) => {
+    const balanceAfter = await withTransaction(async (tx) => {
       const reserved = await reserveWalletCredits(tx, {
         id: this.idGen.generate(ID_PREFIXES.transaction),
         tenantId,
@@ -101,6 +152,8 @@ export class WalletService implements CreditGate {
       if (!reserved) throw Errors.insufficientCredit();
       return reserved.balanceAfter;
     });
+    void this.warnLowBalance(tenantId, balanceAfter, amount);
+    return balanceAfter;
   }
 
   /**
