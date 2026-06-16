@@ -100,8 +100,240 @@ export function exchangeOAuthCode(code: string): Promise<{ token: string }> {
 // ---- Account ----
 
 export interface MeResult {
-  tenant: { id: string; name: string; status: string };
+  tenant: {
+    id: string;
+    name: string;
+    status: string;
+    country?: string | null;
+    default_locale?: string;
+    created_at?: string;
+  };
   wallet: { balance: number; currency: string };
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  created_at: string;
+}
+
+export function getTeam(): Promise<{ data: TeamMember[] }> {
+  return request('/team');
+}
+
+export function inviteMember(input: {
+  email: string;
+  name?: string;
+  role: 'admin' | 'member';
+}): Promise<{ member: TeamMember }> {
+  return request('/team', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function updateMemberRole(
+  id: string,
+  role: 'admin' | 'member',
+): Promise<{ member: TeamMember }> {
+  return request(`/team/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function removeMember(id: string): Promise<{ deleted: boolean }> {
+  return request(`/team/${id}`, { method: 'DELETE' });
+}
+
+// ---- Owner console (platform-wide) ----
+
+export interface OwnerSummary {
+  tenants_active: number;
+  revenue_month_idr: number;
+  documents_30d: number;
+  uptime: number;
+  revenue: { week_idr: number; delta_pct: number; days14: number[] };
+  queue: { workers: number; running: number; queued: number; p95: number };
+  top_tenants: {
+    id: string;
+    name: string;
+    docs: number;
+    revenue_idr: number;
+  }[];
+  recent_signups: {
+    id: string;
+    name: string;
+    plan: string;
+    created_at: string;
+  }[];
+}
+
+// Token owner disimpan TERPISAH dari token tenant.
+const OWNER_TOKEN_KEY = 'docgen_owner_token';
+export function getOwnerToken(): string | null {
+  return localStorage.getItem(OWNER_TOKEN_KEY);
+}
+export function setOwnerToken(token: string): void {
+  localStorage.setItem(OWNER_TOKEN_KEY, token);
+}
+export function clearOwnerToken(): void {
+  localStorage.removeItem(OWNER_TOKEN_KEY);
+}
+
+export function ownerLogin(
+  email: string,
+  password: string,
+): Promise<{ token: string; email: string }> {
+  return request(
+    '/owner/login',
+    { method: 'POST', body: JSON.stringify({ email, password }) },
+    '', // publik — jangan kirim token tenant
+  );
+}
+
+export function getOwnerSummary(): Promise<OwnerSummary> {
+  return request('/owner/summary', {}, getOwnerToken() ?? '');
+}
+
+export interface OwnerTenant {
+  id: string;
+  name: string;
+  plan: string;
+  docs: number;
+  balance: number;
+  mrr_idr: number;
+  status: string;
+}
+
+export function getOwnerTenants(): Promise<{ data: OwnerTenant[] }> {
+  return request('/owner/tenants', {}, getOwnerToken() ?? '');
+}
+
+export function ownerAddCredit(
+  id: string,
+  amount: number,
+): Promise<{ balance: number }> {
+  return request(
+    `/owner/tenants/${id}/credit`,
+    { method: 'POST', body: JSON.stringify({ amount }) },
+    getOwnerToken() ?? '',
+  );
+}
+
+export interface OwnerRender {
+  status_ok: boolean;
+  stats: { workers: number; running: number; queued: number; p95: number };
+  throughput: { per_day: number; days14: number[] };
+  recent_jobs: {
+    id: string;
+    tenant: string;
+    template: string;
+    status: string;
+    duration_s: number | null;
+  }[];
+}
+
+export function getOwnerRender(): Promise<OwnerRender> {
+  return request('/owner/render', {}, getOwnerToken() ?? '');
+}
+
+export interface OwnerBilling {
+  mrr_idr: number;
+  revenue_30d_idr: number;
+  topup_30d_idr: number;
+  refund_30d_idr: number;
+  plan_split: { prepaid: number; trial: number };
+  recent_payments: {
+    id: string;
+    tenant: string;
+    method: string;
+    amount_idr: number;
+    paid_at: string;
+  }[];
+}
+
+export function getOwnerBilling(): Promise<OwnerBilling> {
+  return request('/owner/billing', {}, getOwnerToken() ?? '');
+}
+
+export interface OwnerAudit {
+  tenant: { id: string; name: string; status: string; created_at: string };
+  balance: number;
+  documents: { total: number; completed: number; failed: number };
+  lifetime_revenue_idr: number;
+  payments_count: number;
+  transactions: {
+    type: string;
+    amount: number;
+    balance_after: number;
+    ref_type: string | null;
+    created_at: string;
+  }[];
+  payments: {
+    amount_idr: number;
+    method: string;
+    status: string;
+    at: string;
+  }[];
+}
+
+export function getOwnerTenantAudit(id: string): Promise<OwnerAudit> {
+  return request(`/owner/tenants/${id}/audit`, {}, getOwnerToken() ?? '');
+}
+
+export interface OwnerHealth {
+  status_ok: boolean;
+  systems: { label: string; ok: boolean; meta: string }[];
+  incidents: { title: string; at: string }[];
+}
+
+export function getOwnerHealth(): Promise<OwnerHealth> {
+  return request('/owner/health', {}, getOwnerToken() ?? '');
+}
+
+export interface PublicPricing {
+  signup_bonus_credits: number;
+  packages: {
+    id: string;
+    name: string;
+    credits: number;
+    bonus: number;
+    price_idr: number;
+    highlight: 'none' | 'popular' | 'hemat';
+  }[];
+}
+
+/** Harga publik (tanpa auth) — dipakai landing & form daftar. */
+export function getPublicPricing(): Promise<PublicPricing> {
+  return request('/public/pricing', {}, '');
+}
+
+export interface OwnerPackage {
+  id?: string;
+  name?: string;
+  credits: number;
+  bonus: number;
+  price_idr: number;
+  highlight: 'none' | 'popular' | 'hemat';
+  active?: boolean;
+}
+export interface OwnerSettings {
+  signup_bonus_credits: number;
+  packages: OwnerPackage[];
+}
+
+export function getOwnerSettings(): Promise<OwnerSettings> {
+  return request('/owner/settings', {}, getOwnerToken() ?? '');
+}
+
+export function saveOwnerSettings(
+  body: OwnerSettings,
+): Promise<{ saved: boolean }> {
+  return request(
+    '/owner/settings',
+    { method: 'PUT', body: JSON.stringify(body) },
+    getOwnerToken() ?? '',
+  );
 }
 
 export function getMe(): Promise<MeResult> {

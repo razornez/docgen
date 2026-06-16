@@ -46,6 +46,11 @@ export class RegistrationService {
     private readonly uow: RegistrationUnitOfWork,
     private readonly idGen: IdGenerator,
     private readonly hasher: ApiKeyHasher,
+    /**
+     * Sumber jumlah kredit bonus pendaftaran. Default ke konstanta bila tak
+     * disuntik. Dipakai owner untuk mengubah "Saldo gratis pendaftar" live.
+     */
+    private readonly bonusProvider?: () => Promise<number>,
   ) {}
 
   async register(input: RegisterTenantInput): Promise<RegisterTenantResult> {
@@ -53,6 +58,9 @@ export class RegistrationService {
     const userId = this.idGen.generate(ID_PREFIXES.user) as UserId;
     const bonusTxnId = this.idGen.generate(ID_PREFIXES.transaction);
     const defaultLocale = defaultLocaleForCountry(input.country);
+    const bonusCredits = this.bonusProvider
+      ? await this.bonusProvider().catch(() => SIGNUP_BONUS_CREDITS)
+      : SIGNUP_BONUS_CREDITS;
 
     try {
       return await this.uow.transaction(async (repos) => {
@@ -72,13 +80,9 @@ export class RegistrationService {
           ...(input.googleId !== undefined ? { googleId: input.googleId } : {}),
         });
         await repos.wallets.create(tenant.id);
-        // Bonus 100 kredit pendaftaran (docs/03 — Alur 1); idempoten via
-        // UNIQUE(signup_bonus, tenant_id) sehingga aman jika dipanggil ulang.
-        await repos.wallets.grantBonus(
-          tenant.id,
-          SIGNUP_BONUS_CREDITS,
-          bonusTxnId,
-        );
+        // Bonus kredit pendaftaran (docs/03 — Alur 1); jumlahnya dapat diatur
+        // owner. Idempoten via UNIQUE(signup_bonus, tenant_id).
+        await repos.wallets.grantBonus(tenant.id, bonusCredits, bonusTxnId);
 
         const material = buildApiKeyMaterial({
           tenantId: tenant.id,

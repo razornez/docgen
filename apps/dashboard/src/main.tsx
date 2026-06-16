@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/AuthContext.js';
+import { LangProvider } from './i18n/index.js';
 import App from './App.js';
 import './index.css';
 
@@ -15,9 +16,11 @@ if (!root) throw new Error('No #root element');
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <LangProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </LangProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

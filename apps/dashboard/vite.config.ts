@@ -3,7 +3,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/app/',
+  // SPA disajikan dari root '/'. API hanya di '/v1' + '/health' (lihat
+  // scripts/nginx.conf.template). Router basename mengikuti BASE_URL ini.
+  base: '/',
   server: {
     port: 5173,
     proxy: {

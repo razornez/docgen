@@ -24,6 +24,9 @@ import { HealthService } from './health/health.service.js';
 import { registerHealthRoutes } from './health/health.route.js';
 import { registerErrorHandler } from './http/error-handler.js';
 import { registerMeRoutes } from './me/me.route.js';
+import { registerTeamRoutes } from './team/team.route.js';
+import { registerOwnerRoutes } from './owner/owner.route.js';
+import { registerPublicRoutes } from './public/public.route.js';
 import { PgTemplateUnitOfWork } from './persistence/template-unit-of-work.js';
 import { PgRegistrationUnitOfWork } from './persistence/unit-of-work.js';
 import { RegistrationService } from './registration/registration.service.js';
@@ -125,6 +128,14 @@ export function buildApp(config: AppConfig): FastifyInstance {
     new PgRegistrationUnitOfWork(),
     idGen,
     hasher,
+    // Jumlah bonus pendaftaran dibaca live dari app_settings (diatur owner).
+    async () => {
+      const { rows } = await pool.query<{ value: unknown }>(
+        `SELECT value FROM app_settings WHERE key='signup_bonus_credits'`,
+      );
+      const n = Number(rows[0]?.value);
+      return Number.isFinite(n) && n >= 0 ? n : 100;
+    },
   );
   const accountService = new AccountService(tenantRepo, walletRepo);
   const templateService = new TemplateService(
@@ -193,6 +204,7 @@ export function buildApp(config: AppConfig): FastifyInstance {
       );
       registerSessionRoutes(instance, sessionService);
       registerEmailAuthRoutes(instance, pool, userRepo, mailer, config);
+      registerPublicRoutes(instance, pool);
       if (fsStorage) registerFileRoutes(instance, fsStorage);
     },
     { prefix: '/v1' },
@@ -236,6 +248,7 @@ export function buildApp(config: AppConfig): FastifyInstance {
         }
       });
       registerMeRoutes(instance, accountService);
+      registerTeamRoutes(instance, pool);
       registerApiKeyRoutes(instance, apiKeyService);
       registerTemplateRoutes(instance, templateService);
       registerDocumentRoutes(instance, renderService);
@@ -243,6 +256,14 @@ export function buildApp(config: AppConfig): FastifyInstance {
       registerWebhookRoutes(instance, new PgWebhookRepository(pool));
       registerPaymentRoutes(instance, paymentService, idGen);
       registerWalletRoutes(instance, walletRepo, pool);
+    },
+    { prefix: '/v1' },
+  );
+
+  // Owner platform — scope TERPISAH (auth owner sendiri, bukan auth tenant).
+  void app.register(
+    async (instance) => {
+      registerOwnerRoutes(instance, pool, config);
     },
     { prefix: '/v1' },
   );

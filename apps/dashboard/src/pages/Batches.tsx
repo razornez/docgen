@@ -6,9 +6,10 @@ import {
   getTemplates,
   createBatch,
   type BatchDocumentItem,
+  type BatchItem,
 } from '../api/client.js';
 import { StatusBadge } from './Dashboard.js';
-import { formatDate } from '../lib/format.js';
+import { useLang } from '../i18n/index.js';
 
 const PLACEHOLDER_ITEMS = `[
   { "ref": "doc-001", "data": { "nama": "Andi Wijaya", "total": "Rp 500.000" } },
@@ -16,29 +17,41 @@ const PLACEHOLDER_ITEMS = `[
 ]`;
 
 const inputCls =
-  'w-full bg-white ring-1 ring-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all placeholder:text-slate-300';
+  'w-full glass-soft rounded-2xl px-4 py-2.5 text-sm text-ink focus:outline-none placeholder:text-mut';
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'baru saja';
+  if (m < 60) return `${m} menit lalu`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} jam lalu`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'kemarin' : `${d} hari lalu`;
+}
+function isThisMonth(iso: string): boolean {
+  const d = new Date(iso);
+  const n = new Date();
+  return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
+}
+
+const ICON_TINT: Record<string, string> = {
+  completed: 'bg-emerald-100/70 text-emerald-600',
+  partially_failed: 'bg-orange-100/70 text-orange-600',
+  failed: 'bg-rose-100/70 text-rose-600',
+  processing: 'bg-indigo-100/70 text-brand-purple',
+  queued: 'bg-slate-200/70 text-slate-500',
+};
 
 function DocStatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { cls: string; label: string }> = {
-    completed: {
-      cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-      label: 'Selesai',
-    },
-    failed: {
-      cls: 'bg-rose-50 text-rose-600 ring-1 ring-rose-200',
-      label: 'Gagal',
-    },
-    processing: {
-      cls: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-      label: 'Proses',
-    },
-    queued: {
-      cls: 'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
-      label: 'Antrian',
-    },
+    completed: { cls: 'bg-emerald-100/70 text-emerald-700', label: 'Selesai' },
+    failed: { cls: 'bg-rose-100/70 text-rose-600', label: 'Gagal' },
+    processing: { cls: 'bg-blue-100/70 text-blue-700', label: 'Proses' },
+    queued: { cls: 'bg-slate-200/70 text-slate-500', label: 'Antrian' },
   };
   const { cls, label } = cfg[status] ?? {
-    cls: 'bg-slate-100 text-slate-500',
+    cls: 'bg-slate-200/70 text-slate-500',
     label: status,
   };
   return (
@@ -50,13 +63,7 @@ function DocStatusBadge({ status }: { status: string }) {
   );
 }
 
-function BatchDocumentsPanel({
-  batchId,
-  onClose,
-}: {
-  batchId: string;
-  onClose: () => void;
-}) {
+function BatchDocumentsPanel({ batchId }: { batchId: string }) {
   const docs = useQuery({
     queryKey: ['batch-documents', batchId],
     queryFn: () => getBatchDocuments(batchId),
@@ -72,125 +79,176 @@ function BatchDocumentsPanel({
   });
 
   return (
-    <div
-      className="mx-4 mb-4 rounded-2xl p-4 ring-1 ring-indigo-100"
-      style={{ background: 'linear-gradient(135deg, #eef2ff, #faf5ff)' }}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[12px] font-semibold text-indigo-600 uppercase tracking-wider">
-          Dokumen — {batchId}
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-6 h-6 rounded-lg bg-white/70 flex items-center justify-center text-indigo-400 hover:text-indigo-600 transition-colors"
+    <div className="mt-3 rounded-2xl glass-soft p-4">
+      {docs.isLoading && (
+        <div className="flex justify-center py-4">
+          <div className="w-5 h-5 border-2 border-white/60 border-t-brand-purple rounded-full animate-spin" />
+        </div>
+      )}
+      {docs.data && (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[10.5px] text-mut uppercase tracking-wider text-left border-b border-white/50">
+              <th className="pb-2 pr-4 font-semibold">Ref</th>
+              <th className="pb-2 pr-4 font-semibold">Status</th>
+              <th className="pb-2 pr-4 text-center font-semibold">Halaman</th>
+              <th className="pb-2 text-right font-semibold">Aksi</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/40">
+            {docs.data.data.map((doc: BatchDocumentItem) => (
+              <tr key={doc.id}>
+                <td className="py-2 pr-4">
+                  <span className="num text-[12px] text-ink">
+                    {doc.ref ?? doc.id}
+                  </span>
+                </td>
+                <td className="py-2 pr-4">
+                  <DocStatusBadge status={doc.status} />
+                  {doc.error && (
+                    <p
+                      className="text-[11px] text-rose-500 mt-0.5 max-w-xs truncate"
+                      title={doc.error}
+                    >
+                      {doc.error}
+                    </p>
+                  )}
+                </td>
+                <td className="num py-2 pr-4 text-center text-mut text-[12px]">
+                  {doc.page_count ?? '—'}
+                </td>
+                <td className="py-2 text-right">
+                  {doc.status === 'completed' && doc.output_url ? (
+                    <a
+                      href={doc.output_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-xl text-white bg-grad hover:opacity-90 transition-opacity"
+                    >
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
+                      </svg>
+                      PDF
+                    </a>
+                  ) : (
+                    <span className="text-[12px] text-mut">—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function BatchRow({
+  b,
+  open,
+  onToggle,
+}: {
+  b: BatchItem;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const pct = b.total > 0 ? (b.completed / b.total) * 100 : 0;
+  const done = b.status === 'completed' || b.status === 'partially_failed';
+  const failed = b.status === 'partially_failed' || b.status === 'failed';
+  return (
+    <div className="px-5 py-4">
+      <div className="flex items-center gap-4">
+        <div
+          className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${ICON_TINT[b.status] ?? 'bg-slate-200/70 text-slate-500'}`}
         >
           <svg
-            className="w-3 h-3"
+            className="w-4.5 h-4.5"
+            width="18"
+            height="18"
             fill="none"
             stroke="currentColor"
-            strokeWidth={2.5}
+            strokeWidth={1.85}
             viewBox="0 0 24 24"
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M6 18L18 6M6 6l12 12"
+              d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"
             />
           </svg>
-        </button>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="num text-[13.5px] font-semibold text-ink truncate">
+            {b.id}
+          </p>
+          <p className="num text-[11px] text-mut mt-0.5">
+            {b.completed}/{b.total} · {relativeTime(b.created_at)}
+          </p>
+        </div>
+        <StatusBadge status={b.status} />
+        {done && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label="Lihat dokumen"
+            className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-ink transition-colors flex-shrink-0"
+          >
+            {failed ? (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.85}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.85}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
-
-      {docs.isLoading && (
-        <div className="flex justify-center py-4">
-          <div className="w-5 h-5 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
-        </div>
-      )}
-
-      {docs.data && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] text-indigo-400 uppercase tracking-wider text-left border-b border-indigo-100/60">
-                <th className="pb-2 pr-4 font-semibold">Ref</th>
-                <th className="pb-2 pr-4 font-semibold">Status</th>
-                <th className="pb-2 pr-4 text-center font-semibold">Halaman</th>
-                <th className="pb-2 text-right font-semibold">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-indigo-100/40">
-              {docs.data.data.map((doc: BatchDocumentItem) => (
-                <tr
-                  key={doc.id}
-                  className="hover:bg-white/40 transition-colors"
-                >
-                  <td className="py-2 pr-4">
-                    <span className="font-mono text-[12px] text-slate-600">
-                      {doc.ref ?? doc.id}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-4">
-                    <DocStatusBadge status={doc.status} />
-                    {doc.error && (
-                      <p
-                        className="text-[11px] text-rose-500 mt-0.5 max-w-xs truncate"
-                        title={doc.error}
-                      >
-                        {doc.error}
-                      </p>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4 text-center text-slate-400 text-[12px]">
-                    {doc.page_count ?? '—'}
-                  </td>
-                  <td className="py-2 text-right">
-                    {doc.status === 'completed' && doc.output_url ? (
-                      <a
-                        href={doc.output_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-xl text-white transition-all hover:opacity-90 shadow-sm shadow-indigo-200"
-                        style={{
-                          background:
-                            'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                        }}
-                      >
-                        <svg
-                          className="w-3 h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                          />
-                        </svg>
-                        PDF
-                      </a>
-                    ) : (
-                      <span className="text-[12px] text-slate-300">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {docs.data.has_more && (
-            <p className="text-[11.5px] text-indigo-400 mt-3 text-center">
-              Ada lebih banyak dokumen — gunakan API untuk mengambil semua.
-            </p>
-          )}
-        </div>
-      )}
+      <div className="mt-2.5 h-1.5 rounded-full bg-white/50 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-grad transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {open && <BatchDocumentsPanel batchId={b.id} />}
     </div>
   );
 }
 
 export default function BatchesPage() {
   const qc = useQueryClient();
+  const { fmtNum } = useLang();
   const batches = useQuery({
     queryKey: ['batches'],
     queryFn: getBatches,
@@ -216,11 +274,19 @@ export default function BatchesPage() {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [formError, setFormError] = useState('');
 
+  const list = batches.data?.data ?? [];
+  const batchesThisMonth = list.filter((b) => isThisMonth(b.created_at)).length;
+  const docsPrinted = list.reduce((s, b) => s + b.completed, 0);
+  const totalFailed = list.reduce((s, b) => s + b.failed, 0);
+  const successRate =
+    docsPrinted + totalFailed > 0
+      ? (docsPrinted / (docsPrinted + totalFailed)) * 100
+      : 100;
+
   const create = useMutation({
     mutationFn: createBatch,
     onSuccess: (res) => {
       void qc.invalidateQueries({ queryKey: ['batches'] });
-      // Batch mendebit kredit → segarkan saldo (header baca ['me'], Wallet baca keduanya).
       void qc.invalidateQueries({ queryKey: ['me'] });
       void qc.invalidateQueries({ queryKey: ['wallet'] });
       setShowForm(false);
@@ -254,42 +320,66 @@ export default function BatchesPage() {
     });
   }
 
+  const stats = [
+    { label: 'Batch bulan ini', value: fmtNum(batchesThisMonth) },
+    { label: 'Dokumen tercetak', value: fmtNum(docsPrinted) },
+    { label: 'Tingkat sukses', value: `${successRate.toFixed(1)}%` },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div />
-        <button
-          type="button"
-          onClick={() => {
-            setShowForm(true);
-            setFormError('');
-          }}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-2xl text-white transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
-          style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
+    <div className="space-y-5">
+      {/* ── Header card + stat strip ────────────────────────────────── */}
+      <div className="glass rounded-glass overflow-hidden">
+        <div className="flex items-start justify-between gap-4 px-6 py-5">
+          <div>
+            <h1 className="text-[17px] font-bold text-ink">Batch</h1>
+            <p className="text-[12.5px] text-mut mt-0.5">
+              Generate banyak dokumen sekaligus dari satu template + data.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowForm(true);
+              setFormError('');
+            }}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-grad text-white text-[12.5px] font-bold shadow-[0_4px_14px_rgba(155,93,229,0.4)] hover:opacity-90 active:scale-[0.98] transition-all flex-shrink-0"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          Batch baru
-        </button>
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Buat batch
+          </button>
+        </div>
+        <div className="grid grid-cols-3 border-t border-white/40 divide-x divide-white/40">
+          {stats.map((s) => (
+            <div key={s.label} className="px-6 py-4">
+              <p className="text-[10.5px] font-bold uppercase tracking-wider text-mut">
+                {s.label}
+              </p>
+              <p className="num mt-1.5 text-[24px] font-extrabold text-ink leading-none">
+                {s.value}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Create form */}
+      {/* ── Create form ─────────────────────────────────────────────── */}
       {showForm && (
-        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] p-6">
+        <div className="glass rounded-glass p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-[14.5px] font-semibold text-slate-800">
+            <h2 className="text-[14.5px] font-bold text-ink">
               Buat batch baru
             </h2>
             <button
@@ -298,7 +388,7 @@ export default function BatchesPage() {
                 setShowForm(false);
                 setFormError('');
               }}
-              className="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+              className="w-7 h-7 rounded-xl glass-soft flex items-center justify-center text-mut hover:text-ink transition-colors"
             >
               <svg
                 className="w-3.5 h-3.5"
@@ -317,7 +407,7 @@ export default function BatchesPage() {
           </div>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
+              <label className="block text-[12.5px] font-semibold text-ink mb-1.5">
                 Template
               </label>
               <select
@@ -334,33 +424,25 @@ export default function BatchesPage() {
                 ))}
               </select>
             </div>
-
             <div>
-              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
+              <label className="block text-[12.5px] font-semibold text-ink mb-1.5">
                 Data items{' '}
-                <span className="font-normal text-slate-400">
+                <span className="font-normal text-mut">
                   (JSON array, maks. 500 item)
                 </span>
               </label>
-              <p className="text-[11.5px] text-slate-400 mb-2">
-                Setiap item butuh{' '}
-                <code className="bg-slate-100 px-1 rounded-md">ref</code> unik
-                dan <code className="bg-slate-100 px-1 rounded-md">data</code>{' '}
-                sesuai template.
-              </p>
               <textarea
                 value={itemsJson}
                 onChange={(e) => setItemsJson(e.target.value)}
                 required
-                rows={10}
-                className="w-full bg-white ring-1 ring-slate-200 rounded-2xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
+                rows={9}
+                className="num w-full glass-soft rounded-2xl px-4 py-3 text-[12.5px] text-ink focus:outline-none"
               />
             </div>
-
             <div>
-              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
+              <label className="block text-[12.5px] font-semibold text-ink mb-1.5">
                 Webhook URL{' '}
-                <span className="font-normal text-slate-400">(opsional)</span>
+                <span className="font-normal text-mut">(opsional)</span>
               </label>
               <input
                 type="url"
@@ -369,13 +451,9 @@ export default function BatchesPage() {
                 placeholder="https://yourapp.com/webhooks/batch"
                 className={inputCls}
               />
-              <p className="text-[11.5px] text-slate-400 mt-1.5">
-                Notifikasi dikirim ke URL ini saat batch selesai.
-              </p>
             </div>
-
             {formError && (
-              <div className="flex items-start gap-2 text-sm text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-2xl px-4 py-3">
+              <div className="flex items-start gap-2 text-[12.5px] text-rose-700 bg-rose-100/60 rounded-2xl px-4 py-3">
                 <svg
                   className="w-4 h-4 mt-0.5 flex-shrink-0"
                   fill="none"
@@ -392,15 +470,11 @@ export default function BatchesPage() {
                 {formError}
               </div>
             )}
-
             <div className="flex gap-3">
               <button
                 type="submit"
                 disabled={create.isPending}
-                className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
-                style={{
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                }}
+                className="px-5 py-2.5 text-sm font-bold rounded-full text-white bg-grad shadow-[0_4px_14px_rgba(155,93,229,0.4)] disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition-all"
               >
                 {create.isPending ? 'Membuat…' : 'Buat batch'}
               </button>
@@ -410,7 +484,7 @@ export default function BatchesPage() {
                   setShowForm(false);
                   setFormError('');
                 }}
-                className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-slate-600 ring-1 ring-slate-200 bg-white hover:bg-slate-50 transition-all"
+                className="px-5 py-2.5 text-sm font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
               >
                 Batal
               </button>
@@ -419,96 +493,24 @@ export default function BatchesPage() {
         </div>
       )}
 
-      {/* Batch list */}
-      <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h2 className="text-[14.5px] font-semibold text-slate-800">Batch</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] text-slate-400 uppercase tracking-wider text-left border-b border-slate-100">
-                <th className="px-6 py-3 font-semibold">Batch ID</th>
-                <th className="px-6 py-3 font-semibold">Status</th>
-                <th className="px-6 py-3 font-semibold text-center">Total</th>
-                <th className="px-6 py-3 font-semibold text-center">Selesai</th>
-                <th className="px-6 py-3 font-semibold text-center">Gagal</th>
-                <th className="px-6 py-3 font-semibold text-right">Kredit</th>
-                <th className="px-6 py-3 font-semibold text-right">Dibuat</th>
-                <th className="px-6 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {batches.data?.data.map((b) => (
-                <>
-                  <tr
-                    key={b.id}
-                    className={`hover:bg-slate-50/60 transition-colors border-t border-slate-50 first:border-t-0 ${selectedBatchId === b.id ? 'bg-indigo-50/30' : ''}`}
-                  >
-                    <td className="px-6 py-3.5 font-mono text-[12px] text-slate-500">
-                      {b.id}
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <StatusBadge status={b.status} />
-                    </td>
-                    <td className="px-6 py-3.5 text-center text-slate-600">
-                      {b.total}
-                    </td>
-                    <td className="px-6 py-3.5 text-center text-emerald-600 font-semibold">
-                      {b.completed}
-                    </td>
-                    <td className="px-6 py-3.5 text-center text-rose-500 font-semibold">
-                      {b.failed}
-                    </td>
-                    <td className="px-6 py-3.5 text-right text-slate-500">
-                      {b.credits_reserved}
-                    </td>
-                    <td className="px-6 py-3.5 text-right text-slate-400">
-                      {formatDate(b.created_at)}
-                    </td>
-                    <td className="px-6 py-3.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedBatchId(
-                            selectedBatchId === b.id ? null : b.id,
-                          )
-                        }
-                        className={`text-[12px] font-semibold transition-colors px-3 py-1 rounded-xl ${
-                          selectedBatchId === b.id
-                            ? 'text-indigo-600 bg-indigo-50'
-                            : 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'
-                        }`}
-                      >
-                        {selectedBatchId === b.id ? '▲ Tutup' : '▼ Dokumen'}
-                      </button>
-                    </td>
-                  </tr>
-                  {selectedBatchId === b.id && (
-                    <tr key={`${b.id}-docs`}>
-                      <td colSpan={8} className="pt-0 pb-2">
-                        <BatchDocumentsPanel
-                          batchId={b.id}
-                          onClose={() => setSelectedBatchId(null)}
-                        />
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))}
-              {batches.data?.data.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-6 py-12 text-center text-slate-400 text-sm"
-                  >
-                    Belum ada batch. Klik "Batch baru" untuk mulai.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* ── Batch list ──────────────────────────────────────────────── */}
+      <div className="glass rounded-glass overflow-hidden divide-y divide-white/40">
+        {list.length === 0 ? (
+          <p className="px-6 py-12 text-center text-[13px] text-mut">
+            Belum ada batch. Klik "Buat batch" untuk mulai.
+          </p>
+        ) : (
+          list.map((b) => (
+            <BatchRow
+              key={b.id}
+              b={b}
+              open={selectedBatchId === b.id}
+              onToggle={() =>
+                setSelectedBatchId(selectedBatchId === b.id ? null : b.id)
+              }
+            />
+          ))
+        )}
       </div>
     </div>
   );

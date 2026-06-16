@@ -21,7 +21,36 @@ jobs:
             cd /var/www/docgen
             git pull origin main
             pnpm install --frozen-lockfile
-            pnpm build:all
-            pnpm db:migrate
+            pnpm build:all          # dashboard di-build dgn base '/' (root)
+            pnpm db:migrate          # terapkan migrasi (mis. 0012_owner_settings)
+
+            # root bisa langsung; non-root pakai sudo (butuh NOPASSWD).
+            SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+
+            # --- Pastikan DASHBOARD_URL = domain root (tanpa /app) ---
+            ENVF=/var/www/docgen/.env
+            DURL="https://docgen.razornez.net"
+            if grep -q '^DASHBOARD_URL=' "$ENVF"; then
+              sed -i "s#^DASHBOARD_URL=.*#DASHBOARD_URL=${DURL}#" "$ENVF"
+            else
+              echo "DASHBOARD_URL=${DURL}" >> "$ENVF"
+            fi
+
+            # --- Terapkan nginx (SPA di root) dgn gerbang nginx -t + restore ---
+            NSRC=/var/www/docgen/scripts/nginx-production.conf
+            NDST=/etc/nginx/sites-available/docgen
+            BAK="${NDST}.bak.$(date +%s)"
+            if [ -f "$NDST" ]; then $SUDO cp "$NDST" "$BAK"; fi
+            $SUDO cp "$NSRC" "$NDST"
+            $SUDO ln -sf "$NDST" /etc/nginx/sites-enabled/docgen
+            if $SUDO nginx -t; then
+              $SUDO systemctl reload nginx
+              echo "nginx: konfigurasi root diterapkan & di-reload"
+            else
+              echo "nginx -t GAGAL — kembalikan konfigurasi sebelumnya"
+              if [ -f "$BAK" ]; then $SUDO cp "$BAK" "$NDST" && $SUDO systemctl reload nginx || true; fi
+              exit 1
+            fi
+
             pm2 reload ecosystem.config.cjs --update-env
             echo "Deploy selesai: $(date)"

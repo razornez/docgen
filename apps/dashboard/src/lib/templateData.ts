@@ -38,6 +38,19 @@ export const CATEGORY_DOT: Record<string, string> = {
   Umum: 'bg-slate-300',
 };
 
+/** Latar thumbnail kartu template + warna header dokumen per kategori. */
+export const CATEGORY_THUMB: Record<string, { bg: string; bar: string }> = {
+  HR: { bg: 'linear-gradient(135deg,#eef2ff,#e0e7ff)', bar: '#6366f1' },
+  Legal: { bg: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', bar: '#8b5cf6' },
+  Keuangan: { bg: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', bar: '#10b981' },
+  Operasional: {
+    bg: 'linear-gradient(135deg,#fff7ed,#ffedd5)',
+    bar: '#f97316',
+  },
+  Marketing: { bg: 'linear-gradient(135deg,#fdf2f8,#fce7f3)', bar: '#ec4899' },
+  Umum: { bg: 'linear-gradient(135deg,#f8fafc,#eef0f4)', bar: '#94a3b8' },
+};
+
 export const CATEGORY_ICON: Record<string, string> = {
   HR: 'bg-blue-100 text-blue-500',
   Legal: 'bg-violet-100 text-violet-500',
@@ -138,6 +151,9 @@ const DUMMY_VALUES: Record<string, string> = {
   no_hp: '081234567890',
   no_telepon: '021-12345678',
 };
+
+/** Katalog variabel umum (untuk panel sisip variabel di editor). */
+export const VARIABLE_CATALOG: string[] = Object.keys(DUMMY_VALUES).sort();
 
 /** Bangun JSON data contoh (dummy Indonesia) untuk variabel template. */
 export function buildDummyJson(vars: string[]): string {

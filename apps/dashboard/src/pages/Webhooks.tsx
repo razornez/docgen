@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getWebhooks, createWebhook, deleteWebhook } from '../api/client.js';
+import {
+  getWebhooks,
+  createWebhook,
+  deleteWebhook,
+  type WebhookEndpoint,
+} from '../api/client.js';
 import ConfirmModal from '../components/ConfirmModal.js';
-import { formatDate } from '../lib/format.js';
 
 const EVENTS = [
   'batch.completed',
@@ -13,7 +17,94 @@ const EVENTS = [
 ];
 
 const inputCls =
-  'w-full bg-white ring-1 ring-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all placeholder:text-slate-300';
+  'w-full glass-soft rounded-2xl px-4 py-2.5 text-sm text-ink focus:outline-none placeholder:text-mut';
+
+/** Secret tersamar untuk tampilan. */
+function maskSecret(s: string): string {
+  const tail = s.slice(-4);
+  return `whsec_****${tail}`;
+}
+
+function EndpointRow({
+  w,
+  onDelete,
+}: {
+  w: WebhookEndpoint;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="group flex items-center gap-4 px-6 py-4">
+      <div
+        className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${w.active ? 'bg-indigo-100/70 text-brand-purple' : 'bg-slate-200/70 text-slate-400'}`}
+      >
+        <svg
+          className="w-4.5 h-4.5"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.85}
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M13 10V3L4 14h7v7l9-11h-7z"
+          />
+        </svg>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="num text-[12.5px] font-semibold text-ink truncate">
+          {w.url}
+        </p>
+        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+          {w.events.map((ev) => (
+            <span
+              key={ev}
+              className="num text-[10.5px] text-mut bg-white/60 rounded-md px-1.5 py-0.5"
+            >
+              {ev}
+            </span>
+          ))}
+        </div>
+        <p className="num text-[10.5px] text-mut mt-1.5">
+          Secret: {maskSecret(w.id)}
+        </p>
+      </div>
+      <span
+        className={`flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-wide flex-shrink-0 ${w.active ? 'text-emerald-600' : 'text-mut'}`}
+      >
+        {w.active ? 'Aktif' : 'Nonaktif'}
+        <span
+          className={`w-9 h-5 rounded-full p-0.5 flex ${w.active ? 'bg-grad justify-end' : 'bg-slate-300 justify-start'}`}
+        >
+          <span className="w-4 h-4 rounded-full bg-white shadow-sm" />
+        </span>
+      </span>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Hapus endpoint"
+        title="Hapus endpoint"
+        className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-rose-500 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+      >
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.85}
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+}
 
 export default function WebhooksPage() {
   const qc = useQueryClient();
@@ -64,104 +155,52 @@ export default function WebhooksPage() {
     create.mutate({ url: trimmed, events: selectedEvents });
   }
 
+  const list = webhooks.data?.data ?? [];
+
   return (
-    <div className="space-y-6 max-w-4xl">
-      {/* Header row */}
-      <div className="flex items-center justify-between">
-        <div />
-        <button
-          type="button"
-          onClick={() => {
-            setShowForm(true);
-            setSecret('');
-          }}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-2xl text-white transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
-          style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
+    <div className="space-y-5 max-w-4xl">
+      <div className="glass rounded-glass overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 px-6 py-5">
+          <div>
+            <h1 className="text-[17px] font-bold text-ink">Webhooks</h1>
+            <p className="text-[12.5px] text-mut mt-0.5">
+              Terima notifikasi saat dokumen atau batch selesai.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowForm((v) => !v);
+              setSecret('');
+            }}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-grad text-white text-[12.5px] font-bold shadow-[0_4px_14px_rgba(155,93,229,0.4)] hover:opacity-90 active:scale-[0.98] transition-all flex-shrink-0"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          Tambah endpoint
-        </button>
-      </div>
-
-      {/* Signing secret alert */}
-      {secret && (
-        <div
-          className="rounded-3xl p-5 ring-1 ring-amber-200"
-          style={{ background: 'linear-gradient(135deg, #fffbeb, #fefce8)' }}
-        >
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <svg
-                className="w-4.5 h-4.5 w-[18px] h-[18px] text-amber-600"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-amber-800 mb-1.5">
-                Signing secret — simpan sekarang, tidak akan ditampilkan lagi.
-              </p>
-              <code className="text-[12px] font-mono text-amber-900 break-all bg-amber-100/60 rounded-xl px-3 py-2 block">
-                {secret}
-              </code>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create form */}
-      {showForm && (
-        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-[14.5px] font-semibold text-slate-800">
-              Endpoint baru
-            </h2>
-            <button
-              type="button"
-              onClick={() => {
-                setShowForm(false);
-                setFormError('');
-              }}
-              className="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              viewBox="0 0 24 24"
             >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-5">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Tambah endpoint
+          </button>
+        </div>
+
+        {/* Create form */}
+        {showForm && (
+          <form
+            onSubmit={handleSubmit}
+            className="mx-6 mb-4 p-4 rounded-2xl glass-soft space-y-4"
+          >
             <div>
-              <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
+              <label className="block text-[11.5px] font-semibold text-ink mb-1.5">
                 URL (HTTPS)
               </label>
               <input
@@ -174,24 +213,24 @@ export default function WebhooksPage() {
               />
             </div>
             <div>
-              <p className="text-[12.5px] font-semibold text-slate-600 mb-2">
+              <p className="text-[11.5px] font-semibold text-ink mb-2">
                 Events
               </p>
               <div className="flex flex-wrap gap-2">
                 {EVENTS.map((ev) => (
                   <label
                     key={ev}
-                    className={`flex items-center gap-2 cursor-pointer px-3 py-2 rounded-2xl ring-1 text-[12.5px] transition-all ${
+                    className={`num flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-full text-[11.5px] transition-all ${
                       selectedEvents.includes(ev)
-                        ? 'bg-indigo-50 ring-indigo-300 text-indigo-700 font-semibold'
-                        : 'bg-white ring-slate-200 text-slate-600 hover:ring-indigo-200'
+                        ? 'bg-grad text-white'
+                        : 'glass-soft text-mut hover:text-ink'
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={selectedEvents.includes(ev)}
                       onChange={() => toggleEvent(ev)}
-                      className="accent-indigo-500"
+                      className="hidden"
                     />
                     {ev}
                   </label>
@@ -199,122 +238,66 @@ export default function WebhooksPage() {
               </div>
             </div>
             {formError && (
-              <div className="flex items-center gap-2 text-sm text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-2xl px-4 py-3">
-                <svg
-                  className="w-4 h-4 flex-shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                {formError}
-              </div>
+              <p className="text-[12px] text-rose-600">{formError}</p>
             )}
             <div className="flex gap-3">
               <button
                 type="submit"
                 disabled={create.isPending || selectedEvents.length === 0}
-                className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
-                style={{
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                }}
+                className="px-4 py-2 rounded-full bg-grad text-white text-[12.5px] font-bold disabled:opacity-50 hover:opacity-90 transition-opacity"
               >
                 {create.isPending ? 'Menambahkan…' : 'Tambah endpoint'}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  setFormError('');
-                }}
-                className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-slate-600 ring-1 ring-slate-200 bg-white hover:bg-slate-50 transition-all"
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 rounded-full glass-soft text-ink text-[12.5px] font-semibold hover:bg-white/60 transition-colors"
               >
                 Batal
               </button>
             </div>
           </form>
-        </div>
-      )}
-
-      {/* Webhooks list */}
-      <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h2 className="text-[14.5px] font-semibold text-slate-800">
-            Endpoints terdaftar
-          </h2>
-        </div>
-        {webhooks.data?.data.length === 0 ? (
-          <div className="px-6 py-12 text-center text-slate-400 text-sm">
-            Belum ada webhook endpoint.
-          </div>
-        ) : (
-          <ul className="divide-y divide-slate-50">
-            {webhooks.data?.data.map((w) => (
-              <li
-                key={w.id}
-                className="px-6 py-4 hover:bg-slate-50/60 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2.5 mb-2">
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-[12px] font-semibold ${w.active ? 'text-emerald-600' : 'text-slate-400'}`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${w.active ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                        />
-                        {w.active ? 'Aktif' : 'Nonaktif'}
-                      </span>
-                      <span className="text-slate-200">·</span>
-                      <span className="text-[11.5px] text-slate-400">
-                        {formatDate(w.created_at)}
-                      </span>
-                    </div>
-                    <p className="font-mono text-[12.5px] text-slate-600 truncate mb-2.5">
-                      {w.url}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {w.events.map((ev) => (
-                        <span
-                          key={ev}
-                          className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-lg text-[11px] font-medium"
-                        >
-                          {ev}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  {w.active && (
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(w.id)}
-                      className="flex-shrink-0 text-[12px] font-semibold text-rose-400 hover:text-rose-600 transition-colors px-3 py-1.5 rounded-xl hover:bg-rose-50"
-                    >
-                      Hapus
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
         )}
+
+        {/* Secret reveal */}
+        {secret && (
+          <div
+            className="mx-6 mb-4 rounded-2xl p-4 ring-1 ring-amber-200"
+            style={{ background: 'linear-gradient(135deg,#fffbeb,#fefce8)' }}
+          >
+            <p className="text-[12.5px] font-semibold text-amber-800 mb-1.5">
+              Signing secret — simpan sekarang, tidak akan ditampilkan lagi.
+            </p>
+            <code className="num text-[12px] text-amber-900 break-all bg-amber-100/60 rounded-xl px-3 py-2 block">
+              {secret}
+            </code>
+          </div>
+        )}
+
+        {/* Endpoints list */}
+        <div className="divide-y divide-white/40 border-t border-white/40">
+          {list.length === 0 ? (
+            <p className="px-6 py-10 text-center text-[13px] text-mut">
+              Belum ada webhook endpoint.
+            </p>
+          ) : (
+            list.map((w) => (
+              <EndpointRow
+                key={w.id}
+                w={w}
+                onDelete={() => setDeleteTarget(w.id)}
+              />
+            ))
+          )}
+        </div>
       </div>
 
       {/* Signature info */}
-      <div
-        className="rounded-3xl p-5 ring-1 ring-indigo-100"
-        style={{ background: 'linear-gradient(135deg, #eef2ff, #faf5ff)' }}
-      >
+      <div className="glass rounded-glass p-5">
         <div className="flex gap-3">
-          <div className="w-8 h-8 rounded-xl bg-white/70 flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-white/60 flex items-center justify-center flex-shrink-0 text-brand-purple">
             <svg
-              className="w-4 h-4 text-indigo-500"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               strokeWidth={1.75}
@@ -328,18 +311,15 @@ export default function WebhooksPage() {
             </svg>
           </div>
           <div>
-            <p className="text-[13px] font-semibold text-indigo-900 mb-1">
+            <p className="text-[13px] font-semibold text-ink mb-1">
               Verifikasi signature
             </p>
-            <p className="text-[12.5px] text-indigo-700/80 leading-relaxed">
+            <p className="text-[12.5px] text-mut leading-relaxed">
               Setiap request menyertakan header{' '}
-              <code className="bg-white/70 px-1.5 py-0.5 rounded-lg font-mono text-[11.5px]">
-                X-DocGen-Signature-256
+              <code className="num bg-white/60 px-1.5 py-0.5 rounded-lg text-[11.5px]">
+                X-Docgen-Signature-256
               </code>{' '}
-              — HMAC-SHA256 dari body payload menggunakan secret endpoint Anda.
-            </p>
-            <p className="font-mono text-[11.5px] text-indigo-500 mt-1.5 bg-white/50 px-2 py-1 rounded-lg inline-block">
-              sha256=&lt;hex&gt; = HMAC-SHA256(secret, body)
+              — HMAC-SHA256 dari body payload memakai secret endpoint Anda.
             </p>
           </div>
         </div>

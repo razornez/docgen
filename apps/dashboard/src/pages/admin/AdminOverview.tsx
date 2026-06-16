@@ -1,406 +1,395 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getMe,
   getBatches,
-  getApiKeys,
   getTemplates,
+  getTeam,
+  inviteMember,
+  updateMemberRole,
+  removeMember,
+  type TeamMember,
 } from '../../api/client.js';
+import { useLang } from '../../i18n/index.js';
+import ConfirmModal from '../../components/ConfirmModal.js';
 
-/* ── helpers ─────────────────────────────────────────────────────────── */
-
-function pct(n: number, total: number) {
-  return total === 0 ? 0 : Math.round((n / total) * 100);
+function isThisMonth(iso: string): boolean {
+  const d = new Date(iso);
+  const n = new Date();
+  return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
 }
 
-/* ── sub-components ─────────────────────────────────────────────────── */
+const ROLE_CFG: Record<string, { label: string; cls: string }> = {
+  owner: { label: 'Pemilik', cls: 'bg-indigo-100 text-brand-purple' },
+  admin: { label: 'Admin', cls: 'bg-blue-100 text-blue-700' },
+  member: { label: 'Anggota', cls: 'bg-slate-200/70 text-slate-600' },
+};
 
-function SoftCard({
-  children,
-  className = '',
+const AVATAR_TINT = [
+  'bg-gradient-to-br from-[#9b5de5] to-[#f15bb5]',
+  'bg-gradient-to-br from-[#6366f1] to-[#8b5cf6]',
+  'bg-gradient-to-br from-[#f15bb5] to-[#fca15b]',
+  'bg-gradient-to-br from-[#8b5cf6] to-[#6366f1]',
+];
+
+function MemberRow({
+  m,
+  i,
+  manage,
+  onRole,
+  onRemove,
 }: {
-  children: React.ReactNode;
-  className?: string;
+  m: TeamMember;
+  i: number;
+  manage: boolean;
+  onRole: (role: 'admin' | 'member') => void;
+  onRemove: () => void;
 }) {
+  const role = ROLE_CFG[m.role] ?? ROLE_CFG.member!;
+  const initials = m.name.slice(0, 2).toUpperCase();
+  const editable = manage && m.role !== 'owner';
   return (
-    <div
-      className={`bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.06)] ${className}`}
-    >
-      {children}
+    <div className="flex items-center gap-3 px-6 py-3.5">
+      <div
+        className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 ${AVATAR_TINT[i % AVATAR_TINT.length]}`}
+      >
+        {initials}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13.5px] font-semibold text-ink truncate">
+          {m.name}
+        </p>
+        <p className="num text-[11px] text-mut truncate">{m.email}</p>
+      </div>
+      {editable ? (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <select
+            value={m.role}
+            onChange={(e) => onRole(e.target.value as 'admin' | 'member')}
+            className="glass-soft rounded-lg px-2 py-1 text-[12px] text-ink focus:outline-none"
+          >
+            <option value="admin">Admin</option>
+            <option value="member">Anggota</option>
+          </select>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Keluarkan anggota"
+            title="Keluarkan"
+            className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-rose-500 transition-colors"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.85}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <span
+          className={`text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-md flex-shrink-0 ${role.cls}`}
+        >
+          {role.label}
+        </span>
+      )}
     </div>
   );
 }
-
-function StatCard({
-  label,
-  value,
-  icon,
-  from,
-  to,
-}: {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-  from: string;
-  to: string;
-}) {
-  return (
-    <div
-      className="rounded-3xl p-6 flex flex-col gap-4 ring-1 ring-white/60 shadow-[0_4px_24px_rgba(0,0,0,0.07)] transition-transform duration-200 hover:-translate-y-0.5"
-      style={{ background: `linear-gradient(145deg, ${from}, ${to})` }}
-    >
-      <div className="w-10 h-10 rounded-2xl bg-white/50 backdrop-blur-sm flex items-center justify-center shadow-sm">
-        {icon}
-      </div>
-      <div>
-        <p className="text-[28px] font-bold text-slate-800 leading-none">
-          {value}
-        </p>
-        <p className="text-[12.5px] text-slate-500 font-medium mt-1.5">
-          {label}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-const BATCH_STATUS_CFG = [
-  {
-    key: 'completed',
-    label: 'Selesai',
-    color: '#22c55e',
-    bg: 'bg-emerald-500',
-  },
-  {
-    key: 'processing',
-    label: 'Diproses',
-    color: '#6366f1',
-    bg: 'bg-indigo-500',
-  },
-  { key: 'queued', label: 'Antrian', color: '#94a3b8', bg: 'bg-slate-400' },
-  {
-    key: 'partially_failed',
-    label: 'Sebagian gagal',
-    color: '#f59e0b',
-    bg: 'bg-amber-500',
-  },
-  { key: 'failed', label: 'Gagal', color: '#ef4444', bg: 'bg-rose-500' },
-] as const;
-
-/* ── main component ─────────────────────────────────────────────────── */
 
 export default function AdminOverview() {
+  const qc = useQueryClient();
+  const { fmtNum } = useLang();
   const me = useQuery({ queryKey: ['me'], queryFn: getMe });
   const batches = useQuery({ queryKey: ['batches'], queryFn: getBatches });
-  const keys = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys });
   const templates = useQuery({
     queryKey: ['templates'],
     queryFn: getTemplates,
   });
+  const team = useQuery({ queryKey: ['team'], queryFn: getTeam });
 
-  const tenantName = me.data?.tenant.name ?? '…';
-  const tenantId = me.data?.tenant.id ?? '…';
-  const balance = me.data?.wallet.balance ?? 0;
-  const totalDocs =
-    batches.data?.data.reduce((s, b) => s + b.completed, 0) ?? 0;
-  const failedDocs = batches.data?.data.reduce((s, b) => s + b.failed, 0) ?? 0;
-  const activeKeys =
-    keys.data?.data.filter((k) => k.status === 'active').length ?? 0;
-  const totalBatches = batches.data?.data.length ?? 0;
+  const [manage, setManage] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [iName, setIName] = useState('');
+  const [iEmail, setIEmail] = useState('');
+  const [iRole, setIRole] = useState<'admin' | 'member'>('member');
+  const [iError, setIError] = useState('');
+  const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
 
+  const invalidate = () => void qc.invalidateQueries({ queryKey: ['team'] });
+
+  const invite = useMutation({
+    mutationFn: inviteMember,
+    onSuccess: () => {
+      invalidate();
+      setInviteOpen(false);
+      setIName('');
+      setIEmail('');
+      setIRole('member');
+      setIError('');
+    },
+    onError: (e) => {
+      const msg = e instanceof Error ? e.message : '';
+      setIError(
+        /sudah terdaftar/i.test(msg)
+          ? 'Email sudah terdaftar.'
+          : msg || 'Gagal mengundang anggota.',
+      );
+    },
+  });
+  const roleMut = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: 'admin' | 'member' }) =>
+      updateMemberRole(id, role),
+    onSuccess: invalidate,
+  });
+  const removeMut = useMutation({
+    mutationFn: removeMember,
+    onSuccess: invalidate,
+  });
+
+  const tenant = me.data?.tenant;
+  const tenantName = tenant?.name ?? '…';
   const initials = tenantName.slice(0, 2).toUpperCase();
+  const balance = me.data?.wallet.balance ?? 0;
+  const docsThisMonth = (batches.data?.data ?? [])
+    .filter((b) => isThisMonth(b.created_at))
+    .reduce((s, b) => s + b.completed, 0);
+  const members = team.data?.data ?? [];
+  const joined = tenant?.created_at
+    ? new Date(tenant.created_at).toLocaleDateString('id-ID', {
+        month: 'short',
+        year: 'numeric',
+      })
+    : '—';
+
+  const stats = [
+    { label: 'Dokumen bln ini', value: fmtNum(docsThisMonth) },
+    { label: 'Kredit tersisa', value: fmtNum(balance) },
+    { label: 'Anggota tim', value: fmtNum(members.length) },
+    {
+      label: 'Template aktif',
+      value: fmtNum(templates.data?.data.length ?? 0),
+    },
+  ];
 
   return (
-    <div className="space-y-7 max-w-5xl">
-      {/* ── Hero header ─────────────────────────────────────────────── */}
-      <div
-        className="rounded-3xl p-7 flex items-center gap-6 ring-1 ring-indigo-100"
-        style={{
-          background:
-            'linear-gradient(135deg, #eef2ff 0%, #faf5ff 60%, #eff6ff 100%)',
-        }}
-      >
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-bold flex-shrink-0 shadow-md"
-          style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-        >
-          {initials}
+    <div className="space-y-5 max-w-5xl">
+      {/* ── Org card + stat strip ───────────────────────────────────── */}
+      <div className="glass rounded-glass overflow-hidden">
+        <div className="flex items-center gap-4 px-6 py-5">
+          <div className="w-12 h-12 rounded-xl bg-grad flex items-center justify-center text-white text-[17px] font-bold flex-shrink-0 shadow-[0_4px_14px_rgba(155,93,229,0.4)]">
+            {initials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[18px] font-bold text-ink truncate">
+              {tenantName}
+            </h1>
+            <p className="num text-[11.5px] text-mut mt-0.5">
+              Prepaid · {tenant?.country ?? '—'} · Bergabung {joined}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setManage((v) => !v)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[12.5px] font-semibold transition-colors flex-shrink-0 ${
+              manage
+                ? 'bg-grad text-white shadow-sm'
+                : 'glass-soft text-ink hover:bg-white/60'
+            }`}
+          >
+            <svg
+              className={`w-4 h-4 ${manage ? 'text-white' : 'text-brand-purple'}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.85}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+            {manage ? 'Selesai' : 'Kelola'}
+          </button>
         </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-slate-900">{tenantName}</h1>
-          <p className="text-[12.5px] text-slate-400 font-mono mt-0.5">
-            {tenantId}
+        <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-white/40 sm:divide-x divide-white/40">
+          {stats.map((s) => (
+            <div key={s.label} className="px-6 py-4">
+              <p className="text-[10.5px] font-bold uppercase tracking-wider text-mut">
+                {s.label}
+              </p>
+              <p className="num mt-1.5 text-[22px] font-extrabold text-ink leading-none">
+                {s.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Team ────────────────────────────────────────────────────── */}
+      <div className="glass rounded-glass overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/40">
+          <h2 className="text-[15px] font-bold text-ink">
+            Tim{' '}
+            {manage && (
+              <span className="text-[11px] font-semibold text-brand-purple">
+                · mode kelola
+              </span>
+            )}
+          </h2>
+          <button
+            type="button"
+            onClick={() => {
+              setInviteOpen(true);
+              setIError('');
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full glass-soft text-[12px] font-semibold text-ink hover:bg-white/60 transition-colors"
+          >
+            <svg
+              className="w-4 h-4 text-brand-purple"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.85}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+              />
+            </svg>
+            Undang anggota
+          </button>
+        </div>
+        {members.length === 0 ? (
+          <p className="px-6 py-10 text-center text-[13px] text-mut">
+            Belum ada anggota tim.
           </p>
-        </div>
-        <div className="hidden sm:flex flex-col items-end gap-1">
-          <span className="text-[11px] text-slate-400 font-medium">
-            Saldo tersedia
-          </span>
-          <span className="text-2xl font-bold text-indigo-600">
-            {balance.toLocaleString()}
-          </span>
-          <span className="text-[11px] text-slate-400">credits</span>
-        </div>
-      </div>
-
-      {/* ── Stat cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Saldo kredit"
-          value={balance.toLocaleString()}
-          from="#eef2ff"
-          to="#faf5ff"
-          icon={
-            <svg
-              className="w-5 h-5 text-indigo-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+        ) : (
+          <div className="divide-y divide-white/40">
+            {members.map((m, i) => (
+              <MemberRow
+                key={m.id}
+                m={m}
+                i={i}
+                manage={manage}
+                onRole={(role) => roleMut.mutate({ id: m.id, role })}
+                onRemove={() => setRemoveTarget(m)}
               />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Dokumen dihasilkan"
-          value={totalDocs.toLocaleString()}
-          from="#ecfdf5"
-          to="#f0fdf4"
-          icon={
-            <svg
-              className="w-5 h-5 text-emerald-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Dokumen gagal"
-          value={failedDocs.toLocaleString()}
-          from="#fff1f2"
-          to="#fff5f5"
-          icon={
-            <svg
-              className="w-5 h-5 text-rose-400"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="API keys aktif"
-          value={String(activeKeys)}
-          from="#fffbeb"
-          to="#fefce8"
-          icon={
-            <svg
-              className="w-5 h-5 text-amber-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-              />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* ── Batch breakdown + Templates ─────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Batch breakdown */}
-        <SoftCard>
-          <div className="px-6 pt-6 pb-5">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[14.5px] font-semibold text-slate-800">
-                Status Batch
-              </h2>
-              <span className="text-[12px] text-slate-400">
-                {totalBatches} total
-              </span>
-            </div>
-
-            {/* Total bar */}
-            {totalBatches > 0 && (
-              <div className="flex h-2.5 rounded-full overflow-hidden mb-5 gap-0.5">
-                {BATCH_STATUS_CFG.map(({ key, bg }) => {
-                  const count =
-                    batches.data?.data.filter((b) => b.status === key).length ??
-                    0;
-                  const width = pct(count, totalBatches);
-                  return width > 0 ? (
-                    <div
-                      key={key}
-                      className={`${bg} rounded-full`}
-                      style={{ width: `${width}%` }}
-                    />
-                  ) : null;
-                })}
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {BATCH_STATUS_CFG.map(({ key, label, color, bg }) => {
-                const count =
-                  batches.data?.data.filter((b) => b.status === key).length ??
-                  0;
-                const width = pct(count, totalBatches);
-                return (
-                  <div key={key} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${bg}`} />
-                        <span className="text-[13px] text-slate-600">
-                          {label}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[12px] text-slate-400">
-                          {width}%
-                        </span>
-                        <span className="text-[13px] font-semibold text-slate-800 w-5 text-right">
-                          {count}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${width}%`, background: color }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            ))}
           </div>
-        </SoftCard>
-
-        {/* Templates */}
-        <SoftCard>
-          <div className="px-6 pt-6 pb-5">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[14.5px] font-semibold text-slate-800">
-                Templates
-              </h2>
-              <span
-                className="text-[12px] font-semibold px-2.5 py-1 rounded-full"
-                style={{ background: '#eef2ff', color: '#6366f1' }}
-              >
-                {templates.data?.data.length ?? 0} aktif
-              </span>
-            </div>
-
-            {!templates.data ? (
-              <div className="flex justify-center py-6">
-                <div className="w-5 h-5 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
-              </div>
-            ) : templates.data.data.length === 0 ? (
-              <div className="py-8 text-center">
-                <p className="text-sm text-slate-400">Belum ada template.</p>
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {templates.data.data.slice(0, 8).map((t) => (
-                  <li
-                    key={t.id}
-                    className="flex items-center justify-between px-3 py-2.5 rounded-2xl hover:bg-slate-50 transition-colors group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-7 h-7 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                        <svg
-                          className="w-3.5 h-3.5 text-indigo-400"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
-                      </div>
-                      <span className="text-[13px] text-slate-700 font-medium truncate">
-                        {t.name}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">
-                      v{t.current_version}
-                    </span>
-                  </li>
-                ))}
-                {templates.data.data.length > 8 && (
-                  <p className="text-[12px] text-slate-400 text-center pt-1">
-                    +{templates.data.data.length - 8} template lainnya
-                  </p>
-                )}
-              </ul>
-            )}
-          </div>
-        </SoftCard>
+        )}
       </div>
 
-      {/* ── Info note ───────────────────────────────────────────────── */}
-      <div
-        className="rounded-3xl p-6 ring-1 ring-indigo-100/80"
-        style={{
-          background: 'linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%)',
+      {/* ── Invite modal ────────────────────────────────────────────── */}
+      {inviteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-[#2a1c4a]/40 backdrop-blur-sm"
+            onClick={() => setInviteOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-[420px] glass rounded-[20px] p-6">
+            <h3 className="text-[15px] font-bold text-ink">Undang anggota</h3>
+            <p className="text-[12px] text-mut mt-0.5 mb-4">
+              Anggota dapat mengakses workspace setelah menerima undangan.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setIError('');
+                if (!iEmail.trim()) {
+                  setIError('Email wajib diisi.');
+                  return;
+                }
+                invite.mutate({
+                  email: iEmail.trim(),
+                  name: iName.trim() || undefined,
+                  role: iRole,
+                });
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label className="block text-[12px] font-semibold text-ink mb-1.5">
+                  Nama
+                </label>
+                <input
+                  value={iName}
+                  onChange={(e) => setIName(e.target.value)}
+                  placeholder="cth: Andi Wijaya"
+                  className="w-full glass-soft rounded-xl px-3.5 py-2.5 text-[13px] text-ink placeholder:text-mut focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-ink mb-1.5">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={iEmail}
+                  onChange={(e) => setIEmail(e.target.value)}
+                  required
+                  placeholder="nama@perusahaan.com"
+                  className="w-full glass-soft rounded-xl px-3.5 py-2.5 text-[13px] text-ink placeholder:text-mut focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-ink mb-1.5">
+                  Peran
+                </label>
+                <select
+                  value={iRole}
+                  onChange={(e) =>
+                    setIRole(e.target.value as 'admin' | 'member')
+                  }
+                  className="w-full glass-soft rounded-xl px-3.5 py-2.5 text-[13px] text-ink focus:outline-none"
+                >
+                  <option value="member">Anggota</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              {iError && <p className="text-[12px] text-rose-600">{iError}</p>}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={invite.isPending}
+                  className="px-5 py-2.5 text-[13px] font-bold rounded-full text-white bg-grad shadow-[0_4px_14px_rgba(155,93,229,0.4)] disabled:opacity-50 hover:opacity-90 transition-all"
+                >
+                  {invite.isPending ? 'Mengundang…' : 'Kirim undangan'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInviteOpen(false)}
+                  className="px-5 py-2.5 text-[13px] font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <ConfirmModal
+        isOpen={removeTarget !== null}
+        title="Keluarkan anggota?"
+        message={`${removeTarget?.name ?? 'Anggota'} akan kehilangan akses ke workspace ini.`}
+        confirmLabel="Ya, keluarkan"
+        danger
+        onConfirm={() => {
+          if (removeTarget) removeMut.mutate(removeTarget.id);
+          setRemoveTarget(null);
         }}
-      >
-        <div className="flex gap-4">
-          <div className="w-9 h-9 rounded-2xl bg-white/70 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <svg
-              className="w-4.5 h-4.5 w-[18px] h-[18px] text-indigo-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <div>
-            <p className="text-[13.5px] font-semibold text-indigo-900 mb-1">
-              Catatan
-            </p>
-            <p className="text-[12.5px] text-indigo-700/80 leading-relaxed">
-              Panel admin ini menampilkan data untuk tenant yang sedang login.
-              Tampilan multi-tenant penuh (lintas semua tenant) memerlukan
-              endpoint admin khusus dengan kontrol akses berbasis peran.
-            </p>
-          </div>
-        </div>
-      </div>
+        onCancel={() => setRemoveTarget(null)}
+      />
     </div>
   );
 }

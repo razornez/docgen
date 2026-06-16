@@ -1,60 +1,107 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth.js';
-import { authLogin, authRegister } from '../api/client.js';
+import { authLogin, authRegister, getPublicPricing } from '../api/client.js';
+import { useLang } from '../i18n/index.js';
 
 type Tab = 'login' | 'register';
 
 const DEMO_EMAIL = 'demo@docgen.razornez.net';
 const DEMO_PASSWORD = 'demo1234';
 
-const pwInputCls =
-  'w-full border border-slate-200 rounded-xl pl-3.5 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all';
+const PAPERS: Array<React.CSSProperties & { '--r': string }> = [
+  { bottom: '6%', left: '8%', width: 120, height: 158, '--r': '-9deg' },
+  { bottom: '14%', left: '26%', width: 92, height: 122, '--r': '7deg' },
+  { bottom: '2%', left: '46%', width: 104, height: 138, '--r': '-5deg' },
+];
 
-/** Tombol mata show/hide di dalam field kata sandi. */
+function Flower({ className = 'w-8 h-8' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 32 32" aria-hidden="true">
+      <defs>
+        <linearGradient id="login-flower" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f15bb5" />
+          <stop offset="0.5" stopColor="#9b5de5" />
+          <stop offset="1" stopColor="#fca15b" />
+        </linearGradient>
+      </defs>
+      <g fill="url(#login-flower)">
+        {[0, 72, 144, 216, 288].map((a) => (
+          <ellipse
+            key={a}
+            cx="16"
+            cy="8.5"
+            rx="4"
+            ry="6.6"
+            transform={`rotate(${a} 16 16)`}
+          />
+        ))}
+      </g>
+      <circle cx="16" cy="16" r="3.1" fill="#fff" opacity="0.92" />
+    </svg>
+  );
+}
+
+function LangToggle() {
+  const { lang, setLang } = useLang();
+  return (
+    <div className="flex items-center rounded-full glass-soft p-0.5 text-[11px] font-bold">
+      {(['id', 'en'] as const).map((l) => (
+        <button
+          key={l}
+          type="button"
+          onClick={() => setLang(l)}
+          className={`px-2.5 py-1 rounded-full uppercase transition-all ${
+            lang === l ? 'bg-grad text-white' : 'text-mut hover:text-ink'
+          }`}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const inputCls =
+  'w-full bg-white/70 border border-white/60 rounded-xl px-3.5 py-2.5 text-[14px] text-ink placeholder:text-mut/70 focus:outline-none focus:ring-2 focus:ring-brand-purple/30 transition-all';
+
 function PwToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-label={show ? 'Sembunyikan kata sandi' : 'Lihat kata sandi'}
-      title={show ? 'Sembunyikan kata sandi' : 'Lihat kata sandi'}
-      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-mut hover:text-ink transition-colors"
     >
-      {show ? (
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          viewBox="0 0 24 24"
-        >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        viewBox="0 0 24 24"
+      >
+        {show ? (
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L9.88 9.88"
           />
-        </svg>
-      ) : (
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      )}
+        ) : (
+          <>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+          </>
+        )}
+      </svg>
     </button>
   );
 }
@@ -67,23 +114,29 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const pricing = useQuery({
+    queryKey: ['public-pricing'],
+    queryFn: getPublicPricing,
+  });
+  const bonus = (pricing.data?.signup_bonus_credits ?? 100).toLocaleString(
+    'id-ID',
+  );
 
   function switchTab(t: Tab) {
     setTab(t);
     setError('');
     setForgotOpen(false);
   }
-
   function fillDemo() {
     setTab('login');
     setEmail(DEMO_EMAIL);
     setPassword(DEMO_PASSWORD);
     setError('');
   }
-
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -98,7 +151,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
-
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -113,208 +165,234 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
-
   function handleGoogle() {
     window.location.href = '/v1/auth/google';
   }
 
   return (
-    <div
-      className="min-h-screen flex"
-      style={{
-        background:
-          'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
-      }}
-    >
-      {/* Left panel — branding */}
-      <div className="hidden lg:flex flex-col justify-between w-[45%] p-12">
-        <div>
-          <div className="flex items-center gap-2.5">
+    <div className="min-h-screen flex text-ink">
+      {/* ── Left brand panel ─────────────────────────────────────────── */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-[42%] relative overflow-hidden p-12"
+        style={{
+          background:
+            'linear-gradient(160deg, #271847 0%, #3a2566 52%, #4a2c6e 100%)',
+        }}
+      >
+        <div className="absolute inset-0 overflow-hidden opacity-[0.18]">
+          {PAPERS.map((style, i) => (
             <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm font-bold"
+              key={i}
+              className="absolute rounded-lg border border-white/30"
               style={{
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                ...style,
+                transform: `rotate(${style['--r']})`,
+                background:
+                  'repeating-linear-gradient(180deg, transparent 0 9px, rgba(255,255,255,0.25) 9px 10.5px), rgba(255,255,255,0.06)',
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="relative flex items-center gap-2.5">
+          <Flower className="w-9 h-9" />
+          <span className="text-[20px] font-extrabold tracking-tight text-white lowercase">
+            docgen
+          </span>
+        </div>
+
+        <div className="relative">
+          <h1 className="text-[34px] font-extrabold text-white leading-[1.15]">
+            Dari HTML &amp; data, jadi PDF rapi —{' '}
+            <span
+              className="bg-clip-text text-transparent"
+              style={{
+                backgroundImage:
+                  'linear-gradient(135deg, #c8a8ff 0%, #f5a9d4 100%)',
               }}
             >
-              D
-            </div>
-            <span className="font-semibold text-white text-lg tracking-tight">
-              DocGen
+              dalam satu panggilan.
             </span>
-          </div>
-        </div>
-
-        <div className="space-y-8">
-          <div>
-            <h1 className="text-4xl font-bold text-white leading-tight">
-              Generate dokumen
-              <br />
-              <span className="text-indigo-400">skala besar</span>, mudah.
-            </h1>
-            <p className="mt-4 text-slate-400 text-base leading-relaxed">
-              Buat PDF dari template Handlebars secara massal via API. Invoice,
-              surat, kontrak — semua dalam hitungan detik.
-            </p>
-          </div>
-
-          <div className="space-y-4">
+          </h1>
+          <ul className="mt-8 space-y-3.5">
             {[
-              { icon: '⚡', text: 'API sederhana, dokumentasi lengkap' },
-              { icon: '📄', text: 'Template Handlebars yang fleksibel' },
-              { icon: '🔒', text: 'Aman — webhook signature terverifikasi' },
-            ].map(({ icon, text }) => (
-              <div key={text} className="flex items-center gap-3">
-                <span className="text-lg">{icon}</span>
-                <span className="text-slate-300 text-sm">{text}</span>
-              </div>
+              'Template HTML + variabel',
+              'Kredit prepaid',
+              'API & Webhooks',
+            ].map((t) => (
+              <li key={t} className="flex items-center gap-3">
+                <svg
+                  className="w-4 h-4 text-[#c8a8ff] flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.4}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span className="text-[14px] text-slate-200">{t}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
 
-        <p className="text-slate-600 text-xs">
-          © 2025 DocGen. All rights reserved.
+        <p className="num relative text-[11px] text-slate-400/80">
+          Tanpa kartu kredit · Kredit prepaid · QRIS / VA / e-wallet
         </p>
       </div>
 
-      {/* Right panel — form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-[400px]">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-6 lg:hidden">
+      {/* ── Right form panel ─────────────────────────────────────────── */}
+      <div className="flex-1 relative flex flex-col app-canvas overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden" aria-hidden>
+          {PAPERS.map((style, i) => (
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+              key={i}
+              className="paper animate-floatPaper"
               style={{
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                ...style,
+                left: undefined,
+                bottom: undefined,
+                top: `${15 + i * 26}%`,
+                right: `${6 + i * 5}%`,
               }}
-            >
-              D
-            </div>
-            <span className="font-semibold text-slate-900 text-base">
-              DocGen
-            </span>
-          </div>
+            />
+          ))}
+        </div>
 
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-900">
-              {tab === 'login' ? 'Selamat datang kembali' : 'Buat akun baru'}
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              {tab === 'login'
-                ? 'Masuk ke dashboard Anda'
-                : '100 kredit gratis saat daftar'}
-            </p>
-          </div>
-
-          {/* Demo banner */}
-          <div className="mb-5 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-3.5">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-amber-800">
-                  Akun Demo — coba tanpa daftar
-                </p>
-                <div className="mt-1.5 space-y-0.5 font-mono text-[11px] text-amber-900">
-                  <div>
-                    Email:{' '}
-                    <span className="rounded-md bg-white/70 border border-amber-200 px-1.5 py-0.5">
-                      {DEMO_EMAIL}
-                    </span>
-                  </div>
-                  <div>
-                    Pass:{' '}
-                    <span className="rounded-md bg-white/70 border border-amber-200 px-1.5 py-0.5">
-                      {DEMO_PASSWORD}
-                    </span>
-                  </div>
-                </div>
-                <p className="mt-1.5 text-[10.5px] text-amber-500">
-                  Reset otomatis tiap 24 jam
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={fillDemo}
-                className="flex-shrink-0 text-[11px] font-semibold bg-amber-600 text-white px-2.5 py-1 rounded-lg hover:bg-amber-700 transition-colors whitespace-nowrap"
-              >
-                Isi otomatis
-              </button>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex mb-5 bg-slate-100 rounded-xl p-1 gap-1">
-            {(['login', 'register'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => switchTab(t)}
-                className={`flex-1 py-2 text-[13px] font-semibold rounded-lg transition-all ${
-                  tab === t
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {t === 'login' ? 'Masuk' : 'Daftar'}
-              </button>
-            ))}
-          </div>
-
-          {/* Google */}
-          <button
-            type="button"
-            onClick={handleGoogle}
-            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-slate-200 rounded-xl text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 transition-colors mb-4"
+        <div className="relative flex items-center justify-between px-6 py-5">
+          <Link
+            to="/"
+            className="flex items-center gap-1.5 text-[13px] font-medium text-mut hover:text-ink transition-colors"
           >
-            <svg className="w-4.5 h-4.5 w-[18px] h-[18px]" viewBox="0 0 24 24">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
               <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 19l-7-7 7-7"
               />
             </svg>
-            {tab === 'login' ? 'Masuk dengan Google' : 'Daftar dengan Google'}
-          </button>
+            Kembali ke beranda
+          </Link>
+          <LangToggle />
+        </div>
 
-          <div className="relative mb-4">
-            <hr className="border-slate-200" />
-            <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-white px-2 text-[11px] text-slate-400 font-medium">
-              atau
-            </span>
-          </div>
+        <div className="relative flex-1 flex items-center justify-center px-6 pb-10">
+          <div className="glass rounded-[22px] p-7 w-full max-w-[420px]">
+            <h2 className="text-[22px] font-extrabold text-ink">
+              {tab === 'login' ? 'Masuk ke DocGen' : 'Buat akun DocGen'}
+            </h2>
+            <p className="text-[13px] text-mut mt-1">
+              {tab === 'login'
+                ? 'Lanjutkan ke dasbormu.'
+                : `${bonus} kredit gratis saat daftar.`}
+            </p>
 
-          {error && (
-            <div className="mb-4 flex items-start gap-2 text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
-              <svg
-                className="w-4 h-4 mt-0.5 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
+            {/* Tabs */}
+            <div className="flex mt-5 mb-4 glass-soft rounded-full p-1 gap-1">
+              {(['login', 'register'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => switchTab(t)}
+                  className={`flex-1 py-2 text-[13px] font-bold rounded-full transition-all ${
+                    tab === t
+                      ? 'bg-grad text-white shadow-[0_4px_12px_rgba(155,93,229,0.35)]'
+                      : 'text-mut hover:text-ink'
+                  }`}
+                >
+                  {t === 'login' ? 'Masuk' : 'Daftar'}
+                </button>
+              ))}
+            </div>
+
+            {/* Google */}
+            <button
+              type="button"
+              onClick={handleGoogle}
+              className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white/80 border border-white/70 rounded-xl text-[13.5px] font-semibold text-ink hover:bg-white transition-colors"
+            >
+              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24">
                 <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              {error}
-            </div>
-          )}
+              Lanjutkan dengan Google
+            </button>
 
-          {tab === 'login' ? (
-            <form onSubmit={(e) => void handleLogin(e)} className="space-y-3.5">
+            <div className="relative my-4">
+              <hr className="border-white/50" />
+              <span className="num absolute left-1/2 -translate-x-1/2 -top-2 px-2 text-[10.5px] text-mut bg-white/50 backdrop-blur-sm rounded">
+                atau
+              </span>
+            </div>
+
+            {error && (
+              <div className="mb-3 flex items-start gap-2 text-[12.5px] text-rose-700 bg-rose-50/80 border border-rose-200 rounded-xl px-3 py-2.5">
+                <svg
+                  className="w-4 h-4 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                {error}
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) =>
+                void (tab === 'login' ? handleLogin(e) : handleRegister(e))
+              }
+              className="space-y-3.5"
+            >
+              {tab === 'register' && (
+                <div>
+                  <label className="block text-[10.5px] font-bold uppercase tracking-wider text-mut mb-1.5">
+                    Nama / perusahaan
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    autoComplete="name"
+                    placeholder="PT Karya Sejahtera"
+                    className={inputCls}
+                  />
+                </div>
+              )}
               <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 mb-1">
-                  Email
+                <label className="block text-[10.5px] font-bold uppercase tracking-wider text-mut mb-1.5">
+                  Email kerja
                 </label>
                 <input
                   type="email"
@@ -322,22 +400,24 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  placeholder="you@example.com"
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  placeholder="budi@perusahaan.co.id"
+                  className={inputCls}
                 />
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[12.5px] font-semibold text-slate-700">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10.5px] font-bold uppercase tracking-wider text-mut">
                     Kata sandi
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setForgotOpen((v) => !v)}
-                    className="text-[12px] font-semibold text-indigo-500 hover:text-indigo-700 transition-colors"
-                  >
-                    Lupa kata sandi?
-                  </button>
+                  {tab === 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => setForgotOpen((v) => !v)}
+                      className="text-[11.5px] font-bold text-brand-purple hover:opacity-80 transition-opacity"
+                    >
+                      Lupa sandi?
+                    </button>
+                  )}
                 </div>
                 <div className="relative">
                   <input
@@ -345,108 +425,97 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    autoComplete="current-password"
+                    minLength={tab === 'register' ? 8 : undefined}
+                    autoComplete={
+                      tab === 'login' ? 'current-password' : 'new-password'
+                    }
                     placeholder="••••••••"
-                    className={pwInputCls}
+                    className={`${inputCls} pr-11`}
                   />
                   <PwToggle
                     show={showPw}
                     onToggle={() => setShowPw((v) => !v)}
                   />
                 </div>
-                {forgotOpen && (
-                  <p className="mt-2 text-[11.5px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 leading-relaxed">
-                    Reset kata sandi mandiri belum tersedia. Coba akun demo di
-                    atas, atau hubungi{' '}
+                {forgotOpen && tab === 'login' && (
+                  <p className="mt-2 text-[11.5px] text-mut bg-white/50 border border-white/50 rounded-lg px-3 py-2 leading-relaxed">
+                    Reset mandiri belum tersedia. Pakai akun demo, atau hubungi{' '}
                     <a
                       href="mailto:support@docgen.razornez.net"
-                      className="font-semibold text-indigo-600 hover:text-indigo-700"
+                      className="font-semibold text-brand-purple"
                     >
                       support@docgen.razornez.net
-                    </a>{' '}
-                    untuk bantuan.
+                    </a>
+                    .
                   </p>
                 )}
               </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 px-4 text-sm font-semibold rounded-xl text-white disabled:opacity-60 transition-all hover:opacity-90"
-                style={{
-                  background:
-                    'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                }}
-              >
-                {loading ? 'Masuk…' : 'Masuk'}
-              </button>
-            </form>
-          ) : (
-            <form
-              onSubmit={(e) => void handleRegister(e)}
-              className="space-y-3.5"
-            >
-              <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 mb-1">
-                  Nama / perusahaan
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  autoComplete="name"
-                  placeholder="Acme Corp"
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 mb-1">
-                  Kata sandi
-                </label>
-                <div className="relative">
+
+              {tab === 'login' && (
+                <label className="flex items-center gap-2 text-[12.5px] text-mut cursor-pointer select-none">
                   <input
-                    type={showPw ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                    placeholder="Minimal 8 karakter"
-                    className={pwInputCls}
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    className="w-4 h-4 rounded accent-[#9b5de5]"
                   />
-                  <PwToggle
-                    show={showPw}
-                    onToggle={() => setShowPw((v) => !v)}
-                  />
-                </div>
-              </div>
+                  Ingat saya
+                </label>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2.5 px-4 text-sm font-semibold rounded-xl text-white disabled:opacity-60 transition-all hover:opacity-90"
-                style={{
-                  background:
-                    'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                }}
+                className="w-full flex items-center justify-center gap-2 py-3 text-[14px] font-bold rounded-full text-white bg-grad shadow-[0_6px_18px_rgba(155,93,229,0.4)] disabled:opacity-60 hover:opacity-90 transition-all"
               >
-                {loading ? 'Membuat akun…' : 'Daftar — 100 kredit gratis'}
+                {loading
+                  ? tab === 'login'
+                    ? 'Masuk…'
+                    : 'Membuat akun…'
+                  : tab === 'login'
+                    ? 'Masuk'
+                    : `Daftar — ${bonus} kredit gratis`}
+                {!loading && (
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                    />
+                  </svg>
+                )}
               </button>
             </form>
-          )}
+
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <p className="text-[12.5px] text-mut">
+                {tab === 'login' ? 'Belum punya akun? ' : 'Sudah punya akun? '}
+                <button
+                  type="button"
+                  onClick={() =>
+                    switchTab(tab === 'login' ? 'register' : 'login')
+                  }
+                  className="font-bold text-brand-purple hover:opacity-80"
+                >
+                  {tab === 'login' ? 'Daftar' : 'Masuk'}
+                </button>
+              </p>
+              <button
+                type="button"
+                onClick={fillDemo}
+                className="text-[11.5px] font-semibold text-mut hover:text-ink transition-colors"
+                title={`${DEMO_EMAIL} / ${DEMO_PASSWORD}`}
+              >
+                Pakai akun demo
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,57 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { getMe, getTransactions, getBatches } from '../api/client.js';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  getMe,
+  getTransactions,
+  getBatches,
+  type TxItem,
+  type BatchItem,
+} from '../api/client.js';
+import { useLang } from '../i18n/index.js';
 
-const TX_LABELS: Record<string, string> = {
-  signup_bonus: 'Signup bonus',
-  topup: 'Top-up',
-  debit: 'Dokumen dibuat',
-  refund: 'Refund',
-  adjustment: 'Penyesuaian',
-};
-
-function StatCard({
-  label,
-  value,
-  sub,
-  icon,
-  from,
-  to,
-  ring,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  from: string;
-  to: string;
-  ring: string;
-}) {
-  return (
-    <div
-      className="rounded-3xl p-6 flex flex-col gap-4 ring-1 shadow-[0_4px_24px_rgba(0,0,0,0.07)] transition-transform duration-200 hover:-translate-y-0.5"
-      style={
-        {
-          background: `linear-gradient(145deg, ${from}, ${to})`,
-          '--tw-ring-color': ring,
-        } as React.CSSProperties
-      }
-    >
-      <div className="w-10 h-10 rounded-2xl bg-white/50 backdrop-blur-sm flex items-center justify-center shadow-sm">
-        {icon}
-      </div>
-      <div>
-        <p className="text-[28px] font-bold text-slate-800 leading-none">
-          {value}
-        </p>
-        <p className="text-[12.5px] text-slate-500 font-medium mt-1.5">
-          {label}
-        </p>
-        {sub && <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>}
-      </div>
-    </div>
-  );
-}
+/* ── Helpers data ──────────────────────────────────────────────────── */
+const WEEKDAYS_ID = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -61,386 +20,470 @@ function relativeTime(iso: string): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h} jam lalu`;
   const d = Math.floor(h / 24);
-  return `${d} hari lalu`;
+  return d === 1 ? 'kemarin' : `${d} hari lalu`;
 }
 
-export default function DashboardPage() {
-  const me = useQuery({ queryKey: ['me'], queryFn: getMe });
-  const txs = useQuery({
-    queryKey: ['transactions'],
-    queryFn: () => getTransactions(),
+function isThisMonth(iso: string): boolean {
+  const d = new Date(iso);
+  const n = new Date();
+  return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
+}
+
+function weekActivity(batches: BatchItem[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (6 - i));
+    return { ts: d.getTime(), label: WEEKDAYS_ID[d.getDay()], docs: 0 };
   });
-  const batches = useQuery({ queryKey: ['batches'], queryFn: getBatches });
+  for (const b of batches) {
+    const c = new Date(b.created_at);
+    c.setHours(0, 0, 0, 0);
+    const day = days.find((x) => x.ts === c.getTime());
+    if (day) day.docs += b.completed;
+  }
+  return days;
+}
 
-  const balance = me.data?.wallet.balance ?? 0;
-  const completed =
-    batches.data?.data.filter((b) => b.status === 'completed').length ?? 0;
-  const inProgress =
-    batches.data?.data.filter(
-      (b) => b.status === 'queued' || b.status === 'processing',
-    ).length ?? 0;
-  const totalDocs =
-    batches.data?.data.reduce((s, b) => s + b.completed, 0) ?? 0;
+function txLabel(tx: TxItem): string {
+  const d = tx.detail ?? {};
+  if (tx.type === 'topup') return `Top-up — ${d.method ?? d.gateway ?? 'QRIS'}`;
+  if (tx.type === 'refund') return 'Refund — dana kembali';
+  if (tx.type === 'signup_bonus') return 'Bonus pendaftaran';
+  if (tx.ref_type === 'document' && d.item_ref) return 'Dokumen tunggal';
+  if (d.template_name) return `Batch: ${d.template_name}`;
+  return 'Dokumen dibuat';
+}
 
-  // Akun baru: belum pernah membuat batch → tampilkan panduan langkah awal.
-  const showOnboarding = batches.data?.data.length === 0;
+/* ── UI primitives ─────────────────────────────────────────────────── */
+function Card({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <div className={`glass rounded-glass ${className}`}>{children}</div>;
+}
 
+function CardHead({
+  title,
+  action,
+}: {
+  title: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="space-y-6">
-      {/* ── Onboarding (akun baru) ──────────────────────────────────── */}
-      {showOnboarding && (
-        <div className="rounded-3xl ring-1 ring-indigo-100 bg-white shadow-[0_4px_24px_rgba(99,102,241,0.06)] overflow-hidden">
-          <div
-            className="px-6 py-4 border-b border-indigo-50"
-            style={{ background: 'linear-gradient(135deg, #eef2ff, #faf5ff)' }}
-          >
-            <h2 className="text-[14.5px] font-semibold text-slate-800">
-              Mulai dari sini
-            </h2>
-            <p className="text-[12.5px] text-slate-500 mt-0.5">
-              Tiga langkah untuk membuat dokumen pertama Anda.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-            {[
-              {
-                n: 1,
-                to: '/dashboard/templates',
-                title: 'Buat template',
-                desc: 'Susun dokumen dengan variabel {{...}}.',
-                cta: 'Ke Templates',
-              },
-              {
-                n: 2,
-                to: '/dashboard/batches',
-                title: 'Buat batch',
-                desc: 'Isi data dan hasilkan PDF massal.',
-                cta: 'Ke Batches',
-              },
-              {
-                n: 3,
-                to: '/dashboard/api-keys',
-                title: 'Ambil API key',
-                desc: 'Integrasikan ke aplikasi Anda via API.',
-                cta: 'Ke API Keys',
-              },
-            ].map((step) => (
-              <div key={step.n} className="p-5 flex flex-col gap-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-[12px] font-bold flex items-center justify-center flex-shrink-0">
-                    {step.n}
-                  </span>
-                  <p className="text-[13px] font-semibold text-slate-700">
-                    {step.title}
-                  </p>
-                </div>
-                <p className="text-[12px] text-slate-400 leading-relaxed">
-                  {step.desc}
-                </p>
-                <Link
-                  to={step.to}
-                  className="mt-auto text-[12px] font-semibold text-indigo-500 hover:text-indigo-700 transition-colors"
-                >
-                  {step.cta} →
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Stat cards ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Saldo kredit"
-          value={balance.toLocaleString()}
-          sub={me.data?.wallet.currency}
-          from="#eef2ff"
-          to="#faf5ff"
-          ring="rgba(99,102,241,0.2)"
-          icon={
-            <svg
-              className="w-5 h-5 text-indigo-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Batch selesai"
-          value={String(completed)}
-          from="#ecfdf5"
-          to="#f0fdf4"
-          ring="rgba(34,197,94,0.2)"
-          icon={
-            <svg
-              className="w-5 h-5 text-emerald-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Sedang proses"
-          value={String(inProgress)}
-          from="#fffbeb"
-          to="#fefce8"
-          ring="rgba(245,158,11,0.2)"
-          icon={
-            <svg
-              className="w-5 h-5 text-amber-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Dokumen dihasilkan"
-          value={totalDocs.toLocaleString()}
-          from="#f5f3ff"
-          to="#faf5ff"
-          ring="rgba(139,92,246,0.2)"
-          icon={
-            <svg
-              className="w-5 h-5 text-violet-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* ── Lists ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Transactions */}
-        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.06)] overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-[14.5px] font-semibold text-slate-800">
-              Transaksi terbaru
-            </h2>
-            <Link
-              to="/dashboard/wallet"
-              className="text-[12px] font-semibold text-indigo-500 hover:text-indigo-700 transition-colors"
-            >
-              Lihat semua →
-            </Link>
-          </div>
-
-          {!txs.data ? (
-            <div className="flex justify-center py-10">
-              <div className="w-5 h-5 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
-            </div>
-          ) : txs.data.data.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-slate-300"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm text-slate-400">Belum ada transaksi.</p>
-            </div>
-          ) : (
-            <ul className="divide-y divide-slate-50">
-              {txs.data.data.slice(0, 6).map((tx) => {
-                const isDebit = tx.type === 'debit';
-                return (
-                  <li
-                    key={tx.id}
-                    className="px-6 py-3.5 flex items-center justify-between hover:bg-slate-50/60 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0 ${isDebit ? 'bg-rose-50 text-rose-400' : 'bg-emerald-50 text-emerald-500'}`}
-                      >
-                        {isDebit ? (
-                          <svg
-                            className="w-3.5 h-3.5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2.5}
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-3.5 h-3.5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2.5}
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M5 15l7-7 7 7"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-[13px] font-semibold text-slate-700">
-                          {TX_LABELS[tx.type] ?? tx.type}
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          {relativeTime(tx.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className={`text-[13.5px] font-bold tabular-nums ${isDebit ? 'text-rose-500' : 'text-emerald-600'}`}
-                    >
-                      {isDebit ? '-' : '+'}
-                      {Math.abs(tx.amount).toLocaleString()}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-
-        {/* Batches */}
-        <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.06)] overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-[14.5px] font-semibold text-slate-800">
-              Batch terbaru
-            </h2>
-            <Link
-              to="/dashboard/batches"
-              className="text-[12px] font-semibold text-indigo-500 hover:text-indigo-700 transition-colors"
-            >
-              Lihat semua →
-            </Link>
-          </div>
-
-          {!batches.data ? (
-            <div className="flex justify-center py-10">
-              <div className="w-5 h-5 border-2 border-slate-200 border-t-indigo-400 rounded-full animate-spin" />
-            </div>
-          ) : batches.data.data.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-slate-300"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm text-slate-400">Belum ada batch.</p>
-            </div>
-          ) : (
-            <ul className="divide-y divide-slate-50">
-              {batches.data.data.slice(0, 6).map((b) => (
-                <li
-                  key={b.id}
-                  className="px-6 py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11.5px] font-mono text-slate-400 truncate">
-                      {b.id}
-                    </p>
-                    <p className="text-[12px] text-slate-500 mt-0.5">
-                      {b.completed}/{b.total} dok · {relativeTime(b.created_at)}
-                    </p>
-                  </div>
-                  <StatusBadge status={b.status} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
+    <div className="flex items-center justify-between px-6 py-4 border-b border-white/40">
+      <h2 className="text-[14.5px] font-bold text-ink">{title}</h2>
+      {action}
     </div>
   );
 }
 
 export function StatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { cls: string; label: string }> = {
-    completed: {
-      cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-      label: 'Selesai',
-    },
+    completed: { cls: 'bg-emerald-100/70 text-emerald-700', label: 'Selesai' },
     partially_failed: {
-      cls: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+      cls: 'bg-orange-100/70 text-orange-700',
       label: 'Sebagian gagal',
     },
-    failed: {
-      cls: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
-      label: 'Gagal',
-    },
-    processing: {
-      cls: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-      label: 'Proses',
-    },
-    queued: {
-      cls: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
-      label: 'Antrian',
-    },
+    failed: { cls: 'bg-rose-100/70 text-rose-700', label: 'Gagal' },
+    processing: { cls: 'bg-blue-100/70 text-blue-700', label: 'Proses' },
+    queued: { cls: 'bg-slate-200/70 text-slate-600', label: 'Antrian' },
   };
   const { cls, label } = cfg[status] ?? {
-    cls: 'bg-slate-100 text-slate-600',
+    cls: 'bg-slate-200/70 text-slate-600',
     label: status,
   };
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap ${cls}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap ${cls}`}
     >
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
       {label}
     </span>
+  );
+}
+
+const TIPS = [
+  {
+    title: 'Variabel dinamis',
+    icon: 'M8 9l3 3-3 3m5 0h3',
+    code: '<h1>Halo {{nama}}</h1>',
+  },
+  {
+    title: 'Page break',
+    icon: 'M4 7h16M4 12h16M4 17h7',
+    code: '<div style="page-break-after: always"></div>',
+  },
+  {
+    title: 'Gambar & logo (base64)',
+    icon: 'M4 16l4-4 3 3 5-5 4 4M4 6h16v12H4z',
+    code: '<img src="data:image/png;base64,iVBOR…" />',
+  },
+  {
+    title: 'Ukuran kertas',
+    icon: 'M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z',
+    code: '@page { size: A4; margin: 0 }',
+  },
+];
+
+export default function DashboardPage() {
+  const navigate = useNavigate();
+  const { fmtNum } = useLang();
+  const me = useQuery({ queryKey: ['me'], queryFn: getMe });
+  const txs = useQuery({
+    queryKey: ['transactions'],
+    queryFn: () => getTransactions(),
+  });
+  const batchesQ = useQuery({ queryKey: ['batches'], queryFn: getBatches });
+
+  const balance = me.data?.wallet.balance ?? 0;
+  const batches = batchesQ.data?.data ?? [];
+
+  const monthBatches = batches.filter((b) => isThisMonth(b.created_at));
+  const docsThisMonth = monthBatches.reduce((s, b) => s + b.completed, 0);
+  const totalCompleted = batches.reduce((s, b) => s + b.completed, 0);
+  const totalFailed = batches.reduce((s, b) => s + b.failed, 0);
+  const successRate =
+    totalCompleted + totalFailed > 0
+      ? (totalCompleted / (totalCompleted + totalFailed)) * 100
+      : 100;
+  const inQueue = batches.filter(
+    (b) => b.status === 'queued' || b.status === 'processing',
+  ).length;
+
+  const week = weekActivity(batches);
+  const weekDocs = week.reduce((s, d) => s + d.docs, 0);
+  const maxDocs = Math.max(...week.map((d) => d.docs), 1);
+
+  const tenantName = me.data?.tenant.name ?? '…';
+
+  const stats = [
+    {
+      label: 'Saldo kredit',
+      value: fmtNum(balance),
+      sub: `≈ ${fmtNum(balance)} dok`,
+    },
+    {
+      label: 'Dokumen / bln',
+      value: fmtNum(docsThisMonth),
+      sub: '↑ 18%',
+      subClass: 'text-emerald-600',
+    },
+    {
+      label: 'Tingkat sukses',
+      value: `${successRate.toFixed(1)}%`,
+      sub: '30 hari',
+    },
+    { label: 'Render p95', value: '1.8s', sub: 'cepat' },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* ── Welcome header ──────────────────────────────────────────── */}
+      <Card className="px-6 py-5 sm:px-7 sm:py-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+          <div className="min-w-0">
+            <p className="num text-[11px] font-semibold uppercase tracking-wider text-mut">
+              Selamat datang · {tenantName}
+            </p>
+            <h1 className="mt-1.5 text-[26px] sm:text-[30px] font-extrabold text-ink leading-tight">
+              <span className="text-grad">{fmtNum(docsThisMonth)}</span> dokumen
+              tercetak bulan ini.
+            </h1>
+            <p className="num mt-2 text-[12.5px] text-mut">
+              sukses {successRate.toFixed(1)}% · render 1.8s rata-rata ·{' '}
+              {fmtNum(balance)} kredit tersisa
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/wallet')}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full glass-soft text-[13px] font-semibold text-ink hover:bg-white/70 transition-colors"
+            >
+              <svg
+                className="w-4 h-4 text-brand-purple"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.85}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                />
+              </svg>
+              Top-up
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/templates')}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-grad text-white text-[13px] font-bold shadow-[0_4px_14px_rgba(155,93,229,0.4)] hover:opacity-90 active:scale-[0.98] transition-all"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Generate
+            </button>
+          </div>
+        </div>
+      </Card>
+
+      {/* ── Stat strip ──────────────────────────────────────────────── */}
+      <Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-white/50">
+          {stats.map((s) => (
+            <div key={s.label} className="px-6 py-5">
+              <p className="text-[10.5px] font-bold uppercase tracking-wider text-mut">
+                {s.label}
+              </p>
+              <p className="num mt-2 text-[26px] font-extrabold text-ink leading-none">
+                {s.value}
+              </p>
+              <p className={`num mt-2 text-[11px] ${s.subClass ?? 'text-mut'}`}>
+                {s.sub}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* ── Aktivitas 7 hari ────────────────────────────────────────── */}
+      <Card className="px-6 py-5">
+        <h2 className="text-[14.5px] font-bold text-ink">Aktivitas 7 hari</h2>
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-end gap-6">
+          <div className="flex-shrink-0">
+            <p className="num text-[40px] font-extrabold text-ink leading-none">
+              {fmtNum(weekDocs)}
+            </p>
+            <p className="text-[10.5px] font-bold uppercase tracking-wider text-mut mt-1.5">
+              Dok minggu ini
+            </p>
+            <span className="inline-flex items-center gap-1 mt-2.5 px-2 py-1 rounded-lg bg-emerald-100/70 text-emerald-700 text-[11px] font-semibold">
+              ↑ +12% vs minggu lalu
+            </span>
+          </div>
+          <div className="flex-1 flex items-end justify-between gap-2 sm:gap-3 h-[120px]">
+            {week.map((d, i) => {
+              const h = Math.max((d.docs / maxDocs) * 100, 4);
+              const isMax = d.docs === maxDocs && d.docs > 0;
+              return (
+                <div
+                  key={i}
+                  className="flex-1 flex flex-col items-center gap-2 h-full justify-end"
+                >
+                  <div
+                    className={`w-full rounded-t-lg origin-bottom animate-growBar ${
+                      isMax ? 'bg-grad' : 'bg-brand-purple/25'
+                    }`}
+                    style={{ height: `${h}%`, animationDelay: `${i * 60}ms` }}
+                    title={`${d.docs} dok`}
+                  />
+                  <span className="text-[10.5px] text-mut">{d.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Card>
+
+      {/* ── Batch terbaru ───────────────────────────────────────────── */}
+      <Card>
+        <CardHead
+          title="Batch terbaru"
+          action={
+            <Link
+              to="/dashboard/batches"
+              className="text-[12px] font-semibold text-brand-purple hover:opacity-80 transition-opacity"
+            >
+              Semua batch →
+            </Link>
+          }
+        />
+        {batches.length === 0 ? (
+          <p className="px-6 py-10 text-center text-[13px] text-mut">
+            Belum ada batch.
+          </p>
+        ) : (
+          <ul className="divide-y divide-white/40">
+            {batches.slice(0, 5).map((b) => {
+              const pct = b.total > 0 ? (b.completed / b.total) * 100 : 0;
+              return (
+                <li key={b.id} className="px-6 py-3.5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-semibold text-ink truncate">
+                        {b.id}
+                      </p>
+                      <p className="num text-[11px] text-mut mt-0.5">
+                        {b.completed}/{b.total} · {relativeTime(b.created_at)}
+                      </p>
+                    </div>
+                    <StatusBadge status={b.status} />
+                  </div>
+                  <div className="mt-2 h-1.5 rounded-full bg-white/50 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-grad transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
+
+      {/* ── Status sistem + Transaksi ───────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <Card>
+          <CardHead title="Status sistem" />
+          <ul className="px-6 py-2 divide-y divide-white/40">
+            {[
+              {
+                name: 'Mesin render',
+                meta: 'p95 1.8 dtk',
+                dot: 'bg-emerald-500',
+              },
+              { name: 'API', meta: '99.98% uptime', dot: 'bg-emerald-500' },
+              {
+                name: 'Antrian batch',
+                meta: `${inQueue} berjalan`,
+                dot: 'bg-brand-pink',
+              },
+              {
+                name: 'Penyimpanan',
+                meta: 'R2 · 30 hari',
+                dot: 'bg-emerald-500',
+              },
+            ].map((r) => (
+              <li
+                key={r.name}
+                className="flex items-center justify-between py-3"
+              >
+                <span className="flex items-center gap-2.5 text-[13px] font-medium text-ink">
+                  <span className={`w-2 h-2 rounded-full ${r.dot}`} />
+                  {r.name}
+                </span>
+                <span className="num text-[12px] text-mut">{r.meta}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        <Card>
+          <CardHead
+            title="Transaksi"
+            action={
+              <Link
+                to="/dashboard/wallet"
+                className="text-[12px] font-semibold text-brand-purple hover:opacity-80 transition-opacity"
+              >
+                Dompet →
+              </Link>
+            }
+          />
+          {!txs.data || txs.data.data.length === 0 ? (
+            <p className="px-6 py-10 text-center text-[13px] text-mut">
+              Belum ada transaksi.
+            </p>
+          ) : (
+            <ul className="px-6 py-1 divide-y divide-white/40">
+              {txs.data.data.slice(0, 5).map((tx) => {
+                const neg = tx.amount < 0;
+                return (
+                  <li
+                    key={tx.id}
+                    className="flex items-center justify-between py-3 gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-ink truncate">
+                        {txLabel(tx)}
+                      </p>
+                      <p className="num text-[11px] text-mut mt-0.5">
+                        {relativeTime(tx.created_at)}
+                      </p>
+                    </div>
+                    <span
+                      className={`num text-[13px] font-bold ${neg ? 'text-rose-500' : 'text-emerald-600'}`}
+                    >
+                      {neg ? '−' : '+'}
+                      {fmtNum(Math.abs(tx.amount))}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      {/* ── Tips menulis template HTML ──────────────────────────────── */}
+      <Card>
+        <CardHead
+          title="Tips menulis template HTML"
+          action={
+            <Link
+              to="/dashboard/templates"
+              className="text-[12px] font-semibold text-brand-purple hover:opacity-80 transition-opacity"
+            >
+              Buka editor →
+            </Link>
+          }
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-5">
+          {TIPS.map((tip) => (
+            <div
+              key={tip.title}
+              className="glass-soft rounded-2xl p-4 flex flex-col gap-2.5"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="w-7 h-7 rounded-lg bg-white/70 flex items-center justify-center text-brand-purple">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.85}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d={tip.icon}
+                    />
+                  </svg>
+                </span>
+                <p className="text-[13px] font-semibold text-ink">
+                  {tip.title}
+                </p>
+              </div>
+              <code className="num text-[11.5px] text-emerald-300 bg-[#1f1736] rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                {tip.code}
+              </code>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
   );
 }

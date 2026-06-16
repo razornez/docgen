@@ -1,19 +1,152 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getApiKeys, createApiKey, revokeApiKey } from '../api/client.js';
+import {
+  getApiKeys,
+  createApiKey,
+  revokeApiKey,
+  type ApiKeyItem,
+} from '../api/client.js';
 import ConfirmModal from '../components/ConfirmModal.js';
 import { formatDate } from '../lib/format.js';
 
-const inputCls =
-  'bg-white ring-1 ring-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all';
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'baru saja';
+  if (m < 60) return `${m} menit lalu`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} jam lalu`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'kemarin' : `${d} hari lalu`;
+}
+
+function KeyRow({
+  k,
+  onCopy,
+  copied,
+  onRevoke,
+}: {
+  k: ApiKeyItem;
+  onCopy: () => void;
+  copied: boolean;
+  onRevoke: () => void;
+}) {
+  const live = k.mode === 'live';
+  const revoked = k.status !== 'active';
+  return (
+    <div
+      className={`flex items-center gap-4 px-6 py-4 ${revoked ? 'opacity-50' : ''}`}
+    >
+      <div
+        className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${live ? 'bg-emerald-100/70 text-emerald-600' : 'bg-blue-100/70 text-blue-600'}`}
+      >
+        <svg
+          className="w-4.5 h-4.5"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.85}
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+          />
+        </svg>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="num text-[13.5px] font-semibold text-ink truncate">
+            {k.prefix}····{k.last4}
+          </p>
+          <span
+            className={`text-[9.5px] font-bold tracking-wide px-1.5 py-0.5 rounded uppercase ${live ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}
+          >
+            {k.mode}
+          </span>
+        </div>
+        <p className="num text-[11px] text-mut mt-0.5">
+          Dibuat {formatDate(k.created_at)}
+          {k.last_used_at
+            ? ` · ${relativeTime(k.last_used_at)} dipakai`
+            : ' · belum dipakai'}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onCopy}
+        aria-label="Salin referensi key"
+        title="Salin referensi key"
+        className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-ink transition-colors flex-shrink-0"
+      >
+        {copied ? (
+          <svg
+            className="w-4 h-4 text-emerald-500"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        ) : (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.85}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M8 8V5a2 2 0 012-2h9a2 2 0 012 2v9a2 2 0 01-2 2h-3M5 8h9a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2v-9a2 2 0 012-2z"
+            />
+          </svg>
+        )}
+      </button>
+      {!revoked && (
+        <button
+          type="button"
+          onClick={onRevoke}
+          aria-label="Cabut key"
+          title="Cabut key"
+          className="w-8 h-8 rounded-lg glass-soft flex items-center justify-center text-mut hover:text-rose-500 transition-colors flex-shrink-0"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.85}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function ApiKeysPage() {
   const qc = useQueryClient();
   const keys = useQuery({ queryKey: ['api-keys'], queryFn: getApiKeys });
 
+  const [showForm, setShowForm] = useState(false);
   const [mode, setMode] = useState<'live' | 'test'>('live');
   const [newKey, setNewKey] = useState('');
   const [createError, setCreateError] = useState('');
+  const [copied, setCopied] = useState('');
   const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
 
   const create = useMutation({
@@ -21,6 +154,7 @@ export default function ApiKeysPage() {
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ['api-keys'] });
       setNewKey(data.api_key.key);
+      setShowForm(false);
     },
     onError: (e) => setCreateError(e instanceof Error ? e.message : 'Gagal'),
   });
@@ -30,182 +164,121 @@ export default function ApiKeysPage() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['api-keys'] }),
   });
 
-  function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setCreateError('');
-    setNewKey('');
-    create.mutate({ mode });
+  function copyRef(k: ApiKeyItem) {
+    void navigator.clipboard?.writeText(`${k.prefix}····${k.last4}`);
+    setCopied(k.id);
+    window.setTimeout(() => setCopied(''), 1200);
   }
 
+  const list = keys.data?.data ?? [];
+  const activeCount = list.filter((k) => k.status === 'active').length;
+
   return (
-    <div className="space-y-6 max-w-4xl">
-      {/* Create key card */}
-      <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] p-6">
-        <h2 className="text-[14.5px] font-semibold text-slate-800 mb-5">
-          Buat API key baru
-        </h2>
-        <form
-          onSubmit={handleCreate}
-          className="flex flex-wrap items-end gap-4"
-        >
+    <div className="space-y-5 max-w-4xl">
+      <div className="glass rounded-glass overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 px-6 py-5">
           <div>
-            <label className="block text-[12.5px] font-semibold text-slate-600 mb-1.5">
-              Mode
-            </label>
-            <select
-              value={mode}
-              onChange={(e) => setMode(e.target.value as 'live' | 'test')}
-              className={inputCls}
-            >
-              <option value="live">Live (sk_live_…)</option>
-              <option value="test">Test (sk_test_…)</option>
-            </select>
+            <h1 className="text-[17px] font-bold text-ink">API Keys</h1>
+            <p className="text-[12.5px] text-mut mt-0.5">
+              Kunci untuk integrasi server-ke-server. Jaga kerahasiaannya.
+            </p>
           </div>
           <button
-            type="submit"
-            disabled={create.isPending}
-            className="px-5 py-2.5 text-sm font-semibold rounded-2xl text-white disabled:opacity-50 transition-all hover:opacity-90 active:scale-[0.98] shadow-md shadow-indigo-200"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+            type="button"
+            onClick={() => {
+              setShowForm((v) => !v);
+              setNewKey('');
+              setCreateError('');
+            }}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-grad text-white text-[12.5px] font-bold shadow-[0_4px_14px_rgba(155,93,229,0.4)] hover:opacity-90 active:scale-[0.98] transition-all flex-shrink-0"
           >
-            {create.isPending ? 'Membuat…' : 'Buat key'}
-          </button>
-        </form>
-
-        {createError && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-2xl px-4 py-3">
             <svg
-              className="w-4 h-4 flex-shrink-0"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={2.5}
               viewBox="0 0 24 24"
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                d="M12 4v16m8-8H4"
               />
             </svg>
-            {createError}
+            Buat API key
+          </button>
+        </div>
+
+        {/* Create form (inline) */}
+        {showForm && (
+          <div className="mx-6 mb-4 p-4 rounded-2xl glass-soft flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-[11.5px] font-semibold text-ink mb-1.5">
+                Mode
+              </label>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as 'live' | 'test')}
+                className="glass-soft rounded-xl px-3 py-2 text-[13px] text-ink focus:outline-none"
+              >
+                <option value="live">Live (produksi)</option>
+                <option value="test">Test (uji coba)</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setCreateError('');
+                create.mutate({ mode });
+              }}
+              disabled={create.isPending}
+              className="px-4 py-2 rounded-full bg-grad text-white text-[12.5px] font-bold disabled:opacity-50 hover:opacity-90 transition-opacity"
+            >
+              {create.isPending ? 'Membuat…' : 'Buat key'}
+            </button>
+            {createError && (
+              <span className="text-[12px] text-rose-600">{createError}</span>
+            )}
           </div>
         )}
 
+        {/* New key reveal (once) */}
         {newKey && (
           <div
-            className="mt-5 rounded-2xl p-4 ring-1 ring-amber-200"
-            style={{ background: 'linear-gradient(135deg, #fffbeb, #fefce8)' }}
+            className="mx-6 mb-4 rounded-2xl p-4 ring-1 ring-amber-200"
+            style={{ background: 'linear-gradient(135deg,#fffbeb,#fefce8)' }}
           >
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-                <svg
-                  className="w-4 h-4 text-amber-600"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[13px] font-semibold text-amber-800 mb-1.5">
-                  Simpan key ini sekarang — tidak akan ditampilkan lagi.
-                </p>
-                <code className="text-[12px] font-mono text-amber-900 break-all bg-amber-100/60 rounded-xl px-3 py-2 block">
-                  {newKey}
-                </code>
-              </div>
-            </div>
+            <p className="text-[12.5px] font-semibold text-amber-800 mb-1.5">
+              Simpan key ini sekarang — tidak akan ditampilkan lagi.
+            </p>
+            <code className="num text-[12px] text-amber-900 break-all bg-amber-100/60 rounded-xl px-3 py-2 block">
+              {newKey}
+            </code>
           </div>
         )}
-      </div>
 
-      {/* Keys list */}
-      <div className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h2 className="text-[14.5px] font-semibold text-slate-800">
-            API Keys
-          </h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[11px] text-slate-400 uppercase tracking-wider text-left border-b border-slate-100">
-                <th className="px-6 py-3 font-semibold">Key</th>
-                <th className="px-6 py-3 font-semibold">Mode</th>
-                <th className="px-6 py-3 font-semibold">Status</th>
-                <th className="px-6 py-3 font-semibold">Terakhir dipakai</th>
-                <th className="px-6 py-3 font-semibold">Dibuat</th>
-                <th className="px-6 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {keys.data?.data.map((k) => (
-                <tr
-                  key={k.id}
-                  className={`hover:bg-slate-50/60 transition-colors ${k.status === 'revoked' ? 'opacity-40' : ''}`}
-                >
-                  <td className="px-6 py-3.5 font-mono text-[12px] text-slate-600">
-                    {k.prefix}…{k.last4}
-                  </td>
-                  <td className="px-6 py-3.5">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ring-1 ${
-                        k.mode === 'live'
-                          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                          : 'bg-blue-50 text-blue-700 ring-blue-200'
-                      }`}
-                    >
-                      {k.mode}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3.5">
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-[12.5px] font-medium ${k.status === 'active' ? 'text-emerald-600' : 'text-slate-400'}`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${k.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                      />
-                      {k.status === 'active' ? 'Aktif' : 'Direvoke'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3.5 text-slate-400">
-                    {k.last_used_at
-                      ? formatDate(k.last_used_at)
-                      : 'Belum pernah'}
-                  </td>
-                  <td className="px-6 py-3.5 text-slate-400">
-                    {formatDate(k.created_at)}
-                  </td>
-                  <td className="px-6 py-3.5 text-right">
-                    {k.status === 'active' && (
-                      <button
-                        type="button"
-                        onClick={() => setRevokeTarget(k.id)}
-                        className="text-[12px] font-semibold text-rose-400 hover:text-rose-600 transition-colors px-3 py-1 rounded-xl hover:bg-rose-50"
-                      >
-                        Cabut
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {keys.data?.data.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-12 text-center text-slate-400 text-sm"
-                  >
-                    Belum ada API key.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <p className="px-6 text-[10.5px] font-bold uppercase tracking-wider text-mut">
+          {activeCount} kunci aktif
+        </p>
+
+        {/* Keys list */}
+        <div className="mt-2 divide-y divide-white/40 border-t border-white/40">
+          {list.length === 0 ? (
+            <p className="px-6 py-10 text-center text-[13px] text-mut">
+              Belum ada API key.
+            </p>
+          ) : (
+            list.map((k) => (
+              <KeyRow
+                key={k.id}
+                k={k}
+                copied={copied === k.id}
+                onCopy={() => copyRef(k)}
+                onRevoke={() => setRevokeTarget(k.id)}
+              />
+            ))
+          )}
         </div>
       </div>
 

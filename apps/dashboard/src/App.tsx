@@ -6,6 +6,9 @@ import Layout from './components/Layout.js';
 import LandingPage from './pages/Landing.js';
 import LoginPage from './pages/Login.js';
 import AuthCallbackPage from './pages/AuthCallback.js';
+import OwnerLoginPage from './pages/owner/OwnerLogin.js';
+import OwnerLayout from './pages/owner/OwnerLayout.js';
+import { getOwnerToken } from './api/client.js';
 
 // Halaman terproteksi di-load lazy (code-splitting) — memangkas bundle awal.
 // Yang terberat (Templates + RichEditor) hanya diunduh saat dibuka.
@@ -16,10 +19,25 @@ const BatchesPage = lazy(() => import('./pages/Batches.js'));
 const ApiKeysPage = lazy(() => import('./pages/ApiKeys.js'));
 const WebhooksPage = lazy(() => import('./pages/Webhooks.js'));
 const AdminPage = lazy(() => import('./pages/admin/AdminOverview.js'));
+const OwnerConsolePage = lazy(() => import('./pages/admin/OwnerConsole.js'));
+const OwnerTenantsPage = lazy(() => import('./pages/owner/OwnerTenants.js'));
+const OwnerRenderPage = lazy(() => import('./pages/owner/OwnerSystem.js'));
+const OwnerBillingPage = lazy(() => import('./pages/owner/OwnerBilling.js'));
+const OwnerHealthPage = lazy(() => import('./pages/owner/OwnerHealth.js'));
+const OwnerSettingsPage = lazy(() => import('./pages/owner/OwnerSettings.js'));
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   return token ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+/** Gerbang area OWNER — pakai token owner terpisah (bukan token tenant). */
+function RequireOwner({ children }: { children: React.ReactNode }) {
+  return getOwnerToken() ? (
+    <>{children}</>
+  ) : (
+    <Navigate to="/owner/login" replace />
+  );
 }
 
 /** Halaman 404 ber-UI (bukan JSON mentah) untuk rute yang tidak dikenal. */
@@ -79,7 +97,7 @@ function PageLoader() {
 
 export default function App() {
   return (
-    <BrowserRouter basename="/app">
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -149,6 +167,67 @@ export default function App() {
             }
           />
         </Route>
+
+        {/* ── Owner platform (auth & layout terpisah) ─────────────── */}
+        <Route path="/owner/login" element={<OwnerLoginPage />} />
+        <Route
+          path="/owner"
+          element={
+            <RequireOwner>
+              <OwnerLayout />
+            </RequireOwner>
+          }
+        >
+          <Route
+            index
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <OwnerConsolePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="tenants"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <OwnerTenantsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="render"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <OwnerRenderPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="billing"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <OwnerBillingPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="health"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <OwnerHealthPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <OwnerSettingsPage />
+              </Suspense>
+            }
+          />
+        </Route>
+
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

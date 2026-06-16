@@ -5,51 +5,69 @@ import {
   getTransactions,
   getPackages,
   getPaymentMethods,
+  getBatches,
+  getMe,
   createTopup,
   confirmTopup,
   type TxItem,
 } from '../api/client.js';
-import { formatDateTime } from '../lib/format.js';
+import { useLang } from '../i18n/index.js';
 
-const TX_LABELS: Record<string, string> = {
-  signup_bonus: 'Signup bonus',
+/* ── Helpers ───────────────────────────────────────────────────────── */
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'baru saja';
+  if (m < 60) return `${m} menit lalu`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} jam lalu`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'kemarin' : `${d} hari lalu`;
+}
+
+function isThisMonth(iso: string): boolean {
+  const d = new Date(iso);
+  const n = new Date();
+  return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
+}
+
+const CAT_LABEL: Record<string, string> = {
   topup: 'Top-up',
-  debit: 'Dokumen dibuat',
+  debit: 'Pemakaian',
   refund: 'Refund',
+  signup_bonus: 'Bonus',
   adjustment: 'Penyesuaian',
 };
 
-const GATEWAY_LABELS: Record<string, string> = {
-  kasugai: 'Kasugai',
-  midtrans: 'Midtrans',
-  xendit: 'Xendit',
-};
-
-/** Baris detail manusiawi per transaksi (metode bayar, ref, template, dll). */
-function txDetailText(tx: TxItem): string {
+/** Judul transaksi manusiawi, mis. "Batch — Slip gaji Juni". */
+function txTitle(tx: TxItem): string {
   const d = tx.detail ?? {};
-  if (tx.type === 'topup') {
-    const parts: string[] = [];
-    if (d.gateway) parts.push(GATEWAY_LABELS[d.gateway] ?? d.gateway);
-    if (d.method) parts.push(d.method);
-    if (typeof d.amount_idr === 'number')
-      parts.push('Rp ' + d.amount_idr.toLocaleString('id-ID'));
-    if (d.payment_ref) parts.push(d.payment_ref);
-    return parts.join(' · ');
-  }
-  if (tx.ref_type === 'document') {
-    const parts: string[] = [];
-    if (d.template_name) parts.push(d.template_name);
-    if (typeof d.batch_total === 'number')
-      parts.push(`${d.batch_total} dokumen`);
-    if (d.item_ref) parts.push(`ref: ${d.item_ref}`);
-    parts.push(d.batch_id ?? d.document_id ?? tx.ref_id);
-    return parts.join(' · ');
-  }
-  if (tx.type === 'signup_bonus') return 'Bonus pendaftaran akun';
-  return tx.ref_id;
+  if (tx.type === 'topup') return `Top-up — ${d.method ?? d.gateway ?? 'QRIS'}`;
+  if (tx.type === 'refund')
+    return `Refund — ${(d as { reason?: string }).reason ?? 'dana kembali'}`;
+  if (tx.type === 'signup_bonus') return 'Bonus pendaftaran';
+  if (d.item_ref) return `Dokumen tunggal — ${d.template_name ?? 'Invoice'}`;
+  if (d.template_name) return `Batch — ${d.template_name}`;
+  return 'Dokumen dibuat';
 }
 
+const FILTERS = [
+  { key: 'all', label: 'Semua' },
+  { key: 'topup', label: 'Top-up' },
+  { key: 'debit', label: 'Pemakaian' },
+  { key: 'refund', label: 'Refund' },
+] as const;
+type FilterKey = (typeof FILTERS)[number]['key'];
+
+// Fallback bila endpoint metode bayar belum tersedia (mis. Midtrans belum
+// dikonfigurasi di lingkungan ini) — agar segmented tetap tampil.
+const FALLBACK_METHODS = [
+  { code: 'midtrans_qris', name: 'QRIS' },
+  { code: 'midtrans_va', name: 'Virtual Account' },
+  { code: 'midtrans_ewallet', name: 'E-Wallet' },
+];
+
+/* ── Snap (Kasugai/Midtrans) — JANGAN diubah ───────────────────────── */
 interface SnapCallbacks {
   onSuccess?: (result: unknown) => void;
   onPending?: (result: unknown) => void;
@@ -65,11 +83,6 @@ declare global {
   }
 }
 
-/**
- * Muat script Midtrans Snap (snap.js) secara dinamis dengan client key.
- * Sandbox vs produksi dideteksi dari prefix client key: 'SB-' = sandbox.
- * Mengembalikan window.snap saat siap.
- */
 function loadSnap(clientKey: string): Promise<SnapApi> {
   const isSandbox = clientKey.startsWith('SB-');
   const src = isSandbox
@@ -96,12 +109,13 @@ function loadSnap(clientKey: string): Promise<SnapApi> {
   });
 }
 
-// Polling konfirmasi pembayaran: cek tiap 2 dtk, hingga ~60 dtk (30x).
 const CONFIRM_POLL_INTERVAL_MS = 2000;
 const CONFIRM_POLL_MAX_TRIES = 30;
 
+/* ── UI ────────────────────────────────────────────────────────────── */
 export default function WalletPage() {
   const qc = useQueryClient();
+  const { fmtNum } = useLang();
   const wallet = useQuery({ queryKey: ['wallet'], queryFn: getWallet });
   const txs = useQuery({
     queryKey: ['transactions'],
@@ -112,20 +126,37 @@ export default function WalletPage() {
     queryKey: ['payment-methods'],
     queryFn: getPaymentMethods,
   });
+  const batchesQ = useQuery({ queryKey: ['batches'], queryFn: getBatches });
+  const me = useQuery({ queryKey: ['me'], queryFn: getMe });
 
   const [selectedPkg, setSelectedPkg] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState('');
+  const [filter, setFilter] = useState<FilterKey>('all');
   const [topupError, setTopupError] = useState('');
   const [confirmMsg, setConfirmMsg] = useState('');
   const [confirming, setConfirming] = useState(false);
 
   const pollRef = useRef<number | null>(null);
-
-  // Bersihkan timer polling saat komponen unmount.
   useEffect(() => {
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current);
     };
   }, []);
+
+  const pkgList = packages.data?.data ?? [];
+  const methodList = methods.data?.data?.length
+    ? methods.data.data
+    : FALLBACK_METHODS;
+  const effPkgId = selectedPkg || pkgList[0]?.id || '';
+  const effMethod = selectedMethod || methodList[0]?.code || '';
+  const selPkg = pkgList.find((p) => p.id === effPkgId);
+  const selMethodName =
+    methodList.find((m) => m.code === effMethod)?.name ?? 'QRIS';
+
+  const balance = wallet.data?.balance ?? 0;
+  const usageThisMonth = (batchesQ.data?.data ?? [])
+    .filter((b) => isThisMonth(b.created_at))
+    .reduce((s, b) => s + b.completed, 0);
 
   function refreshWallet() {
     void qc.invalidateQueries({ queryKey: ['wallet'] });
@@ -133,12 +164,6 @@ export default function WalletPage() {
     void qc.invalidateQueries({ queryKey: ['me'] });
   }
 
-  /**
-   * Setelah Snap sukses, konfirmasi cepat ke server (yang cek langsung ke
-   * Kasugai, bukan menunggu webhook). Poll tiap 2 dtk sampai status 'paid'
-   * → saldo masuk hampir seketika. Webhook tetap jadi cadangan (idempoten).
-   * CATATAN: krediting terjadi di SERVER — menutup halaman tak membatalkannya.
-   */
   function pollConfirm(paymentId: string) {
     if (pollRef.current) window.clearInterval(pollRef.current);
     setConfirming(true);
@@ -167,7 +192,7 @@ export default function WalletPage() {
         })
         .catch(() => undefined);
     };
-    tick(); // cek langsung sekali, lalu berkala
+    tick();
     pollRef.current = window.setInterval(tick, CONFIRM_POLL_INTERVAL_MS);
   }
 
@@ -175,7 +200,6 @@ export default function WalletPage() {
     mutationFn: createTopup,
     onSuccess: async (data) => {
       const paymentId = data.payment_id;
-      // Tampilkan widget Snap embedded bila ada snapToken + clientKey.
       if (data.snap_token && data.client_key) {
         try {
           const snap = await loadSnap(data.client_key);
@@ -187,7 +211,7 @@ export default function WalletPage() {
           });
           return;
         } catch {
-          // Fallback ke redirect bila Snap gagal dimuat.
+          /* fallback redirect */
         }
       }
       if (data.payment_url) window.open(data.payment_url, '_blank');
@@ -197,106 +221,156 @@ export default function WalletPage() {
       setTopupError(e instanceof Error ? e.message : 'Top-up gagal'),
   });
 
-  // Klik "Bayar pakai Midtrans" → buat transaksi → tampilkan Snap popup.
-  // Channel ditentukan widget Snap sendiri; kita kirim 1 method valid sbg
-  // syarat API Kasugai (default: method pertama yang aktif).
   function handleTopup() {
-    if (!selectedPkg) return;
+    if (!effPkgId) return;
     setTopupError('');
     setConfirmMsg('');
-    const method = methods.data?.data[0]?.code ?? 'midtrans_qris';
-    topup.mutate({ packageId: selectedPkg, method });
+    topup.mutate({ packageId: effPkgId, method: effMethod || 'midtrans_qris' });
   }
 
+  const allTx = txs.data?.data ?? [];
+  const shownTx =
+    filter === 'all' ? allTx : allTx.filter((t) => t.type === filter);
+
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Balance + Top-up */}
-        <div
-          className="col-span-1 rounded-3xl p-6 ring-1 ring-indigo-100 shadow-[0_4px_32px_rgba(99,102,241,0.08)]"
-          style={{ background: 'linear-gradient(145deg, #eef2ff, #faf5ff)' }}
-        >
-          <p className="text-[12.5px] font-semibold text-indigo-400 uppercase tracking-widest">
-            Saldo tersedia
-          </p>
-          <p className="mt-2 text-5xl font-bold text-slate-900 leading-none">
-            {(wallet.data?.balance ?? 0).toLocaleString()}
-          </p>
-          <p className="text-sm text-slate-400 mt-1.5">credits</p>
+    <div className="mx-auto w-full max-w-[840px] space-y-5">
+      {/* ── Saldo kredit ────────────────────────────────────────────── */}
+      <div className="glass rounded-glass px-6 py-6 sm:px-7">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-mut">
+              Saldo kredit
+            </p>
+            <p className="num mt-2 text-[44px] font-extrabold text-ink leading-none">
+              {fmtNum(balance)}
+              <span className="text-[18px] font-bold text-mut ml-1">
+                kredit
+              </span>
+            </p>
+            <p className="num mt-3 text-[12.5px] text-mut">
+              ≈ {fmtNum(balance)} dokumen · {me.data?.tenant.name ?? '…'}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] text-mut">Pemakaian bln ini</p>
+            <p className="num mt-1 text-[22px] font-bold text-brand-purple">
+              {fmtNum(usageThisMonth)}
+            </p>
+          </div>
+        </div>
+      </div>
 
-          <div className="my-5 h-px bg-indigo-100" />
-
-          <p className="text-[13px] font-semibold text-slate-700 mb-3">
-            Top up kredit
+      {/* ── Isi ulang ───────────────────────────────────────────────── */}
+      <div className="glass rounded-glass px-6 py-6 sm:px-7">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-bold text-ink">Isi ulang</h2>
+          <p className="num text-[11.5px] text-mut">
+            1 kredit = 1 dokumen (≤ 5 hlm)
           </p>
+        </div>
 
-          <div className="space-y-2.5">
-            {packages.data?.data.map((pkg) => (
-              <label
+        {/* Paket */}
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {pkgList.map((pkg, i) => {
+            const active = pkg.id === effPkgId;
+            const badge =
+              i === 1 ? 'POPULER' : i === pkgList.length - 1 ? 'HEMAT' : null;
+            return (
+              <button
                 key={pkg.id}
-                className={`flex items-center gap-3 cursor-pointer px-4 py-3 rounded-2xl ring-1 transition-all ${
-                  selectedPkg === pkg.id
-                    ? 'ring-indigo-400 bg-indigo-50/60'
-                    : 'ring-slate-200 bg-white/70 hover:ring-indigo-200'
+                type="button"
+                onClick={() => setSelectedPkg(pkg.id)}
+                className={`relative text-left rounded-2xl px-3.5 py-3.5 border transition-all ${
+                  active
+                    ? 'border-brand-purple bg-white/70 shadow-[0_4px_16px_rgba(155,93,229,0.18)]'
+                    : 'border-white/60 glass-soft hover:border-brand-purple/40'
                 }`}
               >
-                <input
-                  type="radio"
-                  name="package"
-                  value={pkg.id}
-                  checked={selectedPkg === pkg.id}
-                  onChange={() => setSelectedPkg(pkg.id)}
-                  className="accent-indigo-500"
-                />
-                <span className="text-sm text-slate-700">
-                  <strong className="text-slate-900">
-                    {pkg.credits.toLocaleString()} credits
-                  </strong>
-                  <span className="text-slate-400">
-                    {' '}
-                    — Rp {pkg.price_idr.toLocaleString()}
+                {badge && (
+                  <span className="absolute top-2 right-2 text-[8.5px] font-bold tracking-wide text-brand-purple">
+                    {badge}
                   </span>
-                </span>
-              </label>
-            ))}
-            {packages.data?.data.length === 0 && (
-              <p className="text-sm text-slate-400">Paket belum tersedia</p>
-            )}
-          </div>
-
-          {topupError && (
-            <div className="mt-3 flex items-center gap-2 text-xs text-rose-700 bg-rose-50 ring-1 ring-rose-200 rounded-xl px-3 py-2">
-              <svg
-                className="w-3.5 h-3.5 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              {topupError}
-            </div>
+                )}
+                <p className="num text-[20px] font-extrabold text-ink leading-none">
+                  {fmtNum(pkg.credits)}
+                </p>
+                <p className="num text-[12px] text-mut mt-1.5">
+                  Rp {fmtNum(pkg.price_idr)}
+                </p>
+              </button>
+            );
+          })}
+          {pkgList.length === 0 && (
+            <p className="col-span-full text-[13px] text-mut">
+              Paket belum tersedia.
+            </p>
           )}
+        </div>
 
+        {/* Metode bayar */}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="flex items-center p-0.5 rounded-full glass-soft">
+            {methodList.map((m) => (
+              <button
+                key={m.code}
+                type="button"
+                onClick={() => setSelectedMethod(m.code)}
+                className={`px-3.5 py-1.5 text-[12px] font-semibold rounded-full transition-all ${
+                  m.code === effMethod
+                    ? 'bg-grad text-white shadow-sm'
+                    : 'text-mut hover:text-ink'
+                }`}
+              >
+                {m.name}
+              </button>
+            ))}
+          </div>
+          <p className="text-[12px] text-mut">
+            Scan sekali — semua bank &amp; e-wallet
+          </p>
+        </div>
+
+        {topupError && (
+          <div className="mt-4 flex items-center gap-2 text-[12.5px] text-rose-700 bg-rose-100/60 rounded-xl px-3 py-2">
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            {topupError}
+          </div>
+        )}
+
+        <div className="my-5 h-px bg-white/50" />
+
+        {/* Ringkasan + Bayar */}
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="num text-[26px] font-extrabold text-ink leading-none">
+              Rp {fmtNum(selPkg?.price_idr ?? 0)}
+            </p>
+            <p className="num text-[12px] text-mut mt-1.5">
+              {fmtNum(selPkg?.credits ?? 0)} kredit · via {selMethodName}
+            </p>
+          </div>
           <button
+            type="button"
             onClick={handleTopup}
-            disabled={!selectedPkg || topup.isPending}
-            className="group mt-4 w-full py-3.5 px-5 text-[14px] font-bold rounded-2xl text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98] shadow-lg shadow-indigo-300/50 flex items-center justify-center gap-2.5 relative overflow-hidden"
-            style={{
-              background:
-                'linear-gradient(135deg, #6366f1 0%, #8b5cf6 60%, #a855f7 100%)',
-            }}
+            disabled={!effPkgId || topup.isPending}
+            className="flex items-center gap-2 px-5 py-3 rounded-full bg-grad text-white text-[13.5px] font-bold shadow-[0_4px_16px_rgba(155,93,229,0.42)] hover:opacity-90 active:scale-[0.98] disabled:opacity-50 transition-all"
           >
-            <span className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 skew-x-12 pointer-events-none" />
             {topup.isPending ? (
               <>
                 <svg
-                  className="w-4 h-4 animate-spin flex-shrink-0"
+                  className="w-4 h-4 animate-spin"
                   fill="none"
                   viewBox="0 0 24 24"
                 >
@@ -314,174 +388,106 @@ export default function WalletPage() {
                     d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"
                   />
                 </svg>
-                <span>Membuka pembayaran…</span>
+                Membuka…
               </>
             ) : (
               <>
                 <svg
-                  className="w-4.5 h-4.5 w-[18px] h-[18px] flex-shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.2}
+                  className="w-4 h-4"
                   viewBox="0 0 24 24"
+                  fill="currentColor"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                  />
+                  <path d="M13 2L3 14h7l-1 8 10-12h-7z" />
                 </svg>
-                <span>Bayar Sekarang</span>
+                Bayar sekarang
               </>
             )}
           </button>
-          <p className="text-[11px] text-slate-400 mt-2.5 text-center">
-            QRIS · Virtual Account · E-wallet · Kartu
-          </p>
+        </div>
 
-          {confirmMsg && (
-            <div className="mt-3 flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50 ring-1 ring-indigo-200 rounded-xl px-3 py-2">
-              {confirming ? (
-                <svg
-                  className="w-3.5 h-3.5 flex-shrink-0 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-3.5 h-3.5 flex-shrink-0"
-                  fill="none"
+        {confirmMsg && (
+          <div className="mt-4 flex items-center gap-2 text-[12.5px] text-brand-purple bg-white/60 rounded-xl px-3 py-2">
+            {confirming && (
+              <svg
+                className="w-3.5 h-3.5 flex-shrink-0 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
                   stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              )}
-              {confirmMsg}
-            </div>
-          )}
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"
+                />
+              </svg>
+            )}
+            {confirmMsg}
+          </div>
+        )}
+      </div>
+
+      {/* ── Riwayat transaksi ───────────────────────────────────────── */}
+      <div className="glass rounded-glass overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/40">
+          <h2 className="text-[15px] font-bold text-ink">Riwayat transaksi</h2>
+          <div className="flex items-center p-0.5 rounded-full glass-soft">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className={`px-3 py-1 text-[11.5px] font-semibold rounded-full transition-all ${
+                  filter === f.key
+                    ? 'bg-white/80 text-ink shadow-sm'
+                    : 'text-mut hover:text-ink'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Transaction history */}
-        <div className="col-span-2 bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-[0_4px_32px_rgba(0,0,0,0.05)] overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h2 className="text-[14.5px] font-semibold text-slate-800">
-              Riwayat transaksi
-            </h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[11px] text-slate-400 uppercase tracking-wider text-left border-b border-slate-100">
-                  <th className="px-6 py-3 font-semibold">Tipe</th>
-                  <th className="px-6 py-3 font-semibold text-right">Jumlah</th>
-                  <th className="px-6 py-3 font-semibold text-right">
-                    Saldo akhir
-                  </th>
-                  <th className="px-6 py-3 font-semibold text-right">Waktu</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {txs.data?.data.map((tx) => {
-                  const isDebit = tx.type === 'debit';
-                  return (
-                    <tr
-                      key={tx.id}
-                      className="hover:bg-slate-50/60 transition-colors"
-                    >
-                      <td className="px-6 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`w-7 h-7 rounded-xl flex items-center justify-center ${isDebit ? 'bg-rose-50 text-rose-400' : 'bg-emerald-50 text-emerald-500'}`}
-                          >
-                            {isDebit ? (
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2.5}
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M19 9l-7 7-7-7"
-                                />
-                              </svg>
-                            ) : (
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2.5}
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M5 15l7-7 7 7"
-                                />
-                              </svg>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="font-medium text-slate-700 block">
-                              {TX_LABELS[tx.type] ?? tx.type}
-                            </span>
-                            <span className="text-[11px] text-slate-400 block truncate max-w-[260px]">
-                              {txDetailText(tx)}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td
-                        className={`px-6 py-3.5 text-right font-semibold tabular-nums ${isDebit ? 'text-rose-500' : 'text-emerald-600'}`}
-                      >
-                        {isDebit ? '-' : '+'}
-                        {Math.abs(tx.amount).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-3.5 text-right text-slate-400 tabular-nums">
-                        {tx.balance_after.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-3.5 text-right text-slate-400 whitespace-nowrap">
-                        {formatDateTime(tx.created_at)}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {txs.data?.data.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="px-6 py-12 text-center text-slate-400 text-sm"
-                    >
-                      Belum ada transaksi.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {shownTx.length === 0 ? (
+          <p className="px-6 py-12 text-center text-[13px] text-mut">
+            Belum ada transaksi.
+          </p>
+        ) : (
+          <ul className="divide-y divide-white/40">
+            {shownTx.map((tx) => {
+              const neg = tx.amount < 0;
+              return (
+                <li
+                  key={tx.id}
+                  className="flex items-center justify-between gap-4 px-6 py-3.5 hover:bg-white/30 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[13.5px] font-semibold text-ink truncate">
+                      {txTitle(tx)}
+                    </p>
+                    <p className="num text-[11px] text-mut mt-0.5 truncate">
+                      {CAT_LABEL[tx.type] ?? tx.type} · {tx.ref_id} ·{' '}
+                      {relativeTime(tx.created_at)}
+                    </p>
+                  </div>
+                  <span
+                    className={`num text-[14px] font-bold flex-shrink-0 ${neg ? 'text-rose-500' : 'text-emerald-600'}`}
+                  >
+                    {neg ? '−' : '+'}
+                    {fmtNum(Math.abs(tx.amount))}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );

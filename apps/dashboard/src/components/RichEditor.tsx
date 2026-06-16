@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
+import { compressImageToDataUrl, dataUrlKb } from '../lib/image.js';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
@@ -17,6 +18,8 @@ interface Props {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** Dipanggil saat editor siap — untuk insert variabel di posisi kursor. */
+  onEditorReady?: (editor: Editor) => void;
 }
 
 // Simple SVG icon component
@@ -87,10 +90,16 @@ function Sep() {
   return <div className="w-px h-5 bg-gray-200 mx-0.5" />;
 }
 
-export default function RichEditor({ value, onChange, placeholder }: Props) {
+export default function RichEditor({
+  value,
+  onChange,
+  placeholder,
+  onEditorReady,
+}: Props) {
   const [sourceMode, setSourceMode] = useState(false);
   const [sourceHtml, setSourceHtml] = useState(value);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [imgStatus, setImgStatus] = useState('');
 
   const editor = useEditor({
     extensions: [
@@ -117,6 +126,11 @@ export default function RichEditor({ value, onChange, placeholder }: Props) {
       onChange(html);
     },
   });
+
+  // Ekspos instance editor ke parent (untuk insert variabel di kursor).
+  useEffect(() => {
+    if (editor && onEditorReady) onEditorReady(editor);
+  }, [editor, onEditorReady]);
 
   // Sync external value changes (e.g., when loading edit panel)
   useEffect(() => {
@@ -165,11 +179,29 @@ export default function RichEditor({ value, onChange, placeholder }: Props) {
       .run();
   }, [editor]);
 
-  const insertImage = useCallback(() => {
-    if (!editor) return;
-    const url = window.prompt('URL gambar:');
-    if (url) editor.chain().focus().setImage({ src: url }).run();
-  }, [editor]);
+  // Upload gambar dari komputer → kompres → base64 inline.
+  const fileRef = useRef<HTMLInputElement>(null);
+  const insertImage = useCallback(() => fileRef.current?.click(), []);
+  const handleImageFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file || !editor) return;
+      setImgStatus('Mengompres gambar…');
+      try {
+        const url = await compressImageToDataUrl(file);
+        editor.chain().focus().setImage({ src: url }).run();
+        setImgStatus(`Gambar disisipkan · ${dataUrlKb(url)} KB`);
+        window.setTimeout(() => setImgStatus(''), 3000);
+      } catch (err) {
+        setImgStatus(
+          err instanceof Error ? err.message : 'Gagal memproses gambar',
+        );
+        window.setTimeout(() => setImgStatus(''), 4000);
+      }
+    },
+    [editor],
+  );
 
   if (!editor) return null;
 
@@ -448,6 +480,15 @@ export default function RichEditor({ value, onChange, placeholder }: Props) {
         </button>
       </div>
 
+      {/* Input file tersembunyi untuk upload gambar */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => void handleImageFile(e)}
+      />
+
       {/* Editor area */}
       {sourceMode ? (
         <textarea
@@ -474,7 +515,12 @@ export default function RichEditor({ value, onChange, placeholder }: Props) {
           </code>{' '}
           untuk data dinamis
         </span>
-        <span className="ml-auto">
+        {imgStatus && (
+          <span className="ml-auto text-indigo-500 font-medium">
+            {imgStatus}
+          </span>
+        )}
+        <span className={imgStatus ? '' : 'ml-auto'}>
           {editor.storage.characterCount?.characters?.() ?? ''}
         </span>
       </div>

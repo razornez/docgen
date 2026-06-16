@@ -89,6 +89,11 @@ const EnvSchema = z.object({
   SESSION_SECRET: z.string().min(16),
   APIKEY_HASH_PEPPER: z.string().min(16),
 
+  // Akun OWNER platform (Owner Console lintas-tenant). Terpisah dari akun
+  // tenant. Di produksi WAJIB diganti nilai kuat via .env.
+  OWNER_EMAIL: z.string().default('owner@docgen.local'),
+  OWNER_PASSWORD: z.string().min(6).default('owner12345'),
+
   // Login Google (dipakai tahap auth)
   GOOGLE_CLIENT_ID: z.string().default(''),
   GOOGLE_CLIENT_SECRET: z.string().default(''),
