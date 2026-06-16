@@ -8,6 +8,7 @@ import {
   PublicFooter,
   pick,
 } from '../components/PublicChrome.js';
+import { Markdown } from '../lib/markdown.js';
 
 export default function PublicPage() {
   const { slug = '' } = useParams();
@@ -62,13 +63,8 @@ export default function PublicPage() {
             <h1 className="mt-3 text-[34px] font-extrabold tracking-tight">
               <span className="text-grad">{title}</span>
             </h1>
-            <div className="mt-5 space-y-4 text-[15px] text-ink/80 leading-relaxed">
-              {body
-                .split(/\n{2,}|\n/)
-                .filter((p) => p.trim())
-                .map((para, i) => (
-                  <p key={i}>{para}</p>
-                ))}
+            <div className="mt-4">
+              <Markdown text={body} />
             </div>
           </article>
         )}
