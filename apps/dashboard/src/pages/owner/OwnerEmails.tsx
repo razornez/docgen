@@ -81,6 +81,7 @@ export default function OwnerEmails() {
           key: x.key,
           subject: x.subject,
           body: x.body,
+          from: x.from,
           enabled: x.enabled,
         })),
       ),
@@ -199,6 +200,19 @@ export default function OwnerEmails() {
                     className="num text-[11px] bg-white/60 border border-white/50 rounded px-1.5 py-0.5 text-brand-purple"
                   >{`{{${v}}}`}</code>
                 ))}
+              </div>
+
+              {/* Pengirim */}
+              <div>
+                <label className="block text-[10.5px] font-bold uppercase tracking-wider text-mut mb-1.5">
+                  {t('Pengirim (From)', 'Sender (From)')}
+                </label>
+                <input
+                  value={sel.from}
+                  onChange={(e) => patch(sel.key, { from: e.target.value })}
+                  placeholder="DocGen <no-reply@docgen.razornez.net>"
+                  className="num w-full bg-white/70 border border-white/60 rounded-lg px-3 py-2 text-[12.5px] text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
+                />
               </div>
 
               {/* Lang tabs */}

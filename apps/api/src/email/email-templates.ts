@@ -18,6 +18,8 @@ export interface EmailTemplate {
   subject: Loc;
   /** Isi HTML bagian dalam (dibungkus layout merek DocGen). */
   body: Loc;
+  /** Alamat pengirim, mis. "DocGen <no-reply@docgen.razornez.net>". */
+  from: string;
   enabled: boolean;
 }
 
@@ -27,8 +29,22 @@ const L = (id: string, en: string): Loc => ({ id, en });
 const btn = (label: string) =>
   `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0"><tr><td style="border-radius:9999px;background:linear-gradient(135deg,#9b5de5,#f15bb5)"><a href="{{action_url}}" style="display:inline-block;padding:13px 26px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:9999px">${label}</a></td></tr></table>`;
 
+type RawTemplate = Omit<EmailTemplate, 'from'>;
+
+/** Alamat pengirim default per email (@docgen.razornez.net). */
+const FROM_BY_KEY: Record<string, string> = {
+  email_verification: 'DocGen <no-reply@docgen.razornez.net>',
+  welcome: 'DocGen <hello@docgen.razornez.net>',
+  password_reset: 'DocGen Security <security@docgen.razornez.net>',
+  password_changed: 'DocGen Security <security@docgen.razornez.net>',
+  topup_success: 'DocGen Billing <billing@docgen.razornez.net>',
+  team_invite: 'DocGen <no-reply@docgen.razornez.net>',
+  low_balance: 'DocGen Billing <billing@docgen.razornez.net>',
+};
+const FROM_FALLBACK = 'DocGen <no-reply@docgen.razornez.net>';
+
 /** Daftar template default (dwibahasa). Owner bisa menimpa via app_settings. */
-export const DEFAULT_EMAIL_TEMPLATES: EmailTemplate[] = [
+const RAW_TEMPLATES: RawTemplate[] = [
   {
     key: 'email_verification',
     name: L('Verifikasi email', 'Email verification'),
@@ -214,6 +230,10 @@ ${btn('Top up now')}
   },
 ];
 
+export const DEFAULT_EMAIL_TEMPLATES: EmailTemplate[] = RAW_TEMPLATES.map(
+  (r) => ({ ...r, from: FROM_BY_KEY[r.key] ?? FROM_FALLBACK }),
+);
+
 /** Bungkus isi email dengan layout bermerk DocGen (inline style). */
 function layout(content: string, lang: Lang): string {
   const year = new Date().getFullYear();
@@ -264,7 +284,7 @@ export async function readEmailTemplates(pool: Pool): Promise<EmailTemplate[]> {
   );
   const override = (rows[0]?.value ?? {}) as Record<
     string,
-    Partial<Pick<EmailTemplate, 'subject' | 'body' | 'enabled'>>
+    Partial<Pick<EmailTemplate, 'subject' | 'body' | 'from' | 'enabled'>>
   >;
   return DEFAULT_EMAIL_TEMPLATES.map((d) => {
     const o = override[d.key];
@@ -273,6 +293,7 @@ export async function readEmailTemplates(pool: Pool): Promise<EmailTemplate[]> {
       ...d,
       subject: o.subject ?? d.subject,
       body: o.body ?? d.body,
+      from: o.from ?? d.from,
       enabled: typeof o.enabled === 'boolean' ? o.enabled : d.enabled,
     };
   });

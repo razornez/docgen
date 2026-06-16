@@ -85,6 +85,7 @@ const EmailTemplatesSchema = z.object({
         key: z.string().trim().min(1).max(60),
         subject: EmailSubject,
         body: EmailBody,
+        from: z.string().trim().max(200),
         enabled: z.boolean(),
       }),
     )
@@ -791,6 +792,7 @@ export function registerOwnerRoutes(
       override[t.key] = {
         subject: t.subject,
         body: t.body,
+        from: t.from,
         enabled: t.enabled,
       };
     }

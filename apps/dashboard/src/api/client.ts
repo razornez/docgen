@@ -350,6 +350,7 @@ export interface OwnerEmailTemplate {
   variables: string[];
   subject: Loc;
   body: Loc;
+  from: string;
   enabled: boolean;
 }
 
@@ -358,7 +359,10 @@ export function getOwnerEmails(): Promise<{ templates: OwnerEmailTemplate[] }> {
 }
 
 export function saveOwnerEmails(
-  templates: Pick<OwnerEmailTemplate, 'key' | 'subject' | 'body' | 'enabled'>[],
+  templates: Pick<
+    OwnerEmailTemplate,
+    'key' | 'subject' | 'body' | 'from' | 'enabled'
+  >[],
 ): Promise<{ saved: boolean }> {
   return request(
     '/owner/emails',

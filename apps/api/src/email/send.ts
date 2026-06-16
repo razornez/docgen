@@ -24,17 +24,13 @@ export function makeEmailSender(
 ): EmailSender {
   return async (key, { to, lang = 'id', vars = {} }) => {
     try {
-      if (!mailer || !config.EMAIL_FROM || !to) return;
+      if (!mailer || !to) return;
       const tpl = await getEmailTemplate(pool, key);
       if (!tpl || !tpl.enabled) return;
+      const from = tpl.from || config.EMAIL_FROM;
+      if (!from) return;
       const { subject, html } = renderEmail(tpl, lang, vars);
-      await mailer.send({
-        from: config.EMAIL_FROM,
-        to,
-        subject,
-        html,
-        locale: lang,
-      });
+      await mailer.send({ from, to, subject, html, locale: lang });
     } catch {
       // Email transaksional best-effort; jangan ganggu alur utama.
     }
