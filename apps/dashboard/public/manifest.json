@@ -1,0 +1,17 @@
+{
+  "name": "DocGen",
+  "short_name": "DocGen",
+  "description": "Generate PDF dari template HTML + JSON via API",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e3d6fa",
+  "theme_color": "#9b5de5",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

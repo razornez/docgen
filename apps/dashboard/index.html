@@ -1,18 +1,84 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>docgen — JSON → PDF · API</title>
+
+    <!-- SEO utama -->
+    <title>DocGen — Generate PDF dari HTML + JSON via API</title>
+    <meta name="description" content="Generate PDF dari template HTML dan data JSON via REST API. Invoice, sertifikat, slip gaji, kontrak — dirender Chromium, bayar per dokumen. Mulai gratis." />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://docgen.razornez.net/" />
+
+    <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://docgen.razornez.net/" />
+    <meta property="og:title" content="DocGen — Generate PDF dari HTML + JSON via API" />
+    <meta property="og:description" content="Generate PDF dari template HTML dan data JSON via REST API. Invoice, sertifikat, slip gaji, kontrak — dirender Chromium, bayar per dokumen. Mulai gratis." />
+    <meta property="og:image" content="https://docgen.razornez.net/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="id_ID" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:site_name" content="DocGen" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DocGen — Generate PDF dari HTML + JSON via API" />
+    <meta name="twitter:description" content="Generate PDF dari template HTML dan data JSON via REST API. Invoice, sertifikat, slip gaji, kontrak — bayar per dokumen. Mulai gratis." />
+    <meta name="twitter:image" content="https://docgen.razornez.net/og-image.png" />
+
+    <!-- Tema & PWA -->
+    <meta name="theme-color" content="#9b5de5" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "DocGen",
+      "url": "https://docgen.razornez.net",
+      "description": "Generate PDF dari template HTML dan data JSON via REST API. Invoice, sertifikat, slip gaji, kontrak — dirender Chromium, bayar per dokumen.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "inLanguage": ["id", "en"],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "IDR",
+        "description": "Mulai gratis, bayar per dokumen"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "DocGen",
+        "url": "https://docgen.razornez.net"
+      },
+      "featureList": [
+        "Template HTML dengan variabel",
+        "Generate PDF via REST API",
+        "Render massal (batch)",
+        "Webhook notifikasi",
+        "Kredit prepaid"
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

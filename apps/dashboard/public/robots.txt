@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /p/
+
+Disallow: /app/
+Disallow: /admin/
+Disallow: /owner/
+
+Sitemap: https://docgen.razornez.net/sitemap.xml

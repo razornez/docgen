@@ -217,319 +217,322 @@ export default function LandingPage() {
       <OrbsBg />
       <PublicNav />
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-16 pb-12 grid lg:grid-cols-2 gap-10 items-center">
-        <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass-soft text-[10.5px] font-bold uppercase tracking-wider text-brand-purple">
-            <span className="w-1.5 h-1.5 rounded-full bg-grad" />
-            {t('API generate dokumen', 'Document generation API')}
-          </span>
-          <h1 className="mt-5 text-[42px] leading-[1.1] font-extrabold tracking-tight">
-            {t(
-              'Dari HTML & data, jadi PDF rapi — ',
-              'From HTML & data to clean PDFs — ',
-            )}
-            <span className="text-grad">
-              {t('dalam satu panggilan.', 'in a single call.')}
-            </span>
-          </h1>
-          <p className="mt-5 text-[15px] text-mut leading-relaxed max-w-lg">
-            {t(
-              'Tulis template HTML sekali, kirim data JSON, terima PDF siap pakai. Invoice, sertifikat, slip gaji, kontrak — dirender Chromium, dibayar per dokumen.',
-              'Write an HTML template once, send JSON data, get a ready-to-use PDF. Invoices, certificates, payslips, contracts — rendered by Chromium, billed per document.',
-            )}
-          </p>
-          <div className="mt-7 flex flex-wrap items-center gap-3">
-            <Link
-              to="/login"
-              className="flex items-center gap-2 px-5 py-3 text-[14px] font-bold rounded-full text-white bg-grad shadow-[0_6px_18px_rgba(155,93,229,0.4)] hover:opacity-90 transition-all"
-            >
-              <Spark />
-              {t('Mulai gratis — ', 'Start free — ')}
-              {fmt(bonus)} {dok}
-            </Link>
-            <Link
-              to="/p/docs"
-              className="px-5 py-3 text-[14px] font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
-            >
-              {t('Lihat dokumentasi', 'View documentation')}
-            </Link>
-          </div>
-          <p className="num mt-4 text-[11.5px] text-mut">
-            {t('Tanpa kartu kredit', 'No credit card')} ·{' '}
-            {t('Kredit prepaid', 'Prepaid credits')} · QRIS / VA / e-wallet
-          </p>
-        </div>
-
-        {/* Code card */}
-        <div className="relative">
-          <div className="rounded-2xl bg-[#241a3d] shadow-[0_24px_60px_rgba(60,30,110,0.35)] overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10">
-              <div className="flex gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
-              </div>
-              <div className="flex gap-1 text-[10.5px] font-semibold">
-                {CODE_TABS.map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setCodeTab(tab)}
-                    className={`px-2 py-0.5 rounded transition-colors ${
-                      codeTab === tab
-                        ? 'bg-white/15 text-white'
-                        : 'text-white/40 hover:text-white/70'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="num p-4 text-[11px] leading-relaxed text-slate-300 min-h-[150px]">
-              {CODE[codeTab]}
-              <div className="mt-3 flex items-center gap-1.5 text-emerald-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                {t('dirender 1.6 dtk', 'rendered in 1.6s')}
-              </div>
-            </div>
-          </div>
-          <div className="absolute -bottom-5 -right-3 w-40 rounded-xl bg-white shadow-[0_16px_40px_rgba(60,30,110,0.3)] p-3 rotate-[3deg]">
-            <div className="flex items-center justify-between">
-              <span className="text-[8px] font-bold text-ink">
-                PT Maju Bersama
-              </span>
-              <span className="text-[8px] font-extrabold text-brand-purple">
-                INVOICE
-              </span>
-            </div>
-            <div className="mt-2 space-y-1">
-              {[70, 90, 55, 80].map((w, i) => (
-                <div
-                  key={i}
-                  className="h-1 rounded bg-slate-200"
-                  style={{ width: `${w}%` }}
-                />
-              ))}
-            </div>
-            <div className="num mt-2.5 text-right text-[10px] font-extrabold text-ink">
-              Rp 49.950.000
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="max-w-6xl mx-auto px-6 py-16">
-        <h2 className="text-center text-[28px] font-extrabold tracking-tight">
-          {t(
-            'Semua yang dibutuhkan untuk dokumen massal',
-            'Everything you need for documents at scale',
-          )}
-        </h2>
-        <p className="text-center text-[14px] text-mut mt-2 max-w-xl mx-auto">
-          {t(
-            'Mesin render polos yang fokus: HTML masuk, PDF keluar. Logika & data di tanganmu.',
-            'A focused, no-frills render engine: HTML in, PDF out. Logic & data stay in your hands.',
-          )}
-        </p>
-        <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map((f) => (
-            <div key={f.icon} className="glass rounded-glass p-6">
-              <div className="w-10 h-10 rounded-xl bg-grad flex items-center justify-center text-white shadow-[0_4px_12px_rgba(155,93,229,0.3)]">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.85}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d={ICON[f.icon]}
-                  />
-                </svg>
-              </div>
-              <h3 className="mt-4 text-[15px] font-bold text-ink">
-                {pick(lang, f.title)}
-              </h3>
-              <p className="mt-1.5 text-[12.5px] text-mut leading-relaxed">
-                {pick(lang, f.desc)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Steps */}
-      <section className="max-w-6xl mx-auto px-6 py-12">
-        <h2 className="text-center text-[28px] font-extrabold tracking-tight">
-          {t('Tiga langkah, selesai', 'Three steps, done')}
-        </h2>
-        <div className="mt-10 grid md:grid-cols-3 gap-4">
-          {STEPS.map((s) => (
-            <div key={s.n} className="glass rounded-glass p-6">
-              <div className="flex items-start justify-between">
-                <span className="num text-[20px] font-extrabold text-grad">
-                  {s.n}
-                </span>
-                <svg
-                  className="w-5 h-5 text-brand-purple/70"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.85}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d={s.icon}
-                  />
-                </svg>
-              </div>
-              <h3 className="mt-4 text-[15px] font-bold text-ink">
-                {pick(lang, s.title)}
-              </h3>
-              <p className="mt-1.5 text-[12.5px] text-mut leading-relaxed">
-                {pick(lang, s.desc)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section id="pricing" className="max-w-6xl mx-auto px-6 py-16">
-        <h2 className="text-center text-[28px] font-extrabold tracking-tight">
-          {t('Harga sejujur kredit', 'Honest credit pricing')}
-        </h2>
-        <p className="text-center text-[14px] text-mut mt-2">
-          {t(
-            'Tanpa langganan, tanpa biaya tersembunyi. Bayar dokumen yang kamu cetak.',
-            'No subscription, no hidden fees. Pay for the documents you print.',
-          )}
-        </p>
-
-        <div className="mt-8 rounded-glass bg-grad px-7 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_14px_40px_rgba(155,93,229,0.35)]">
+      <main>
+        {/* Hero */}
+        <section className="max-w-6xl mx-auto px-6 pt-16 pb-12 grid lg:grid-cols-2 gap-10 items-center">
           <div>
-            <p className="text-[10.5px] font-bold uppercase tracking-wider text-white/80">
-              {t('Gratis saat daftar', 'Free on sign-up')}
-            </p>
-            <p className="num mt-1 text-[30px] font-extrabold text-white leading-none">
-              {fmt(bonus)} <span className="text-[15px] font-bold">{dok}</span>
-            </p>
-            <p className="text-[12.5px] text-white/85 mt-1">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass-soft text-[10.5px] font-bold uppercase tracking-wider text-brand-purple">
+              <span className="w-1.5 h-1.5 rounded-full bg-grad" />
+              {t('API generate dokumen', 'Document generation API')}
+            </span>
+            <h1 className="mt-5 text-[42px] leading-[1.1] font-extrabold tracking-tight">
               {t(
-                'Coba penuh tanpa kartu kredit.',
-                'Try it fully, no credit card.',
+                'Dari HTML & data, jadi PDF rapi — ',
+                'From HTML & data to clean PDFs — ',
+              )}
+              <span className="text-grad">
+                {t('dalam satu panggilan.', 'in a single call.')}
+              </span>
+            </h1>
+            <p className="mt-5 text-[15px] text-mut leading-relaxed max-w-lg">
+              {t(
+                'Tulis template HTML sekali, kirim data JSON, terima PDF siap pakai. Invoice, sertifikat, slip gaji, kontrak — dirender Chromium, dibayar per dokumen.',
+                'Write an HTML template once, send JSON data, get a ready-to-use PDF. Invoices, certificates, payslips, contracts — rendered by Chromium, billed per document.',
               )}
             </p>
-          </div>
-          <Link
-            to="/login"
-            className="flex items-center gap-1.5 px-5 py-2.5 text-[13.5px] font-bold rounded-full bg-white text-brand-purple hover:bg-white/90 transition-colors"
-          >
-            <Spark />
-            {t('Mulai gratis', 'Start free')}
-          </Link>
-        </div>
-
-        <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {packages.map((p) => {
-            const perDok =
-              p.credits > 0 ? Math.round(p.price_idr / p.credits) : 0;
-            const ring =
-              p.highlight === 'popular'
-                ? 'ring-2 ring-brand-purple'
-                : p.highlight === 'hemat'
-                  ? 'ring-2 ring-brand-pink'
-                  : '';
-            const badge =
-              p.highlight === 'popular'
-                ? { t: t('Populer', 'Popular'), c: 'bg-brand-purple' }
-                : p.highlight === 'hemat'
-                  ? { t: t('Hemat', 'Best value'), c: 'bg-brand-pink' }
-                  : null;
-            return (
-              <div
-                key={p.id}
-                className={`glass rounded-glass p-5 relative ${ring}`}
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <Link
+                to="/login"
+                className="flex items-center gap-2 px-5 py-3 text-[14px] font-bold rounded-full text-white bg-grad shadow-[0_6px_18px_rgba(155,93,229,0.4)] hover:opacity-90 transition-all"
               >
-                {badge && (
-                  <span
-                    className={`absolute top-4 right-4 px-2 py-0.5 rounded-full text-[9.5px] font-bold uppercase tracking-wide text-white ${badge.c}`}
-                  >
-                    {badge.t}
-                  </span>
-                )}
-                <p className="num text-[24px] font-extrabold text-ink leading-none">
-                  {fmt(p.credits)}{' '}
-                  <span className="text-[12px] font-bold text-mut">
-                    {t('kredit', 'credits')}
-                  </span>
-                </p>
-                {p.bonus > 0 ? (
-                  <p className="num text-[11.5px] font-bold text-emerald-600 mt-1">
-                    +{fmt(p.bonus)} bonus
-                  </p>
-                ) : (
-                  <p className="text-[11.5px] text-mut mt-1">&nbsp;</p>
-                )}
-                <p className="num mt-3 text-[18px] font-extrabold text-ink">
-                  Rp {fmt(p.price_idr)}
-                </p>
-                <p className="num text-[11px] text-mut mt-0.5">
-                  Rp {fmt(perDok)}/{t('dokumen', 'doc')}
-                </p>
-                <Link
-                  to="/login"
-                  className={`mt-4 block text-center py-2 text-[12.5px] font-bold rounded-full transition-all ${
-                    badge
-                      ? 'text-white bg-grad shadow-[0_4px_12px_rgba(155,93,229,0.35)] hover:opacity-90'
-                      : 'glass-soft text-ink hover:bg-white/60'
-                  }`}
-                >
-                  {t('Pilih paket', 'Choose plan')}
-                </Link>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+                <Spark />
+                {t('Mulai gratis — ', 'Start free — ')}
+                {fmt(bonus)} {dok}
+              </Link>
+              <Link
+                to="/p/docs"
+                className="px-5 py-3 text-[14px] font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
+              >
+                {t('Lihat dokumentasi', 'View documentation')}
+              </Link>
+            </div>
+            <p className="num mt-4 text-[11.5px] text-mut">
+              {t('Tanpa kartu kredit', 'No credit card')} ·{' '}
+              {t('Kredit prepaid', 'Prepaid credits')} · QRIS / VA / e-wallet
+            </p>
+          </div>
 
-      {/* CTA */}
-      <section className="max-w-6xl mx-auto px-6 py-12">
-        <div
-          className="rounded-glass px-8 py-14 text-center"
-          style={{
-            background:
-              'linear-gradient(150deg, #271847 0%, #3a2566 55%, #4a2c6e 100%)',
-          }}
-        >
-          <h2 className="text-[28px] font-extrabold text-white">
+          {/* Code card */}
+          <div className="relative">
+            <div className="rounded-2xl bg-[#241a3d] shadow-[0_24px_60px_rgba(60,30,110,0.35)] overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10">
+                <div className="flex gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+                </div>
+                <div className="flex gap-1 text-[10.5px] font-semibold">
+                  {CODE_TABS.map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setCodeTab(tab)}
+                      className={`px-2 py-0.5 rounded transition-colors ${
+                        codeTab === tab
+                          ? 'bg-white/15 text-white'
+                          : 'text-white/40 hover:text-white/70'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="num p-4 text-[11px] leading-relaxed text-slate-300 min-h-[150px]">
+                {CODE[codeTab]}
+                <div className="mt-3 flex items-center gap-1.5 text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  {t('dirender 1.6 dtk', 'rendered in 1.6s')}
+                </div>
+              </div>
+            </div>
+            <div className="absolute -bottom-5 -right-3 w-40 rounded-xl bg-white shadow-[0_16px_40px_rgba(60,30,110,0.3)] p-3 rotate-[3deg]">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-bold text-ink">
+                  PT Maju Bersama
+                </span>
+                <span className="text-[8px] font-extrabold text-brand-purple">
+                  INVOICE
+                </span>
+              </div>
+              <div className="mt-2 space-y-1">
+                {[70, 90, 55, 80].map((w, i) => (
+                  <div
+                    key={i}
+                    className="h-1 rounded bg-slate-200"
+                    style={{ width: `${w}%` }}
+                  />
+                ))}
+              </div>
+              <div className="num mt-2.5 text-right text-[10px] font-extrabold text-ink">
+                Rp 49.950.000
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section id="features" className="max-w-6xl mx-auto px-6 py-16">
+          <h2 className="text-center text-[28px] font-extrabold tracking-tight">
             {t(
-              'Cetak dokumen pertamamu hari ini',
-              'Print your first document today',
+              'Semua yang dibutuhkan untuk dokumen massal',
+              'Everything you need for documents at scale',
             )}
           </h2>
-          <p className="mt-3 text-[14px] text-slate-300">
-            {fmt(bonus)}{' '}
+          <p className="text-center text-[14px] text-mut mt-2 max-w-xl mx-auto">
             {t(
-              'dokumen gratis. Tanpa kartu kredit. Siap dalam 5 menit.',
-              'free documents. No credit card. Ready in 5 minutes.',
+              'Mesin render polos yang fokus: HTML masuk, PDF keluar. Logika & data di tanganmu.',
+              'A focused, no-frills render engine: HTML in, PDF out. Logic & data stay in your hands.',
             )}
           </p>
-          <Link
-            to="/login"
-            className="mt-7 inline-flex items-center gap-2 px-6 py-3 text-[14px] font-bold rounded-full bg-white text-brand-purple hover:bg-white/90 transition-colors"
+          <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {FEATURES.map((f) => (
+              <div key={f.icon} className="glass rounded-glass p-6">
+                <div className="w-10 h-10 rounded-xl bg-grad flex items-center justify-center text-white shadow-[0_4px_12px_rgba(155,93,229,0.3)]">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.85}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d={ICON[f.icon]}
+                    />
+                  </svg>
+                </div>
+                <h3 className="mt-4 text-[15px] font-bold text-ink">
+                  {pick(lang, f.title)}
+                </h3>
+                <p className="mt-1.5 text-[12.5px] text-mut leading-relaxed">
+                  {pick(lang, f.desc)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Steps */}
+        <section className="max-w-6xl mx-auto px-6 py-12">
+          <h2 className="text-center text-[28px] font-extrabold tracking-tight">
+            {t('Tiga langkah, selesai', 'Three steps, done')}
+          </h2>
+          <div className="mt-10 grid md:grid-cols-3 gap-4">
+            {STEPS.map((s) => (
+              <div key={s.n} className="glass rounded-glass p-6">
+                <div className="flex items-start justify-between">
+                  <span className="num text-[20px] font-extrabold text-grad">
+                    {s.n}
+                  </span>
+                  <svg
+                    className="w-5 h-5 text-brand-purple/70"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.85}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d={s.icon}
+                    />
+                  </svg>
+                </div>
+                <h3 className="mt-4 text-[15px] font-bold text-ink">
+                  {pick(lang, s.title)}
+                </h3>
+                <p className="mt-1.5 text-[12.5px] text-mut leading-relaxed">
+                  {pick(lang, s.desc)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Pricing */}
+        <section id="pricing" className="max-w-6xl mx-auto px-6 py-16">
+          <h2 className="text-center text-[28px] font-extrabold tracking-tight">
+            {t('Harga sejujur kredit', 'Honest credit pricing')}
+          </h2>
+          <p className="text-center text-[14px] text-mut mt-2">
+            {t(
+              'Tanpa langganan, tanpa biaya tersembunyi. Bayar dokumen yang kamu cetak.',
+              'No subscription, no hidden fees. Pay for the documents you print.',
+            )}
+          </p>
+
+          <div className="mt-8 rounded-glass bg-grad px-7 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_14px_40px_rgba(155,93,229,0.35)]">
+            <div>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider text-white/80">
+                {t('Gratis saat daftar', 'Free on sign-up')}
+              </p>
+              <p className="num mt-1 text-[30px] font-extrabold text-white leading-none">
+                {fmt(bonus)}{' '}
+                <span className="text-[15px] font-bold">{dok}</span>
+              </p>
+              <p className="text-[12.5px] text-white/85 mt-1">
+                {t(
+                  'Coba penuh tanpa kartu kredit.',
+                  'Try it fully, no credit card.',
+                )}
+              </p>
+            </div>
+            <Link
+              to="/login"
+              className="flex items-center gap-1.5 px-5 py-2.5 text-[13.5px] font-bold rounded-full bg-white text-brand-purple hover:bg-white/90 transition-colors"
+            >
+              <Spark />
+              {t('Mulai gratis', 'Start free')}
+            </Link>
+          </div>
+
+          <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {packages.map((p) => {
+              const perDok =
+                p.credits > 0 ? Math.round(p.price_idr / p.credits) : 0;
+              const ring =
+                p.highlight === 'popular'
+                  ? 'ring-2 ring-brand-purple'
+                  : p.highlight === 'hemat'
+                    ? 'ring-2 ring-brand-pink'
+                    : '';
+              const badge =
+                p.highlight === 'popular'
+                  ? { t: t('Populer', 'Popular'), c: 'bg-brand-purple' }
+                  : p.highlight === 'hemat'
+                    ? { t: t('Hemat', 'Best value'), c: 'bg-brand-pink' }
+                    : null;
+              return (
+                <div
+                  key={p.id}
+                  className={`glass rounded-glass p-5 relative ${ring}`}
+                >
+                  {badge && (
+                    <span
+                      className={`absolute top-4 right-4 px-2 py-0.5 rounded-full text-[9.5px] font-bold uppercase tracking-wide text-white ${badge.c}`}
+                    >
+                      {badge.t}
+                    </span>
+                  )}
+                  <p className="num text-[24px] font-extrabold text-ink leading-none">
+                    {fmt(p.credits)}{' '}
+                    <span className="text-[12px] font-bold text-mut">
+                      {t('kredit', 'credits')}
+                    </span>
+                  </p>
+                  {p.bonus > 0 ? (
+                    <p className="num text-[11.5px] font-bold text-emerald-600 mt-1">
+                      +{fmt(p.bonus)} bonus
+                    </p>
+                  ) : (
+                    <p className="text-[11.5px] text-mut mt-1">&nbsp;</p>
+                  )}
+                  <p className="num mt-3 text-[18px] font-extrabold text-ink">
+                    Rp {fmt(p.price_idr)}
+                  </p>
+                  <p className="num text-[11px] text-mut mt-0.5">
+                    Rp {fmt(perDok)}/{t('dokumen', 'doc')}
+                  </p>
+                  <Link
+                    to="/login"
+                    className={`mt-4 block text-center py-2 text-[12.5px] font-bold rounded-full transition-all ${
+                      badge
+                        ? 'text-white bg-grad shadow-[0_4px_12px_rgba(155,93,229,0.35)] hover:opacity-90'
+                        : 'glass-soft text-ink hover:bg-white/60'
+                    }`}
+                  >
+                    {t('Pilih paket', 'Choose plan')}
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="max-w-6xl mx-auto px-6 py-12">
+          <div
+            className="rounded-glass px-8 py-14 text-center"
+            style={{
+              background:
+                'linear-gradient(150deg, #271847 0%, #3a2566 55%, #4a2c6e 100%)',
+            }}
           >
-            <Spark />
-            {t('Buat akun gratis', 'Create free account')}
-          </Link>
-        </div>
-      </section>
+            <h2 className="text-[28px] font-extrabold text-white">
+              {t(
+                'Cetak dokumen pertamamu hari ini',
+                'Print your first document today',
+              )}
+            </h2>
+            <p className="mt-3 text-[14px] text-slate-300">
+              {fmt(bonus)}{' '}
+              {t(
+                'dokumen gratis. Tanpa kartu kredit. Siap dalam 5 menit.',
+                'free documents. No credit card. Ready in 5 minutes.',
+              )}
+            </p>
+            <Link
+              to="/login"
+              className="mt-7 inline-flex items-center gap-2 px-6 py-3 text-[14px] font-bold rounded-full bg-white text-brand-purple hover:bg-white/90 transition-colors"
+            >
+              <Spark />
+              {t('Buat akun gratis', 'Create free account')}
+            </Link>
+          </div>
+        </section>
+      </main>
 
       <PublicFooter content={content.data} />
     </div>
