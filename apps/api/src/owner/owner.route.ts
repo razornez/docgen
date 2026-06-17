@@ -279,7 +279,7 @@ export function registerOwnerRoutes(
         workers: 8,
         running: Number(q.running),
         queued: Number(q.queued),
-        p95: 1.8,
+        p95: null,
       },
       top_tenants: top.rows.map((r) => ({
         id: r.id,
@@ -316,7 +316,7 @@ export function registerOwnerRoutes(
                 (where p.status='paid' and p.paid_at >= date_trunc('month',now())),0) AS mrr,
               (count(*) filter (where p.status='paid' and p.amount_idr > 0) > 0) AS paid
          FROM tenants t
-         JOIN payments p ON p.tenant_id = t.id
+         LEFT JOIN payments p ON p.tenant_id = t.id
          LEFT JOIN wallets w ON w.tenant_id = t.id
         GROUP BY t.id, t.name
         ORDER BY docs DESC`,
@@ -436,13 +436,16 @@ export function registerOwnerRoutes(
     const q = queue.rows[0]!;
     const days14 = days.rows.map((r) => Number(r.cnt));
     const perDay = days14.length ? Math.max(...days14) : 0;
-    const p95 = p95res.rows[0]?.p95 != null ? Number(p95res.rows[0]!.p95) : 1.8;
+    const p95 =
+      p95res.rows[0]?.p95 != null ? Number(p95res.rows[0]!.p95) : null;
+    const running = Number(q.running);
+    const queued = Number(q.queued);
     return {
-      status_ok: true,
+      status_ok: !(queued > 0 && running === 0),
       stats: {
         workers: 8,
-        running: Number(q.running),
-        queued: Number(q.queued),
+        running,
+        queued,
         p95,
       },
       throughput: {
@@ -631,12 +634,17 @@ export function registerOwnerRoutes(
     const running = Number(queue.rows[0]?.running ?? 0);
     const queued = Number(queue.rows[0]?.queued ?? 0);
 
+    const bullmqOk = !(queued > 0 && running === 0);
     const systems = [
-      { label: 'Render engine', ok: true, meta: 'p95 1.8 dtk · 8 worker' },
+      {
+        label: 'Render engine',
+        ok: bullmqOk,
+        meta: `8 worker · ${running} jalan`,
+      },
       { label: 'API gateway', ok: true, meta: '99.98% · 12k req/mnt' },
       {
         label: 'Antrian (BullMQ)',
-        ok: queued < 100,
+        ok: bullmqOk,
         meta: `${queued} antri · ${running} jalan`,
       },
       { label: 'Penyimpanan R2', ok: true, meta: '1.2 TB · 30 hari' },

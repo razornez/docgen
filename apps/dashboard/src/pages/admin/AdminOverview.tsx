@@ -365,7 +365,6 @@ export default function AdminOverview() {
                   type="email"
                   value={iEmail}
                   onChange={(e) => setIEmail(e.target.value)}
-                  required
                   placeholder="nama@perusahaan.com"
                   className="w-full glass-soft rounded-xl px-3.5 py-2.5 text-[13px] text-ink placeholder:text-mut focus:outline-none"
                 />

@@ -51,6 +51,8 @@ async function request<T>(
     throw new ApiError(res.status, code, message);
   }
 
+  if (res.status === 204) return undefined as T;
+
   return res.json() as Promise<T>;
 }
 
@@ -172,7 +174,12 @@ export interface OwnerSummary {
   documents_30d: number;
   uptime: number;
   revenue: { week_idr: number; delta_pct: number; days14: number[] };
-  queue: { workers: number; running: number; queued: number; p95: number };
+  queue: {
+    workers: number;
+    running: number;
+    queued: number;
+    p95: number | null;
+  };
   top_tenants: {
     id: string;
     name: string;
@@ -641,8 +648,15 @@ export interface BatchCreateInput {
   webhook_url?: string;
 }
 
-export function createBatch(input: BatchCreateInput): Promise<BatchItem> {
-  return request('/batches', { method: 'POST', body: JSON.stringify(input) });
+export function createBatch(
+  input: BatchCreateInput,
+  signal?: AbortSignal,
+): Promise<BatchItem> {
+  return request('/batches', {
+    method: 'POST',
+    body: JSON.stringify(input),
+    ...(signal ? { signal } : {}),
+  });
 }
 
 export interface BatchDocumentItem {

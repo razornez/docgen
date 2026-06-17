@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getBatches,
@@ -7,6 +7,7 @@ import {
   createBatch,
   type BatchDocumentItem,
   type BatchItem,
+  type BatchCreateInput,
 } from '../api/client.js';
 import { StatusBadge } from './Dashboard.js';
 import { useLang } from '../i18n/index.js';
@@ -305,6 +306,9 @@ export default function BatchesPage() {
   const [itemsJson, setItemsJson] = useState(PLACEHOLDER_ITEMS);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [formError, setFormError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const abortRef = useRef<AbortController | null>(null);
+  const abortTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const list = batches.data?.data ?? [];
   const batchesThisMonth = list.filter((b) => isThisMonth(b.created_at)).length;
@@ -313,11 +317,24 @@ export default function BatchesPage() {
   const successRate =
     docsPrinted + totalFailed > 0
       ? (docsPrinted / (docsPrinted + totalFailed)) * 100
-      : 100;
+      : null;
+
+  function clearAbortTimer() {
+    if (abortTimerRef.current) {
+      clearTimeout(abortTimerRef.current);
+      abortTimerRef.current = null;
+    }
+  }
 
   const create = useMutation({
-    mutationFn: createBatch,
+    mutationFn: (input: BatchCreateInput) => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      abortTimerRef.current = setTimeout(() => controller.abort(), 30_000);
+      return createBatch(input, controller.signal);
+    },
     onSuccess: (res) => {
+      clearAbortTimer();
       void qc.invalidateQueries({ queryKey: ['batches'] });
       void qc.invalidateQueries({ queryKey: ['me'] });
       void qc.invalidateQueries({ queryKey: ['wallet'] });
@@ -326,18 +343,48 @@ export default function BatchesPage() {
       setTemplateId('');
       setWebhookUrl('');
       setSelectedBatchId(res.id);
+      const msg = t('Batch berhasil dibuat!', 'Batch created successfully!');
+      setSuccessMsg(msg);
+      setTimeout(() => setSuccessMsg(''), 5000);
     },
-    onError: (e) =>
-      setFormError(
-        e instanceof Error
-          ? e.message
-          : t('Gagal membuat batch', 'Failed to create batch'),
-      ),
+    onError: (e) => {
+      clearAbortTimer();
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setFormError(
+          t(
+            'Permintaan timeout. Batch kemungkinan sudah dibuat — cek di daftar batch.',
+            'Request timed out. The batch may have been created — check the batch list.',
+          ),
+        );
+      } else {
+        setFormError(
+          e instanceof Error
+            ? e.message
+            : t('Gagal membuat batch', 'Failed to create batch'),
+        );
+      }
+    },
   });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
+    if (!templateId) {
+      setFormError(
+        t('Pilih template terlebih dahulu.', 'Please select a template.'),
+      );
+      return;
+    }
+    const trimmedWebhook = webhookUrl.trim();
+    if (trimmedWebhook && !trimmedWebhook.startsWith('https://')) {
+      setFormError(
+        t(
+          'Webhook URL harus menggunakan HTTPS.',
+          'Webhook URL must use HTTPS.',
+        ),
+      );
+      return;
+    }
     let items: { ref: string; data: Record<string, unknown> }[];
     try {
       const parsed = JSON.parse(itemsJson) as unknown;
@@ -356,7 +403,7 @@ export default function BatchesPage() {
     create.mutate({
       template: templateId,
       items,
-      ...(webhookUrl.trim() ? { webhook_url: webhookUrl.trim() } : {}),
+      ...(trimmedWebhook ? { webhook_url: trimmedWebhook } : {}),
     });
   }
 
@@ -371,7 +418,7 @@ export default function BatchesPage() {
     },
     {
       label: t('Tingkat sukses', 'Success rate'),
-      value: `${successRate.toFixed(1)}%`,
+      value: successRate !== null ? `${successRate.toFixed(1)}%` : '–',
     },
   ];
 
@@ -437,6 +484,8 @@ export default function BatchesPage() {
             <button
               type="button"
               onClick={() => {
+                abortRef.current?.abort();
+                clearAbortTimer();
                 setShowForm(false);
                 setFormError('');
               }}
@@ -465,7 +514,6 @@ export default function BatchesPage() {
               <select
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
-                required
                 className={inputCls}
               >
                 <option value="">
@@ -504,7 +552,7 @@ export default function BatchesPage() {
                 </span>
               </label>
               <input
-                type="url"
+                type="text"
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
                 placeholder="https://yourapp.com/webhooks/batch"
@@ -542,6 +590,8 @@ export default function BatchesPage() {
               <button
                 type="button"
                 onClick={() => {
+                  abortRef.current?.abort();
+                  clearAbortTimer();
                   setShowForm(false);
                   setFormError('');
                 }}
@@ -551,6 +601,26 @@ export default function BatchesPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ── Success toast ──────────────────────────────────────────── */}
+      {successMsg && (
+        <div className="flex items-center gap-2 text-[12.5px] text-emerald-700 bg-emerald-100/70 rounded-2xl px-4 py-3">
+          <svg
+            className="w-4 h-4 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          {successMsg}
         </div>
       )}
 

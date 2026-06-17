@@ -79,7 +79,9 @@ export function ApiGuideModal({
     return () => document.removeEventListener('keydown', h);
   }, [onClose]);
 
-  const baseUrl = window.location.origin;
+  const baseUrl =
+    (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+    window.location.origin;
   const keyPlaceholder =
     activeKeys.length > 0
       ? `${activeKeys[0]!.prefix}...${activeKeys[0]!.last4}`

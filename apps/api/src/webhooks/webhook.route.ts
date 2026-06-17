@@ -1,7 +1,8 @@
-import { randomBase62 } from '@docgen/shared';
+import { Errors, randomBase62 } from '@docgen/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth } from '../auth/auth-context.js';
+import { assertNotSsrf } from '../lib/ssrf.js';
 import type { WebhookRepository } from './webhook.repository.js';
 
 const VALID_EVENTS = [
@@ -44,6 +45,14 @@ export function registerWebhookRoutes(
   app.post('/webhooks/endpoints', async (request, reply) => {
     const ctx = requireAuth(request);
     const body = CreateBody.parse(request.body);
+    try {
+      assertNotSsrf(body.url);
+    } catch (e) {
+      throw Errors.invalidRequest(
+        e instanceof Error ? e.message : 'URL tidak diizinkan',
+        'url',
+      );
+    }
     const secret = randomBase62(32); // secret HMAC dihasilkan server
     const id = `whe_${randomBase62(20)}`;
     const endpoint = await repo.create({

@@ -110,11 +110,25 @@ export default function OwnerSettings() {
     setRows((rs) => rs.filter((r) => r.key !== key));
 
   const onSave = () => {
+    if (num(bonus) < 0 || num(lowBal) < 0) {
+      setError(t('Nilai tidak boleh negatif.', 'Values cannot be negative.'));
+      return;
+    }
     if (rows.some((r) => num(r.credits) <= 0)) {
       setError(
         t(
           'Setiap paket harus punya kredit lebih dari 0.',
           'Each package must have more than 0 credits.',
+        ),
+      );
+      return;
+    }
+    const sorotUsed = rows.map((r) => r.highlight).filter((h) => h !== 'none');
+    if (sorotUsed.length !== new Set(sorotUsed).size) {
+      setError(
+        t(
+          'Label Sorot (Populer / Hemat) harus unik per paket.',
+          'Highlight labels (Popular / Value) must be unique per package.',
         ),
       );
       return;

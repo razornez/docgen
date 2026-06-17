@@ -31,6 +31,7 @@ function RevenueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const max = Math.max(...s.revenue.days14, 1);
   const up = s.revenue.delta_pct >= 0;
+  const hasRevenueData = s.revenue.days14.some((d) => d > 0);
   return (
     <div className="glass rounded-glass px-6 py-5">
       <h2 className="text-[14.5px] font-bold text-ink">
@@ -47,13 +48,15 @@ function RevenueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
           <p className="text-[10.5px] font-bold uppercase tracking-wider text-mut mt-1.5">
             {t('Juta minggu ini', 'Million this week')}
           </p>
-          <span
-            className={`inline-flex items-center gap-1 mt-2.5 px-2 py-1 rounded-lg text-[11px] font-semibold ${up ? 'bg-emerald-100/70 text-emerald-700' : 'bg-rose-100/70 text-rose-600'}`}
-          >
-            {up ? '↑' : '↓'} {up ? '+' : ''}
-            {idNum(s.revenue.delta_pct, 0)}%{' '}
-            {t('vs minggu lalu', 'vs last week')}
-          </span>
+          {hasRevenueData && (
+            <span
+              className={`inline-flex items-center gap-1 mt-2.5 px-2 py-1 rounded-lg text-[11px] font-semibold ${up ? 'bg-emerald-100/70 text-emerald-700' : 'bg-rose-100/70 text-rose-600'}`}
+            >
+              {up ? '↑' : '↓'} {up ? '+' : ''}
+              {idNum(s.revenue.delta_pct, 0)}%{' '}
+              {t('vs minggu lalu', 'vs last week')}
+            </span>
+          )}
         </div>
         <div className="flex-1 flex items-end justify-between gap-1.5 h-[110px]">
           {s.revenue.days14.map((amt, i) => {
@@ -77,17 +80,19 @@ function RevenueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
 function QueueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const q = s.queue;
+  const bullmqStuck = q.queued > 0 && q.running === 0;
+  const p95Label = q.p95 != null ? `${q.p95}s` : '–';
   const stats = [
     { label: t('Worker', 'Workers'), value: String(q.workers) },
     { label: t('Berjalan', 'Running'), value: String(q.running) },
     { label: t('Antri', 'Queued'), value: String(q.queued) },
-    { label: 'P95', value: `${q.p95}s` },
+    { label: 'P95', value: p95Label },
   ];
   const rows = [
     {
       name: 'Render engine',
-      meta: `p95 ${q.p95} ${t('dtk', 'sec')} · ${q.workers} ${t('worker', 'workers')}`,
-      dot: 'bg-emerald-500',
+      meta: `${q.workers} ${t('worker', 'workers')} · ${q.running} ${t('jalan', 'running')}`,
+      dot: bullmqStuck ? 'bg-brand-pink' : 'bg-emerald-500',
     },
     {
       name: 'API gateway',
@@ -97,7 +102,7 @@ function QueueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
     {
       name: t('Antrian (BullMQ)', 'Queue (BullMQ)'),
       meta: `${q.queued} ${t('antri', 'queued')} · ${q.running} ${t('jalan', 'running')}`,
-      dot: q.queued > 0 ? 'bg-brand-pink' : 'bg-emerald-500',
+      dot: bullmqStuck ? 'bg-brand-pink' : 'bg-emerald-500',
     },
   ];
   return (
@@ -219,29 +224,35 @@ export default function OwnerConsole() {
                 </span>
               </div>
               <div className="divide-y divide-white/40">
-                {s.top_tenants.map((tn, i) => (
-                  <div
-                    key={tn.id}
-                    className="flex items-center gap-3 px-6 py-3.5"
-                  >
+                {s.top_tenants.length === 0 ? (
+                  <p className="px-6 py-10 text-center text-[13px] text-mut">
+                    {t('Belum ada transaksi.', 'No transactions yet.')}
+                  </p>
+                ) : (
+                  s.top_tenants.map((tn, i) => (
                     <div
-                      className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 ${TINT[i % TINT.length]}`}
+                      key={tn.id}
+                      className="flex items-center gap-3 px-6 py-3.5"
                     >
-                      {tn.name.slice(0, 2).toUpperCase()}
+                      <div
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 ${TINT[i % TINT.length]}`}
+                      >
+                        {tn.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13.5px] font-semibold text-ink truncate">
+                          {tn.name}
+                        </p>
+                        <p className="num text-[11px] text-mut">
+                          Prepaid · Rp {jt(tn.revenue_idr)} {t('jt', 'M')}
+                        </p>
+                      </div>
+                      <span className="num text-[14px] font-bold text-ink flex-shrink-0">
+                        {fmtNum(tn.docs)}
+                      </span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13.5px] font-semibold text-ink truncate">
-                        {tn.name}
-                      </p>
-                      <p className="num text-[11px] text-mut">
-                        Prepaid · Rp {jt(tn.revenue_idr)} {t('jt', 'M')}
-                      </p>
-                    </div>
-                    <span className="num text-[14px] font-bold text-ink flex-shrink-0">
-                      {fmtNum(tn.docs)}
-                    </span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 

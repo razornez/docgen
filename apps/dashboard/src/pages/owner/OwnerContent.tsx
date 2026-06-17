@@ -6,6 +6,7 @@ import {
   type OwnerSiteContent,
 } from '../../api/client.js';
 import { useLang } from '../../i18n/index.js';
+import ConfirmModal from '../../components/ConfirmModal.js';
 
 interface LocS {
   id: string;
@@ -76,6 +77,7 @@ export default function OwnerContent() {
   const [pages, setPages] = useState<PageS[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
   const k = useRef(0);
   const nk = () => `k${k.current++}`;
 
@@ -206,145 +208,79 @@ export default function OwnerContent() {
     ]);
 
   return (
-    <div className="space-y-5">
-      <div className="glass rounded-glass px-6 py-5">
-        <h1 className="text-[16px] font-bold text-ink">
-          {t('Konten publik', 'Public content')}
-        </h1>
-        <p className="text-[12.5px] text-mut mt-0.5">
-          {t(
-            'Halaman & footer landing — dwibahasa (ID / EN). Perubahan langsung live.',
-            'Landing pages & footer — bilingual (ID / EN). Changes go live instantly.',
-          )}
-        </p>
-        <div className="flex mt-4 glass-soft rounded-full p-1 gap-1 w-fit">
-          {(
-            [
-              ['pages', t('Halaman', 'Pages')],
-              ['footer', t('Footer', 'Footer')],
-            ] as const
-          ).map(([v, l]) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setTab(v)}
-              className={`px-4 py-1.5 text-[12.5px] font-bold rounded-full transition-all ${
-                tab === v ? 'bg-grad text-white' : 'text-mut hover:text-ink'
-              }`}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Halaman (CMS) ──────────────────────────────────────────── */}
-      {tab === 'pages' && (
-        <div className="space-y-4">
-          {pages.map((p) => (
-            <div key={p.key} className="glass rounded-glass p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-mut mb-1">
-                    {t('Slug', 'Slug')} · URL: /p/{p.slug || '…'}
-                  </p>
-                  <input
-                    value={p.slug}
-                    onChange={(e) => patchPage(p.key, { slug: e.target.value })}
-                    placeholder={t('contoh-halaman', 'example-page')}
-                    className={`num ${inputCls}`}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => delPage(p.key)}
-                  aria-label={t('Hapus halaman', 'Delete page')}
-                  className="self-end p-2 rounded-lg bg-white/55 text-mut hover:text-rose-600 hover:bg-white/75 transition-colors"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.85}
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <LocRow
-                label={t('Judul', 'Title')}
-                value={p.title}
-                onChange={(v) => patchPage(p.key, { title: v })}
-              />
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-mut mb-1">
-                  {t(
-                    'Isi (markdown polos, pisah paragraf dgn baris baru)',
-                    'Content (plain markdown, separate paragraphs with new lines)',
-                  )}
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['id', 'en'] as const).map((l) => (
-                    <textarea
-                      key={l}
-                      value={p.body[l]}
-                      onChange={(e) =>
-                        patchPage(p.key, {
-                          body: { ...p.body, [l]: e.target.value },
-                        })
-                      }
-                      rows={4}
-                      placeholder={l.toUpperCase()}
-                      className={`${inputCls} resize-y`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addPage}
-            className="text-[13px] font-semibold text-brand-purple hover:opacity-80"
-          >
-            {t('+ Tambah halaman', '+ Add page')}
-          </button>
-        </div>
-      )}
-
-      {/* ── Footer ─────────────────────────────────────────────────── */}
-      {tab === 'footer' && (
-        <div className="space-y-4">
-          <div className="glass rounded-glass p-5">
-            <LocRow
-              label={t('Tagline', 'Tagline')}
-              value={tagline}
-              onChange={setTagline}
-            />
+    <>
+      <ConfirmModal
+        isOpen={confirmDeleteKey !== null}
+        title={t('Hapus halaman?', 'Delete page?')}
+        message={t(
+          'Halaman ini akan dihapus dari daftar. Perubahan belum tersimpan hingga Anda klik Simpan.',
+          'This page will be removed from the list. Changes are not saved until you click Save.',
+        )}
+        confirmLabel={t('Hapus', 'Delete')}
+        cancelLabel={t('Batal', 'Cancel')}
+        danger
+        onConfirm={() => {
+          if (confirmDeleteKey) delPage(confirmDeleteKey);
+          setConfirmDeleteKey(null);
+        }}
+        onCancel={() => setConfirmDeleteKey(null)}
+      />
+      <div className="space-y-5">
+        <div className="glass rounded-glass px-6 py-5">
+          <h1 className="text-[16px] font-bold text-ink">
+            {t('Konten publik', 'Public content')}
+          </h1>
+          <p className="text-[12.5px] text-mut mt-0.5">
+            {t(
+              'Halaman & footer landing — dwibahasa (ID / EN). Perubahan langsung live.',
+              'Landing pages & footer — bilingual (ID / EN). Changes go live instantly.',
+            )}
+          </p>
+          <div className="flex mt-4 glass-soft rounded-full p-1 gap-1 w-fit">
+            {(
+              [
+                ['pages', t('Halaman', 'Pages')],
+                ['footer', t('Footer', 'Footer')],
+              ] as const
+            ).map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setTab(v)}
+                className={`px-4 py-1.5 text-[12.5px] font-bold rounded-full transition-all ${
+                  tab === v ? 'bg-grad text-white' : 'text-mut hover:text-ink'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {cols.map((c) => (
-              <div key={c.key} className="glass rounded-glass p-5 space-y-3">
-                <div className="flex items-start gap-2">
+        </div>
+
+        {/* ── Halaman (CMS) ──────────────────────────────────────────── */}
+        {tab === 'pages' && (
+          <div className="space-y-4">
+            {pages.map((p) => (
+              <div key={p.key} className="glass rounded-glass p-5 space-y-3">
+                <div className="flex items-center gap-2">
                   <div className="flex-1">
-                    <LocRow
-                      label={t('Judul kolom', 'Column title')}
-                      value={c.head}
-                      onChange={(v) => patchCol(c.key, { head: v })}
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-mut mb-1">
+                      {t('Slug', 'Slug')} · URL: /p/{p.slug || '…'}
+                    </p>
+                    <input
+                      value={p.slug}
+                      onChange={(e) =>
+                        patchPage(p.key, { slug: e.target.value })
+                      }
+                      placeholder={t('contoh-halaman', 'example-page')}
+                      className={`num ${inputCls}`}
                     />
                   </div>
                   <button
                     type="button"
-                    onClick={() =>
-                      setCols((cs) => cs.filter((x) => x.key !== c.key))
-                    }
-                    aria-label={t('Hapus kolom', 'Delete column')}
-                    className="mt-5 p-2 rounded-lg bg-white/55 text-mut hover:text-rose-600 flex-shrink-0"
+                    onClick={() => setConfirmDeleteKey(p.key)}
+                    aria-label={t('Hapus halaman', 'Delete page')}
+                    className="self-end p-2 rounded-lg bg-white/55 text-mut hover:text-rose-600 hover:bg-white/75 transition-colors"
                   >
                     <svg
                       className="w-4 h-4"
@@ -361,102 +297,188 @@ export default function OwnerContent() {
                     </svg>
                   </button>
                 </div>
-                {c.items.map((it) => (
-                  <div
-                    key={it.key}
-                    className="border-t border-white/40 pt-2.5 space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-mut">
-                        {t('Tautan', 'Link')}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          colItems(c.key, (its) =>
-                            its.filter((x) => x.key !== it.key),
-                          )
+                <LocRow
+                  label={t('Judul', 'Title')}
+                  value={p.title}
+                  onChange={(v) => patchPage(p.key, { title: v })}
+                />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-mut mb-1">
+                    {t(
+                      'Isi (markdown polos, pisah paragraf dgn baris baru)',
+                      'Content (plain markdown, separate paragraphs with new lines)',
+                    )}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['id', 'en'] as const).map((l) => (
+                      <textarea
+                        key={l}
+                        value={p.body[l]}
+                        onChange={(e) =>
+                          patchPage(p.key, {
+                            body: { ...p.body, [l]: e.target.value },
+                          })
                         }
-                        className="text-[11px] text-mut hover:text-rose-600"
-                      >
-                        {t('hapus', 'remove')}
-                      </button>
-                    </div>
-                    <LocRow
-                      label={t('Label', 'Label')}
-                      value={it.label}
-                      onChange={(v) => patchLink(c.key, it.key, { label: v })}
-                    />
-                    <input
-                      value={it.href}
-                      onChange={(e) =>
-                        patchLink(c.key, it.key, { href: e.target.value })
-                      }
-                      placeholder={t(
-                        '/p/slug atau https://…',
-                        '/p/slug or https://…',
-                      )}
-                      className={`num ${inputCls}`}
-                    />
+                        rows={4}
+                        placeholder={l.toUpperCase()}
+                        className={`${inputCls} resize-y`}
+                      />
+                    ))}
                   </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    colItems(c.key, (its) => [
-                      ...its,
-                      {
-                        key: nk(),
-                        label: { id: 'Tautan', en: 'Link' },
-                        href: '#',
-                      },
-                    ])
-                  }
-                  className="text-[12px] font-semibold text-brand-purple hover:opacity-80"
-                >
-                  {t('+ Tautan', '+ Link')}
-                </button>
+                </div>
               </div>
             ))}
+            <button
+              type="button"
+              onClick={addPage}
+              className="text-[13px] font-semibold text-brand-purple hover:opacity-80"
+            >
+              {t('+ Tambah halaman', '+ Add page')}
+            </button>
           </div>
+        )}
+
+        {/* ── Footer ─────────────────────────────────────────────────── */}
+        {tab === 'footer' && (
+          <div className="space-y-4">
+            <div className="glass rounded-glass p-5">
+              <LocRow
+                label={t('Tagline', 'Tagline')}
+                value={tagline}
+                onChange={setTagline}
+              />
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {cols.map((c) => (
+                <div key={c.key} className="glass rounded-glass p-5 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1">
+                      <LocRow
+                        label={t('Judul kolom', 'Column title')}
+                        value={c.head}
+                        onChange={(v) => patchCol(c.key, { head: v })}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCols((cs) => cs.filter((x) => x.key !== c.key))
+                      }
+                      aria-label={t('Hapus kolom', 'Delete column')}
+                      className="mt-5 p-2 rounded-lg bg-white/55 text-mut hover:text-rose-600 flex-shrink-0"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.85}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  {c.items.map((it) => (
+                    <div
+                      key={it.key}
+                      className="border-t border-white/40 pt-2.5 space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-mut">
+                          {t('Tautan', 'Link')}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            colItems(c.key, (its) =>
+                              its.filter((x) => x.key !== it.key),
+                            )
+                          }
+                          className="text-[11px] text-mut hover:text-rose-600"
+                        >
+                          {t('hapus', 'remove')}
+                        </button>
+                      </div>
+                      <LocRow
+                        label={t('Label', 'Label')}
+                        value={it.label}
+                        onChange={(v) => patchLink(c.key, it.key, { label: v })}
+                      />
+                      <input
+                        value={it.href}
+                        onChange={(e) =>
+                          patchLink(c.key, it.key, { href: e.target.value })
+                        }
+                        placeholder={t(
+                          '/p/slug atau https://…',
+                          '/p/slug or https://…',
+                        )}
+                        className={`num ${inputCls}`}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      colItems(c.key, (its) => [
+                        ...its,
+                        {
+                          key: nk(),
+                          label: { id: 'Tautan', en: 'Link' },
+                          href: '#',
+                        },
+                      ])
+                    }
+                    className="text-[12px] font-semibold text-brand-purple hover:opacity-80"
+                  >
+                    {t('+ Tautan', '+ Link')}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addCol}
+              className="text-[13px] font-semibold text-brand-purple hover:opacity-80"
+            >
+              {t('+ Tambah kolom', '+ Add column')}
+            </button>
+          </div>
+        )}
+
+        {/* ── Aksi ───────────────────────────────────────────────────── */}
+        {error && (
+          <p className="text-[12.5px] text-rose-600 text-right">{error}</p>
+        )}
+        <div className="flex items-center justify-end gap-3">
+          {saved && (
+            <span className="text-[12.5px] font-semibold text-emerald-600">
+              {t('Tersimpan ✓', 'Saved ✓')}
+            </span>
+          )}
           <button
             type="button"
-            onClick={addCol}
-            className="text-[13px] font-semibold text-brand-purple hover:opacity-80"
+            onClick={() => q.data && seed(q.data)}
+            className="px-4 py-2.5 text-[13px] font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
           >
-            {t('+ Tambah kolom', '+ Add column')}
+            {t('Reset', 'Reset')}
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={save.isPending}
+            className="px-5 py-2.5 text-[13px] font-bold rounded-full text-white bg-grad shadow-[0_4px_14px_rgba(155,93,229,0.4)] disabled:opacity-50 hover:opacity-90 transition-all"
+          >
+            {save.isPending
+              ? t('Menyimpan…', 'Saving…')
+              : t('Simpan konten', 'Save content')}
           </button>
         </div>
-      )}
-
-      {/* ── Aksi ───────────────────────────────────────────────────── */}
-      {error && (
-        <p className="text-[12.5px] text-rose-600 text-right">{error}</p>
-      )}
-      <div className="flex items-center justify-end gap-3">
-        {saved && (
-          <span className="text-[12.5px] font-semibold text-emerald-600">
-            {t('Tersimpan ✓', 'Saved ✓')}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => q.data && seed(q.data)}
-          className="px-4 py-2.5 text-[13px] font-semibold rounded-full glass-soft text-ink hover:bg-white/60 transition-colors"
-        >
-          {t('Reset', 'Reset')}
-        </button>
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={save.isPending}
-          className="px-5 py-2.5 text-[13px] font-bold rounded-full text-white bg-grad shadow-[0_4px_14px_rgba(155,93,229,0.4)] disabled:opacity-50 hover:opacity-90 transition-all"
-        >
-          {save.isPending
-            ? t('Menyimpan…', 'Saving…')
-            : t('Simpan konten', 'Save content')}
-        </button>
       </div>
-    </div>
+    </>
   );
 }

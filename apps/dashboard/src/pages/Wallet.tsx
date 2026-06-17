@@ -164,7 +164,7 @@ export default function WalletPage() {
     methodList.find((m) => m.code === effMethod)?.name ?? 'QRIS';
   const filterList = filters(t);
 
-  const balance = wallet.data?.balance ?? 0;
+  const balance = wallet.data?.balance ?? null;
   const usageThisMonth = (batchesQ.data?.data ?? [])
     .filter((b) => isThisMonth(b.created_at))
     .reduce((s, b) => s + b.completed, 0);
@@ -277,14 +277,14 @@ export default function WalletPage() {
               {t('Saldo kredit', 'Credit balance')}
             </p>
             <p className="num mt-2 text-[44px] font-extrabold text-ink leading-none">
-              {fmtNum(balance)}
+              {balance !== null ? fmtNum(balance) : '–'}
               <span className="text-[18px] font-bold text-mut ml-1">
                 {t('kredit', 'credits')}
               </span>
             </p>
             <p className="num mt-3 text-[12.5px] text-mut">
-              ≈ {fmtNum(balance)} {t('dokumen', 'documents')} ·{' '}
-              {me.data?.tenant.name ?? '…'}
+              ≈ {balance !== null ? fmtNum(balance) : '–'}{' '}
+              {t('dokumen', 'documents')} · {me.data?.tenant.name ?? '…'}
             </p>
           </div>
           <div className="text-right">

@@ -74,6 +74,7 @@ export class RegistrationService {
           id: userId,
           tenantId: tenant.id,
           email: input.email,
+          role: 'owner',
           ...(input.passwordHash !== undefined
             ? { passwordHash: input.passwordHash }
             : {}),

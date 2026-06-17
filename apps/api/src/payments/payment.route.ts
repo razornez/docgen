@@ -95,8 +95,19 @@ export function registerPaymentRoutes(
   // Daftar metode bayar aktif dari Kasugai.
   app.get('/wallet/payment-methods', async (request) => {
     requireAuth(request);
-    const methods = await service.listMethods();
-    return { data: methods.map((m) => ({ code: m.code, name: m.name })) };
+    try {
+      const methods = await service.listMethods();
+      return { data: methods.map((m) => ({ code: m.code, name: m.name })) };
+    } catch {
+      // Kasugai tidak tersedia (mis. dev tanpa konfigurasi) — kembalikan fallback.
+      return {
+        data: [
+          { code: 'qris', name: 'QRIS' },
+          { code: 'va', name: 'Virtual Account' },
+          { code: 'ewallet', name: 'E-Wallet' },
+        ],
+      };
+    }
   });
 
   // Buat top-up: kembalikan payment_url Kasugai (redirect ke Snap).

@@ -136,9 +136,20 @@ export default function WebhooksPage() {
       setFormError(e instanceof Error ? e.message : t('Gagal', 'Failed')),
   });
 
+  const [deleteError, setDeleteError] = useState('');
+
   const del = useMutation({
     mutationFn: deleteWebhook,
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['webhooks'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['webhooks'] });
+      setDeleteError('');
+    },
+    onError: (e) =>
+      setDeleteError(
+        e instanceof Error
+          ? e.message
+          : t('Gagal menghapus endpoint.', 'Failed to delete endpoint.'),
+      ),
   });
 
   function toggleEvent(ev: string) {
@@ -216,10 +227,9 @@ export default function WebhooksPage() {
                 {t('URL (HTTPS)', 'URL (HTTPS)')}
               </label>
               <input
-                type="url"
+                type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                required
                 placeholder="https://yourapp.com/webhooks/docgen"
                 className={inputCls}
               />
@@ -302,10 +312,16 @@ export default function WebhooksPage() {
               <EndpointRow
                 key={w.id}
                 w={w}
-                onDelete={() => setDeleteTarget(w.id)}
+                onDelete={() => {
+                  setDeleteError('');
+                  setDeleteTarget(w.id);
+                }}
                 t={t}
               />
             ))
+          )}
+          {deleteError && (
+            <p className="px-6 py-3 text-[12px] text-rose-600">{deleteError}</p>
           )}
         </div>
       </div>

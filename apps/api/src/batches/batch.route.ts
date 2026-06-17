@@ -1,8 +1,10 @@
+import { Errors } from '@docgen/shared';
 import type { BatchId, StoragePort, TemplateId } from '@docgen/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth } from '../auth/auth-context.js';
 import { presentDocument } from '../http/presenters.js';
+import { assertNotSsrf } from '../lib/ssrf.js';
 import type { BatchService } from './batch.service.js';
 
 const MarginSchema = z.object({
@@ -32,7 +34,7 @@ const BatchBody = z.object({
     .min(1)
     .max(500),
   options: OptionsSchema.optional(),
-  webhook_url: z.string().url().optional(),
+  webhook_url: z.string().url().startsWith('https://').optional(),
 });
 
 const IdParams = z.object({ id: z.string().trim().min(1) });
@@ -68,6 +70,16 @@ export function registerBatchRoutes(
   app.post('/batches', async (request, reply) => {
     const ctx = requireAuth(request);
     const body = BatchBody.parse(request.body);
+    if (body.webhook_url) {
+      try {
+        assertNotSsrf(body.webhook_url);
+      } catch (e) {
+        throw Errors.invalidRequest(
+          e instanceof Error ? e.message : 'URL tidak diizinkan',
+          'webhook_url',
+        );
+      }
+    }
     const batch = await service.create(
       ctx.tenantId,
       {

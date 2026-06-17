@@ -27,10 +27,12 @@ export function TemplateEditor({
   template,
   onClose,
   onSaved,
+  readOnly = false,
 }: {
   template: TemplateItem;
   onClose: () => void;
   onSaved: () => void;
+  readOnly?: boolean;
 }) {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
@@ -261,31 +263,43 @@ export function TemplateEditor({
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={saveState === 'saving' || loading}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full glass-soft text-[12.5px] font-semibold text-ink hover:bg-white/60 disabled:opacity-50 transition-colors"
-            >
-              {saveState === 'saved'
-                ? t('✓ Tersimpan', '✓ Saved')
-                : saveState === 'saving'
-                  ? t('Menyimpan…', 'Saving…')
-                  : t('Simpan versi', 'Save version')}
-            </button>
-            <button
-              type="button"
-              onClick={() => void generate()}
-              disabled={pdf.loading || loading}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-grad text-white text-[12.5px] font-bold shadow-[0_4px_14px_rgba(155,93,229,0.4)] hover:opacity-90 active:scale-[0.98] disabled:opacity-50 transition-all"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              {pdf.loading
-                ? t('Membuat…', 'Generating…')
-                : t('Generate PDF', 'Generate PDF')}
-            </button>
+            {readOnly ? (
+              <span className="px-3 py-1.5 rounded-full glass-soft text-[12px] font-semibold text-mut">
+                {t('Mode pratinjau', 'Preview mode')}
+              </span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void save()}
+                  disabled={saveState === 'saving' || loading}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full glass-soft text-[12.5px] font-semibold text-ink hover:bg-white/60 disabled:opacity-50 transition-colors"
+                >
+                  {saveState === 'saved'
+                    ? t('✓ Tersimpan', '✓ Saved')
+                    : saveState === 'saving'
+                      ? t('Menyimpan…', 'Saving…')
+                      : t('Simpan versi', 'Save version')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void generate()}
+                  disabled={pdf.loading || loading}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-grad text-white text-[12.5px] font-bold shadow-[0_4px_14px_rgba(155,93,229,0.4)] hover:opacity-90 active:scale-[0.98] disabled:opacity-50 transition-all"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  {pdf.loading
+                    ? t('Membuat…', 'Generating…')
+                    : t('Generate PDF', 'Generate PDF')}
+                </button>
+              </>
+            )}
           </div>
         </div>
 

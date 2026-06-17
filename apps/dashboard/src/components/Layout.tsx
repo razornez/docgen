@@ -263,7 +263,7 @@ export default function Layout() {
     sub: 'sub.overview',
   };
   const initials = data?.tenant.name?.slice(0, 2).toUpperCase() ?? 'DG';
-  const balance = data?.wallet.balance ?? 0;
+  const balance = data?.wallet.balance ?? null;
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -383,7 +383,18 @@ export default function Layout() {
                   {data?.tenant.name ?? '…'}
                 </p>
                 <p className="num text-[11px] text-mut">
-                  {fmtNum(balance)} {t('unit.credit')}
+                  {balance !== null ? (
+                    <>
+                      {fmtNum(balance)}{' '}
+                      {lang === 'en'
+                        ? balance === 1
+                          ? 'credit'
+                          : 'credits'
+                        : t('unit.credit')}
+                    </>
+                  ) : (
+                    '…'
+                  )}
                 </p>
               </div>
               <svg
@@ -513,7 +524,7 @@ export default function Layout() {
                 <path d="M12 2l2.4 6.9L21 9.3l-5.2 4.2 1.8 6.9L12 16.9 6.4 20.4l1.8-6.9L3 9.3l6.6-.4z" />
               </svg>
               <span className="num text-[12.5px] font-bold text-ink">
-                {fmtNum(balance)}
+                {balance !== null ? fmtNum(balance) : '…'}
               </span>
               <span className="text-[12px] text-mut">{t('unit.credits')}</span>
             </div>

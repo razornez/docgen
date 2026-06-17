@@ -22,7 +22,8 @@ import { useLang } from '../i18n/index.js';
 type Panel =
   | { type: 'none' }
   | { type: 'create' }
-  | { type: 'edit'; template: TemplateItem };
+  | { type: 'edit'; template: TemplateItem }
+  | { type: 'preview'; template: TemplateItem };
 
 function DocIcon({ cls }: { cls?: string }) {
   return (
@@ -330,6 +331,16 @@ export default function TemplatesPage() {
         />
       )}
 
+      {/* Preview — editor read-only tanpa tombol simpan/generate */}
+      {panel.type === 'preview' && (
+        <TemplateEditor
+          template={panel.template}
+          onClose={closePanel}
+          onSaved={() => undefined}
+          readOnly
+        />
+      )}
+
       {/* ── Loading ─────────────────────────────────────────────────── */}
       {templates.isLoading && (
         <div className="flex items-center justify-center py-16">
@@ -408,7 +419,9 @@ export default function TemplatesPage() {
                   <div className="absolute inset-0 flex items-center justify-center gap-2 bg-ink/10 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
-                      onClick={() => setPanel({ type: 'edit', template: tpl })}
+                      onClick={() =>
+                        setPanel({ type: 'preview', template: tpl })
+                      }
                       className="px-3 py-1.5 rounded-lg bg-white/90 text-[12px] font-semibold text-ink shadow hover:bg-white transition-colors"
                     >
                       {t('Pratinjau', 'Preview')}
@@ -546,7 +559,7 @@ export default function TemplatesPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPanel({ type: 'edit', template: tpl })}
+                    onClick={() => setPanel({ type: 'preview', template: tpl })}
                     className="px-3 py-1.5 text-[12px] font-semibold rounded-lg text-mut hover:text-ink hover:bg-white/50 transition-colors"
                   >
                     {t('Pratinjau', 'Preview')}

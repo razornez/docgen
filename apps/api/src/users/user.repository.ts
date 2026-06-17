@@ -8,6 +8,7 @@ export interface CreateUserInput {
   readonly passwordHash?: string;
   readonly googleId?: string;
   readonly displayName?: string;
+  readonly role?: 'owner' | 'admin' | 'member';
 }
 
 /** Row yang dikembalikan hanya untuk keperluan autentikasi (tidak pernah dikirim ke klien). */
@@ -58,8 +59,8 @@ export class PgUserRepository implements UserRepository {
 
   async create(input: CreateUserInput): Promise<User> {
     const { rows } = await this.db.query<UserRow>(
-      `INSERT INTO users (id, tenant_id, email, password_hash, google_id, display_name)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO users (id, tenant_id, email, password_hash, google_id, display_name, role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING ${COLUMNS}`,
       [
         input.id,
@@ -68,6 +69,7 @@ export class PgUserRepository implements UserRepository {
         input.passwordHash ?? null,
         input.googleId ?? null,
         input.displayName ?? null,
+        input.role ?? 'member',
       ],
     );
     return toUser(rows[0]!);
@@ -106,9 +108,9 @@ export class PgUserRepository implements UserRepository {
   }
 
   async updatePassword(userId: string, passwordHash: string): Promise<void> {
-    await this.db.query(
-      `UPDATE users SET password_hash = $2 WHERE id = $1`,
-      [userId, passwordHash],
-    );
+    await this.db.query(`UPDATE users SET password_hash = $2 WHERE id = $1`, [
+      userId,
+      passwordHash,
+    ]);
   }
 }

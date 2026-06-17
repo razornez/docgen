@@ -141,7 +141,7 @@ export default function DashboardPage() {
   });
   const batchesQ = useQuery({ queryKey: ['batches'], queryFn: getBatches });
 
-  const balance = me.data?.wallet.balance ?? 0;
+  const balance = me.data?.wallet.balance ?? null;
   const batches = batchesQ.data?.data ?? [];
 
   const monthBatches = batches.filter((b) => isThisMonth(b.created_at));
@@ -151,7 +151,7 @@ export default function DashboardPage() {
   const successRate =
     totalCompleted + totalFailed > 0
       ? (totalCompleted / (totalCompleted + totalFailed)) * 100
-      : 100;
+      : null;
   const inQueue = batches.filter(
     (b) => b.status === 'queued' || b.status === 'processing',
   ).length;
@@ -189,21 +189,19 @@ export default function DashboardPage() {
   const stats = [
     {
       label: t('Saldo kredit', 'Credit balance'),
-      value: fmtNum(balance),
-      sub: `≈ ${fmtNum(balance)} ${dok}`,
+      value: balance !== null ? fmtNum(balance) : '–',
+      sub: balance !== null ? `≈ ${fmtNum(balance)} ${dok}` : undefined,
     },
     {
       label: t('Dokumen / bln', 'Documents / mo'),
       value: fmtNum(docsThisMonth),
-      sub: '↑ 18%',
-      subClass: 'text-emerald-600',
     },
     {
       label: t('Tingkat sukses', 'Success rate'),
-      value: `${successRate.toFixed(1)}%`,
+      value: successRate !== null ? `${successRate.toFixed(1)}%` : '–',
       sub: t('30 hari', '30 days'),
     },
-    { label: 'Render p95', value: '1.8s', sub: t('cepat', 'fast') },
+    { label: 'Render p95', value: '–' },
   ];
 
   return (
@@ -223,9 +221,11 @@ export default function DashboardPage() {
               )}
             </h1>
             <p className="num mt-2 text-[12.5px] text-mut">
-              {t('sukses', 'success')} {successRate.toFixed(1)}% ·{' '}
-              {t('render 1.8s rata-rata', '1.8s avg render')} ·{' '}
-              {fmtNum(balance)} {t('kredit tersisa', 'credits left')}
+              {successRate !== null
+                ? `${t('sukses', 'success')} ${successRate.toFixed(1)}% · `
+                : ''}
+              {balance !== null ? fmtNum(balance) : '–'}{' '}
+              {t('kredit tersisa', 'credits left')}
             </p>
           </div>
           <div className="flex items-center gap-2.5 flex-shrink-0">
@@ -289,9 +289,9 @@ export default function DashboardPage() {
               <p className="num mt-2 text-[26px] font-extrabold text-ink leading-none">
                 {s.value}
               </p>
-              <p className={`num mt-2 text-[11px] ${s.subClass ?? 'text-mut'}`}>
-                {s.sub}
-              </p>
+              {s.sub && (
+                <p className="num mt-2 text-[11px] text-mut">{s.sub}</p>
+              )}
             </div>
           ))}
         </div>
@@ -310,8 +310,8 @@ export default function DashboardPage() {
             <p className="text-[10.5px] font-bold uppercase tracking-wider text-mut mt-1.5">
               {t('Dok minggu ini', 'Docs this week')}
             </p>
-            <span className="inline-flex items-center gap-1 mt-2.5 px-2 py-1 rounded-lg bg-emerald-100/70 text-emerald-700 text-[11px] font-semibold">
-              ↑ +12% {t('vs minggu lalu', 'vs last week')}
+            <span className="inline-flex items-center gap-1 mt-2.5 px-2 py-1 rounded-lg bg-slate-100/70 text-mut text-[11px] font-semibold">
+              {t('7 hari terakhir', 'last 7 days')}
             </span>
           </div>
           <div className="flex-1 flex items-end justify-between gap-2 sm:gap-3 h-[120px]">
@@ -394,10 +394,10 @@ export default function DashboardPage() {
             {[
               {
                 name: t('Mesin render', 'Render engine'),
-                meta: t('p95 1.8 dtk', 'p95 1.8s'),
+                meta: '–',
                 dot: 'bg-emerald-500',
               },
-              { name: 'API', meta: '99.98% uptime', dot: 'bg-emerald-500' },
+              { name: 'API', meta: '–', dot: 'bg-emerald-500' },
               {
                 name: t('Antrian batch', 'Batch queue'),
                 meta: `${inQueue} ${t('berjalan', 'running')}`,
