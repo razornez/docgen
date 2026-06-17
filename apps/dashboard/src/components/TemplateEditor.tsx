@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   getTemplateBody,
   createTemplateVersion,
@@ -49,6 +49,31 @@ export function TemplateEditor({
     error: '',
   });
   const [showTips, setShowTips] = useState(false);
+  const [leftPct, setLeftPct] = useState(50);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef(false);
+
+  function onDividerMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    dragRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+      setLeftPct(Math.min(Math.max(pct, 20), 80));
+    };
+    const onUp = () => {
+      dragRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
 
   const vars = useMemo(() => extractVars(body), [body]);
   const preview = useMemo(() => renderClient(body, data), [body, data]);
@@ -304,9 +329,12 @@ export function TemplateEditor({
         </div>
 
         {/* ── Body 2 panel ───────────────────────────────────────── */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 min-h-0">
+        <div ref={containerRef} className="flex-1 flex min-h-0">
           {/* Left */}
-          <div className="flex flex-col min-h-0 border-r border-white/40 bg-white/20">
+          <div
+            className="flex flex-col min-h-0 bg-white/20 flex-none overflow-hidden"
+            style={{ width: `${leftPct}%` }}
+          >
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/40">
               <div className="flex items-center p-0.5 rounded-full glass-soft">
                 <button
@@ -393,8 +421,24 @@ export function TemplateEditor({
             </div>
           </div>
 
+          {/* Drag divider */}
+          <div
+            onMouseDown={onDividerMouseDown}
+            className="w-3 flex-none flex items-center justify-center cursor-col-resize group relative z-10 border-x border-white/40 bg-white/10 hover:bg-brand-purple/10 transition-colors select-none"
+            title="Geser untuk resize"
+          >
+            <div className="flex flex-col gap-[3.5px]">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="w-[3px] h-[3px] rounded-full bg-white/50 group-hover:bg-brand-purple/60 transition-colors"
+                />
+              ))}
+            </div>
+          </div>
+
           {/* Right — preview */}
-          <div className="flex flex-col min-h-0">
+          <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
             <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-white/40">
               <span className="text-[10px] font-bold uppercase tracking-wider text-mut flex-shrink-0">
                 {t('Preview langsung', 'Live preview')}
