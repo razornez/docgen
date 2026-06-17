@@ -29,10 +29,14 @@ export default {
       },
       keyframes: {
         floatPaper: {
-          '0%, 100%': { transform: 'translateY(0) rotate(var(--r, 0deg))' },
-          '50%': {
-            transform: 'translateY(-24px) rotate(calc(var(--r, 0deg) + 4deg))',
+          '0%': { transform: 'translateY(0px)   rotate(var(--r, 0deg))' },
+          '30%': {
+            transform: 'translateY(-18px)  rotate(calc(var(--r, 0deg) + 3deg))',
           },
+          '65%': {
+            transform: 'translateY(-10px)  rotate(calc(var(--r, 0deg) - 2deg))',
+          },
+          '100%': { transform: 'translateY(0px)   rotate(var(--r, 0deg))' },
         },
         growBar: {
           '0%': { transform: 'scaleY(0)' },
@@ -40,7 +44,7 @@ export default {
         },
       },
       animation: {
-        floatPaper: 'floatPaper 16s ease-in-out infinite',
+        floatPaper: 'floatPaper 18s ease-in-out infinite',
         growBar: 'growBar 0.7s cubic-bezier(0.22, 1, 0.36, 1) both',
       },
     },

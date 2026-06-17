@@ -53,30 +53,174 @@ export function LangToggle() {
   );
 }
 
-const ORBS = [
-  { top: '14%', left: '3%', size: 70, from: '#b388f5', to: '#9b5de5' },
-  { top: '8%', right: '7%', size: 56, from: '#c8a8ff', to: '#9b5de5' },
-  { top: '40%', left: '6%', size: 44, from: '#f5a9d4', to: '#f15bb5' },
-  { top: '52%', right: '5%', size: 64, from: '#b388f5', to: '#9b5de5' },
-  { top: '72%', left: '4%', size: 50, from: '#f5a9d4', to: '#f15bb5' },
+type DocType = 'lined' | 'headed' | 'plain';
+interface PaperDef {
+  x: string;
+  y: string;
+  w: number;
+  h: number;
+  r: number;
+  delay: number;
+  dur: number;
+  type: DocType;
+  opacity?: number;
+}
+
+const LINED_BG =
+  'repeating-linear-gradient(180deg,transparent 0 9px,rgba(120,95,180,0.13) 9px 10.5px),rgba(255,255,255,0.62)';
+const HEADED_BG =
+  'repeating-linear-gradient(180deg,transparent 0 9px,rgba(120,95,180,0.13) 9px 10.5px),' +
+  'linear-gradient(180deg,rgba(155,93,229,0.22) 0% 22%,rgba(255,255,255,0.62) 22%)';
+const PLAIN_BG = 'rgba(255,255,255,0.58)';
+
+const BG: Record<DocType, string> = {
+  lined: LINED_BG,
+  headed: HEADED_BG,
+  plain: PLAIN_BG,
+};
+
+const PAPERS: PaperDef[] = [
+  /* kiri */
+  { x: '1%', y: '7%', w: 58, h: 74, r: -13, delay: 0, dur: 18, type: 'headed' },
+  {
+    x: '3%',
+    y: '42%',
+    w: 44,
+    h: 58,
+    r: 8,
+    delay: -5,
+    dur: 15,
+    type: 'lined',
+    opacity: 0.5,
+  },
+  {
+    x: '1%',
+    y: '75%',
+    w: 50,
+    h: 64,
+    r: -10,
+    delay: -11,
+    dur: 20,
+    type: 'plain',
+    opacity: 0.45,
+  },
+  /* kanan */
+  { x: '91%', y: '4%', w: 64, h: 82, r: 14, delay: -9, dur: 17, type: 'lined' },
+  {
+    x: '88%',
+    y: '46%',
+    w: 46,
+    h: 60,
+    r: -7,
+    delay: -2,
+    dur: 22,
+    type: 'headed',
+    opacity: 0.55,
+  },
+  {
+    x: '92%',
+    y: '72%',
+    w: 36,
+    h: 48,
+    r: 11,
+    delay: -7,
+    dur: 16,
+    type: 'plain',
+    opacity: 0.45,
+  },
+  /* atas */
+  {
+    x: '25%',
+    y: '1%',
+    w: 40,
+    h: 52,
+    r: 12,
+    delay: -6,
+    dur: 21,
+    type: 'headed',
+    opacity: 0.5,
+  },
+  {
+    x: '47%',
+    y: '-1%',
+    w: 46,
+    h: 58,
+    r: -5,
+    delay: -3,
+    dur: 19,
+    type: 'lined',
+    opacity: 0.45,
+  },
+  {
+    x: '68%',
+    y: '2%',
+    w: 36,
+    h: 46,
+    r: 9,
+    delay: -4,
+    dur: 23,
+    type: 'plain',
+    opacity: 0.4,
+  },
+  /* bawah */
+  {
+    x: '16%',
+    y: '86%',
+    w: 52,
+    h: 66,
+    r: -8,
+    delay: -12,
+    dur: 17,
+    type: 'lined',
+    opacity: 0.5,
+  },
+  {
+    x: '40%',
+    y: '88%',
+    w: 48,
+    h: 62,
+    r: 7,
+    delay: -8,
+    dur: 14,
+    type: 'headed',
+    opacity: 0.45,
+  },
+  {
+    x: '65%',
+    y: '86%',
+    w: 42,
+    h: 54,
+    r: -11,
+    delay: -1,
+    dur: 18,
+    type: 'plain',
+    opacity: 0.4,
+  },
 ];
 
 export function OrbsBg() {
   return (
-    <div className="fixed inset-0 -z-10 app-canvas overflow-hidden" aria-hidden>
-      {ORBS.map((o, i) => (
+    <div
+      className="fixed inset-0 -z-10 app-canvas overflow-hidden pointer-events-none"
+      aria-hidden
+    >
+      {PAPERS.map((p, i) => (
         <div
           key={i}
-          className="absolute rounded-full blur-[2px] opacity-70"
-          style={{
-            top: o.top,
-            left: o.left,
-            right: o.right,
-            width: o.size,
-            height: o.size,
-            background: `radial-gradient(circle at 32% 28%, ${o.from}, ${o.to})`,
-            boxShadow: `0 18px 40px ${o.to}55`,
-          }}
+          className="paper animate-floatPaper"
+          style={
+            {
+              left: p.x,
+              top: p.y,
+              width: p.w,
+              height: p.h,
+              opacity: p.opacity ?? 0.6,
+              background: BG[p.type],
+              '--r': `${p.r}deg`,
+              animationDelay: `${p.delay}s`,
+              animationDuration: `${p.dur}s`,
+            } as React.CSSProperties
+          }
         />
       ))}
     </div>
