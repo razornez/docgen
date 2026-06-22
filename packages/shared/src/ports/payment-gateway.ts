@@ -3,11 +3,9 @@
  * gateway internal yang mem-proxy Midtrans. Client tidak menyentuh Midtrans.
  * Kredit hanya ditambahkan dari webhook terverifikasi (docs/21 — Aturan Emas Uang).
  */
-export interface CreateTxInput {
+export interface CreateOrderInput {
   readonly orderId: string;
   readonly amountIdr: number;
-  /** Kode metode bayar Kasugai, mis. 'midtrans_qris', 'midtrans_va_bni'. */
-  readonly method: string;
   readonly customerName: string;
   readonly customerEmail?: string;
 }
@@ -42,16 +40,11 @@ export interface PaymentGatewayPort {
   listMethods(): Promise<PaymentMethod[]>;
 
   /**
-   * Kunci nominal (POST /orders) lalu inisiasi bayar (POST /pay).
-   * Mengembalikan URL redirect ke halaman Snap, plus token + clientKey
-   * untuk menampilkan widget Snap embedded (snap.js) di dashboard.
+   * Kunci nominal: POST /orders saja. Pemilihan metode & inisiasi bayar (/pay)
+   * ditangani oleh widget Kasugai (widget.js) di browser memakai orderId ini.
+   * Mengembalikan orderId yang dipakai widget untuk mount.
    */
-  createTransaction(input: CreateTxInput): Promise<{
-    orderId: string;
-    paymentUrl: string;
-    token: string | null;
-    clientKey: string | null;
-  }>;
+  createOrder(input: CreateOrderInput): Promise<{ orderId: string }>;
 
   /**
    * Verifikasi HMAC-SHA256 atas RAW body webhook. WAJIB raw body — JSON yang

@@ -82,7 +82,9 @@ const EnvSchema = z.object({
   // Boleh kosong di dev; diperketat di produksi (top-up akan gagal tanpa key).
   KASUGAI_BASE_URL: z.string().default('https://kasugai.razornez.net'),
   KASUGAI_SECRET_KEY: z.string().default(''), // sk_... (BUKAN pk_) — server only
-  KASUGAI_PUBLISHABLE_KEY: z.string().default(''), // pk_... — untuk snap.js di browser
+  // pk_... — dipakai widget Kasugai (widget.js) di browser. Aman di publik;
+  // default = tenant DocGen (t9). Override via env bila tenant berganti.
+  KASUGAI_PUBLISHABLE_KEY: z.string().default('pk_kasugai_t9_f8d2993ff37abb70'),
   KASUGAI_WEBHOOK_SECRET: z.string().default(''), // whsec_... (dari dashboard)
 
   // Rahasia aplikasi

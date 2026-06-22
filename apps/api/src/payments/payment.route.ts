@@ -61,14 +61,16 @@ async function notifyTopup(
 
 const TopupBody = z.object({
   package: z.string().trim().min(1),
-  method: z.string().trim().min(1),
 });
 
 /**
- * Rute top-up kredit via Kasugai (docs/03 — Alur 3).
- * - GET  /v1/wallet/packages         → daftar paket kredit
- * - GET  /v1/wallet/payment-methods  → metode bayar aktif (QRIS, VA, dst)
- * - POST /v1/wallet/topups           → buat transaksi Kasugai, kembali payment_url
+ * Rute top-up kredit via Kasugai (widget).
+ * - GET  /v1/wallet/packages    → daftar paket kredit
+ * - POST /v1/wallet/topups      → buat order Kasugai, kembali orderId + pk widget
+ * - POST /v1/wallet/topups/:id/confirm → cek status (cepat) sebelum webhook
+ *
+ * Pemilihan metode bayar & inisiasi pembayaran ditangani widget Kasugai
+ * (widget.js) di browser — tidak ada daftar metode buatan sendiri lagi.
  */
 export function registerPaymentRoutes(
   app: FastifyInstance,
@@ -92,39 +94,23 @@ export function registerPaymentRoutes(
     };
   });
 
-  // Daftar metode bayar aktif dari Kasugai.
-  app.get('/wallet/payment-methods', async (request) => {
-    requireAuth(request);
-    try {
-      const methods = await service.listMethods();
-      return { data: methods.map((m) => ({ code: m.code, name: m.name })) };
-    } catch {
-      // Kasugai tidak tersedia (mis. dev tanpa konfigurasi) — kembalikan fallback.
-      return {
-        data: [
-          { code: 'qris', name: 'QRIS' },
-          { code: 'va', name: 'Virtual Account' },
-          { code: 'ewallet', name: 'E-Wallet' },
-        ],
-      };
-    }
-  });
-
-  // Buat top-up: kembalikan payment_url Kasugai (redirect ke Snap).
+  // Buat top-up: kunci nominal di Kasugai (order) → kembalikan orderId + pk agar
+  // browser bisa mount widget Kasugai. Pembayaran ditangani widget.
   app.post('/wallet/topups', async (request, reply) => {
     const ctx = requireAuth(request);
     const body = TopupBody.parse(request.body);
-    const { payment, paymentUrl, snapToken, clientKey } =
-      await service.createTopup(ctx.tenantId, body.package, body.method);
+    const { payment, publishableKey, apiBase } = await service.createTopup(
+      ctx.tenantId,
+      body.package,
+    );
     reply.code(201);
     return {
       payment_id: payment.id,
       amount_idr: payment.amountIdr,
       credits: payment.credits,
       currency: 'IDR',
-      payment_url: paymentUrl,
-      snap_token: snapToken,
-      client_key: clientKey,
+      public_key: publishableKey,
+      kasugai_base_url: apiBase,
       status: payment.status,
     };
   });
@@ -157,10 +143,12 @@ export function registerPaymentRoutes(
  * Webhook Kasugai — rute PUBLIK (tanpa auth API key).
  * Keamanan: HMAC-SHA256 atas RAW body, header X-Kasugai-Signature.
  *
- * SELALU balas 200 — termasuk saat signature invalid — agar Kasugai tidak
- * retry tanpa henti (lihat brief integrasi). Payload hanya diproses bila
- * signature valid. Raw body diambil dari content-type parser khusus
- * (lihat app.ts: scope webhook punya parser yang menyimpan rawBody).
+ * Signature WAJIB valid. Bila gagal verifikasi kita balas non-2xx (401/400) —
+ * BUKAN silent-200 — supaya kegagalan terlihat di log delivery Kasugai dan
+ * di-retry (ini akar bug lama "settle sukses tapi saldo tak nambah": secret
+ * salah → 200 senyap → tak pernah kredit & tak pernah retry). Payload hanya
+ * diproses bila signature valid. Raw body diambil dari parser khusus scope
+ * webhook (lihat app.ts).
  */
 export function registerPaymentWebhookRoute(
   app: FastifyInstance,
@@ -179,13 +167,16 @@ export function registerPaymentWebhookRoute(
         { reason: result.reason, body_len: raw.length },
         'Kasugai webhook ditolak',
       );
-    } else {
-      request.log.info(
-        { reason: result.reason, orderId: result.orderId },
-        'Kasugai webhook diproses',
-      );
+      // Signature salah → 401; payload rusak → 400. Keduanya non-2xx agar
+      // Kasugai menandai delivery gagal & me-retry.
+      reply.code(result.reason === 'invalid_signature' ? 401 : 400);
+      return { received: false, reason: result.reason };
     }
 
+    request.log.info(
+      { reason: result.reason, orderId: result.orderId },
+      'Kasugai webhook diproses',
+    );
     reply.code(200);
     return { received: true, ...result };
   });

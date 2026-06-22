@@ -57,6 +57,10 @@ export class PaymentService {
     private readonly db: Queryable,
     private readonly gateway: PaymentGatewayPort,
     private readonly idGen: IdGenerator,
+    /** Publishable key Kasugai (pk_) — dipakai widget di browser. */
+    private readonly publishableKey: string = '',
+    /** Base URL Kasugai — dipakai widget sebagai apiBase. */
+    private readonly gatewayApiBase: string = 'https://kasugai.razornez.net',
   ) {}
 
   /** Daftar metode bayar aktif dari Kasugai (mis. QRIS, VA BCA). */
@@ -81,13 +85,10 @@ export class PaymentService {
   async createTopup(
     tenantId: TenantId,
     packageId: string,
-    method: string,
-    customerEmail?: string,
   ): Promise<{
     payment: PaymentRecord;
-    paymentUrl: string;
-    snapToken: string | null;
-    clientKey: string | null;
+    publishableKey: string;
+    apiBase: string;
   }> {
     const { rows: pkgRows } = await this.db.query<
       CreditPackageRow & { bonus: string }
@@ -98,27 +99,37 @@ export class PaymentService {
     const pkg = pkgRows[0];
     if (!pkg) throw Errors.notFound('Credit package not found', 'package');
 
-    // Nama customer untuk Kasugai (wajib) — ambil dari tenant.
+    // Customer untuk Kasugai: nama dari user utama (fallback nama tenant), email
+    // dari user utama bila ada.
     const { rows: tenantRows } = await this.db.query<{ name: string }>(
       `SELECT name FROM tenants WHERE id = $1`,
       [tenantId],
     );
-    const customerName = tenantRows[0]?.name ?? 'DocGen User';
+    const { rows: userRows } = await this.db.query<{
+      email: string | null;
+      display_name: string | null;
+    }>(
+      `SELECT email, display_name FROM users WHERE tenant_id = $1
+        ORDER BY created_at ASC LIMIT 1`,
+      [tenantId],
+    );
+    const customerName =
+      userRows[0]?.display_name ?? tenantRows[0]?.name ?? 'DocGen User';
+    const customerEmail = userRows[0]?.email ?? undefined;
 
     const paymentId = this.idGen.generate(ID_PREFIXES.payment);
     // Kredit diterima = kredit paket + bonus paket (jika ada).
     const credits = Number(pkg.credits) + Number(pkg.bonus ?? 0);
     const amountIdr = Number(pkg.price_idr);
 
-    // Buat transaksi di Kasugai (orders + pay).
-    const { paymentUrl, token, clientKey } =
-      await this.gateway.createTransaction({
-        orderId: paymentId,
-        amountIdr,
-        method,
-        customerName,
-        ...(customerEmail !== undefined ? { customerEmail } : {}),
-      });
+    // Kunci nominal di Kasugai (POST /orders). Pemilihan metode & bayar
+    // ditangani widget di browser memakai orderId ini.
+    await this.gateway.createOrder({
+      orderId: paymentId,
+      amountIdr,
+      customerName,
+      ...(customerEmail !== undefined ? { customerEmail } : {}),
+    });
 
     // Simpan record payment dengan status 'pending'.
     const { rows } = await this.db.query<PaymentRow>(
@@ -137,13 +148,12 @@ export class PaymentService {
         amountIdr: Number(row.amount_idr),
         credits: Number(row.credits),
         status: row.status,
-        paymentUrl,
+        paymentUrl: null,
         gatewayRef: row.gateway_ref,
         createdAt: row.created_at,
       },
-      paymentUrl,
-      snapToken: token,
-      clientKey,
+      publishableKey: this.publishableKey,
+      apiBase: this.gatewayApiBase,
     };
   }
 
@@ -152,9 +162,9 @@ export class PaymentService {
    * 'payment.paid' kredit saldo dalam satu transaksi atomik. Idempoten via
    * UNIQUE(topup, paymentId).
    *
-   * Mengembalikan ringkasan untuk logging route. TIDAK melempar pada signature
-   * invalid — route tetap balas 200 agar Kasugai tidak retry tanpa henti
-   * (lihat brief — return 4xx menyebabkan spam retry).
+   * Mengembalikan hasil terdiskriminasi (ok/reason). Route memetakan kegagalan
+   * verifikasi ke non-2xx (signature → 401, payload → 400) agar terlihat &
+   * di-retry Kasugai; sukses → 200.
    */
   async handleKasugaiWebhook(
     rawBody: string,

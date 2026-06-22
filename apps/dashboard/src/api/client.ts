@@ -568,29 +568,21 @@ export interface TopupResult {
   payment_id: string;
   amount_idr: number;
   credits: number;
-  payment_url: string;
-  snap_token: string | null;
-  client_key: string | null;
+  currency: string;
+  /** Publishable key Kasugai (pk_) untuk mount widget di browser. */
+  public_key: string;
+  /** Base URL Kasugai untuk apiBase widget. */
+  kasugai_base_url: string;
   status: string;
 }
 
 export function createTopup(input: {
   packageId: string;
-  method: string;
 }): Promise<TopupResult> {
   return request('/wallet/topups', {
     method: 'POST',
-    body: JSON.stringify({ package: input.packageId, method: input.method }),
+    body: JSON.stringify({ package: input.packageId }),
   });
-}
-
-export interface PaymentMethodItem {
-  code: string;
-  name: string;
-}
-
-export function getPaymentMethods(): Promise<{ data: PaymentMethodItem[] }> {
-  return request('/wallet/payment-methods');
 }
 
 export interface ConfirmTopupResult {

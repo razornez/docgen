@@ -9,7 +9,7 @@ import { NotImplementedError } from '../errors.js';
 import type { StoragePort } from '../ports/storage.js';
 import type {
   PaymentGatewayPort,
-  CreateTxInput,
+  CreateOrderInput,
   PaymentMethod,
   WebhookVerification,
   OrderStatusValue,
@@ -33,13 +33,8 @@ export class StubPaymentGateway implements PaymentGatewayPort {
   listMethods(): Promise<PaymentMethod[]> {
     throw new NotImplementedError('PaymentGatewayPort.listMethods');
   }
-  createTransaction(_input: CreateTxInput): Promise<{
-    orderId: string;
-    paymentUrl: string;
-    token: string | null;
-    clientKey: string | null;
-  }> {
-    throw new NotImplementedError('PaymentGatewayPort.createTransaction');
+  createOrder(_input: CreateOrderInput): Promise<{ orderId: string }> {
+    throw new NotImplementedError('PaymentGatewayPort.createOrder');
   }
   verifyWebhook(_rawBody: string, _signature: string): WebhookVerification {
     throw new NotImplementedError('PaymentGatewayPort.verifyWebhook');

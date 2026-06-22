@@ -9,6 +9,7 @@ import {
   createTopup,
   confirmTopup,
   type TxItem,
+  type TopupResult,
 } from '../api/client.js';
 import { useLang } from '../i18n/index.js';
 
@@ -67,53 +68,67 @@ function filters(t: Translate): { key: FilterKey; label: string }[] {
   ];
 }
 
-// Metode bayar dipilih di popup Snap, jadi cukup kirim default ke gateway.
-const DEFAULT_METHOD = 'midtrans_qris';
+const CONFIRM_POLL_INTERVAL_MS = 2000;
+const CONFIRM_POLL_MAX_TRIES = 30;
 
-/* ── Snap (Kasugai/Midtrans) — JANGAN diubah ───────────────────────── */
-interface SnapCallbacks {
-  onSuccess?: (result: unknown) => void;
-  onPending?: (result: unknown) => void;
-  onError?: (result: unknown) => void;
-  onClose?: () => void;
+/* ── Widget Kasugai (widget.js) ────────────────────────────────────────
+ * Widget menangani daftar metode bayar (Tunai · Dompet Digital · Transfer
+ * Bank · Gateway) + Snap. Kita hanya membuat order di backend lalu mount
+ * widget dengan orderId-nya. Saldo bertambah lewat webhook payment.paid
+ * (sumber kebenaran); onSuccess hanya memicu polling konfirmasi cepat.
+ */
+const WIDGET_MOUNT_ID = 'kasugai-bayar';
+
+interface KasugaiMountOptions {
+  publicKey: string;
+  orderId: string;
+  amount: number; // tampilan saja — nominal terkunci di order
+  apiBase: string;
+  onSuccess?: (orderId: string) => void;
+  onPending?: (orderId: string) => void;
+  onError?: (err: unknown) => void;
 }
-interface SnapApi {
-  pay: (token: string, cb?: SnapCallbacks) => void;
+interface KasugaiWidgetApi {
+  mount: (target: string | HTMLElement, options: KasugaiMountOptions) => void;
 }
 declare global {
   interface Window {
-    snap?: SnapApi;
+    KasugaiWidget?: KasugaiWidgetApi;
   }
 }
 
-function loadSnap(clientKey: string): Promise<SnapApi> {
-  const isSandbox = clientKey.startsWith('SB-');
-  const src = isSandbox
-    ? 'https://app.sandbox.midtrans.com/snap/snap.js'
-    : 'https://app.midtrans.com/snap/snap.js';
+/** Muat widget.js Kasugai sekali (idempoten), resolve global KasugaiWidget. */
+function loadKasugaiWidget(apiBase: string): Promise<KasugaiWidgetApi> {
   return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      `script[data-snap="1"]`,
-    );
-    if (existing && window.snap) {
-      resolve(window.snap);
+    if (window.KasugaiWidget) {
+      resolve(window.KasugaiWidget);
       return;
     }
-    const s = existing ?? document.createElement('script');
-    s.src = src;
-    s.setAttribute('data-client-key', clientKey);
-    s.setAttribute('data-snap', '1');
-    s.onload = () => {
-      if (window.snap) resolve(window.snap);
-      else reject(new Error('Snap unavailable after load'));
+    const ready = () => {
+      if (window.KasugaiWidget) resolve(window.KasugaiWidget);
+      else reject(new Error('KasugaiWidget tidak tersedia setelah dimuat'));
     };
-    s.onerror = () => reject(new Error('Failed to load Snap'));
-    if (!existing) document.body.appendChild(s);
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-kasugai-widget="1"]',
+    );
+    if (existing) {
+      existing.addEventListener('load', ready, { once: true });
+      existing.addEventListener(
+        'error',
+        () => reject(new Error('Gagal memuat widget Kasugai')),
+        { once: true },
+      );
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = `${apiBase.replace(/\/+$/, '')}/widget.js`;
+    s.async = true;
+    s.setAttribute('data-kasugai-widget', '1');
+    s.onload = ready;
+    s.onerror = () => reject(new Error('Gagal memuat widget Kasugai'));
+    document.body.appendChild(s);
   });
 }
-
-const CONFIRM_POLL_INTERVAL_MS = 2000;
-const CONFIRM_POLL_MAX_TRIES = 30;
 
 /* ── UI ────────────────────────────────────────────────────────────── */
 export default function WalletPage() {
@@ -134,6 +149,9 @@ export default function WalletPage() {
   const [topupError, setTopupError] = useState('');
   const [confirmMsg, setConfirmMsg] = useState('');
   const [confirming, setConfirming] = useState(false);
+  // Order aktif yang sedang dibayar lewat widget Kasugai (null = modal tertutup).
+  const [payInfo, setPayInfo] = useState<TopupResult | null>(null);
+  const [widgetError, setWidgetError] = useState('');
 
   const pollRef = useRef<number | null>(null);
   useEffect(() => {
@@ -205,33 +223,19 @@ export default function WalletPage() {
 
   const topup = useMutation({
     mutationFn: createTopup,
-    onSuccess: async (data) => {
-      const paymentId = data.payment_id;
-      if (data.snap_token && data.client_key) {
-        try {
-          const snap = await loadSnap(data.client_key);
-          snap.pay(data.snap_token, {
-            onSuccess: () => pollConfirm(paymentId),
-            onPending: () => pollConfirm(paymentId),
-            onClose: () => undefined,
-            onError: () =>
-              setTopupError(
-                t('Pembayaran gagal di Snap.', 'Payment failed in Snap.'),
-              ),
-          });
-          return;
-        } catch {
-          /* fallback redirect */
-        }
-      }
-      if (data.payment_url) window.open(data.payment_url, '_blank');
-      else
+    onSuccess: (data) => {
+      if (!data.public_key) {
         setTopupError(
           t(
-            'Gateway tidak mengembalikan token pembayaran.',
-            'Gateway did not return a payment token.',
+            'Konfigurasi pembayaran belum lengkap. Hubungi admin.',
+            'Payment is not configured yet. Please contact admin.',
           ),
         );
+        return;
+      }
+      // Buka modal — widget di-mount oleh effect setelah container ter-render.
+      setWidgetError('');
+      setPayInfo(data);
     },
     onError: (e) =>
       setTopupError(
@@ -239,11 +243,61 @@ export default function WalletPage() {
       ),
   });
 
+  // Mount widget Kasugai ketika modal terbuka (container sudah ada di DOM).
+  useEffect(() => {
+    if (!payInfo) return;
+    let cancelled = false;
+    const el = document.getElementById(WIDGET_MOUNT_ID);
+    if (el) el.innerHTML = '';
+
+    loadKasugaiWidget(payInfo.kasugai_base_url)
+      .then((widget) => {
+        if (cancelled) return;
+        widget.mount(`#${WIDGET_MOUNT_ID}`, {
+          publicKey: payInfo.public_key,
+          orderId: payInfo.payment_id,
+          amount: payInfo.amount_idr,
+          apiBase: payInfo.kasugai_base_url,
+          onSuccess: (orderId) => {
+            setPayInfo(null);
+            pollConfirm(orderId);
+          },
+          onPending: (orderId) => {
+            setPayInfo(null);
+            pollConfirm(orderId);
+          },
+          onError: () => {
+            setWidgetError(
+              t(
+                'Pembayaran gagal. Coba lagi.',
+                'Payment failed. Please try again.',
+              ),
+            );
+          },
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPayInfo(null);
+        setTopupError(
+          t(
+            'Gagal memuat widget pembayaran. Coba lagi.',
+            'Failed to load the payment widget. Please try again.',
+          ),
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // Re-run hanya saat order (payInfo) berubah — pollConfirm & t cukup stabil.
+  }, [payInfo]);
+
   function handleTopup() {
     if (!effPkgId) return;
     setTopupError('');
     setConfirmMsg('');
-    topup.mutate({ packageId: effPkgId, method: DEFAULT_METHOD });
+    topup.mutate({ packageId: effPkgId });
   }
 
   const allTx = txs.data?.data ?? [];
@@ -519,6 +573,69 @@ export default function WalletPage() {
           </ul>
         )}
       </div>
+
+      {/* ── Modal pembayaran (widget Kasugai) ───────────────────────── */}
+      {payInfo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2a1c4a]/40 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPayInfo(null)}
+        >
+          <div
+            className="glass rounded-[22px] w-full max-w-[440px] max-h-[90vh] overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-[16px] font-bold text-ink">
+                  {t('Pembayaran', 'Payment')}
+                </h3>
+                <p className="num text-[12px] text-mut mt-0.5">
+                  {fmtNum(payInfo.credits)} {t('kredit', 'credits')} · Rp{' '}
+                  {fmtNum(payInfo.amount_idr)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPayInfo(null)}
+                aria-label={t('Tutup', 'Close')}
+                className="flex-shrink-0 p-1.5 rounded-lg text-mut hover:text-ink hover:bg-white/50 transition-colors"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {widgetError && (
+              <div className="mb-3 text-[12.5px] text-rose-700 bg-rose-100/60 rounded-xl px-3 py-2">
+                {widgetError}
+              </div>
+            )}
+
+            {/* Target mount widget Kasugai */}
+            <div id={WIDGET_MOUNT_ID} className="min-h-[180px]" />
+
+            <p className="mt-4 text-[11px] text-mut leading-relaxed">
+              {t(
+                'Saldo masuk otomatis setelah pembayaran terkonfirmasi — aman meski halaman ditutup.',
+                'Your balance is added automatically once payment is confirmed — safe to close this page.',
+              )}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

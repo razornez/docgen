@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type {
-  CreateTxInput,
+  CreateOrderInput,
   OrderStatusValue,
   PaymentGatewayPort,
   PaymentMethod,
@@ -9,32 +9,21 @@ import type {
 
 /**
  * Adapter Kasugai (docs/21 — Ports & Adapters). Kasugai adalah payment gateway
- * internal (NestJS) yang mem-proxy Midtrans. Client tidak menyentuh Midtrans.
+ * internal yang mem-proxy Midtrans. Client tidak menyentuh Midtrans.
  *
- * Alur bayar: POST /orders (kunci nominal) → POST /pay (dapat redirectUrl) →
- * user dibawa ke Snap → bayar → Midtrans → Kasugai → webhook ke server kita.
+ * Alur bayar (widget): server POST /orders (kunci nominal) → kirim orderId ke
+ * browser → widget Kasugai (widget.js) yang menangani pemilihan metode + /pay +
+ * Snap → bayar → Kasugai → webhook ke server kita (sumber kebenaran saldo).
  *
- * Auth: Bearer sk_... (WAJIB secret key, BUKAN publishable pk_).
+ * Auth /orders: Bearer sk_... (WAJIB secret key, BUKAN publishable pk_).
+ * Widget di browser memakai pk_ (publishable).
  * Webhook: HMAC-SHA256 atas RAW body, header X-Kasugai-Signature = 'sha256=<hex>'.
  */
-
-/**
- * Metode cadangan untuk mencetak token Snap bila metode yang diminta nonaktif
- * (422 METHOD_INACTIVE). Urut dari yang paling umum aktif. Tidak memengaruhi
- * channel yang tampil di widget (Snap menampilkan semua channel akun Midtrans).
- */
-const FALLBACK_PAY_METHODS = [
-  'credit_card',
-  'gopay',
-  'midtrans_qris',
-  'bca_va',
-  'other_va',
-] as const;
 export class KasugaiGateway implements PaymentGatewayPort {
   private readonly baseUrl: string;
   private readonly secretKey: string;
   private readonly webhookSecret: string;
-  private readonly publishableKey: string;
+  readonly publishableKey: string;
 
   constructor(
     baseUrl: string,
@@ -46,6 +35,11 @@ export class KasugaiGateway implements PaymentGatewayPort {
     this.secretKey = secretKey;
     this.webhookSecret = webhookSecret;
     this.publishableKey = publishableKey;
+  }
+
+  /** Base URL Kasugai (untuk apiBase widget di browser). */
+  get apiBase(): string {
+    return this.baseUrl;
   }
 
   private authHeaders(): Record<string, string> {
@@ -83,14 +77,12 @@ export class KasugaiGateway implements PaymentGatewayPort {
     });
   }
 
-  async createTransaction(input: CreateTxInput): Promise<{
-    orderId: string;
-    paymentUrl: string;
-    token: string | null;
-    clientKey: string | null;
-  }> {
-    // Step 1: kunci nominal. Panduan resmi menunjukkan /orders bisa langsung
-    // mengembalikan snapToken — kita tangkap bila ada.
+  /**
+   * Kunci nominal di Kasugai (POST /orders). Hanya membuat order — pemilihan
+   * metode & /pay ditangani widget di browser. Body customer.{nama,email}
+   * mengikuti kontrak widget (disamakan dengan integrasi meter-air).
+   */
+  async createOrder(input: CreateOrderInput): Promise<{ orderId: string }> {
     const orderRes = await fetch(`${this.baseUrl}/v1/payment/orders`, {
       method: 'POST',
       headers: { ...this.authHeaders(), 'Content-Type': 'application/json' },
@@ -98,75 +90,18 @@ export class KasugaiGateway implements PaymentGatewayPort {
         orderId: input.orderId,
         amount: input.amountIdr,
         currency: 'IDR',
-        customerName: input.customerName,
+        customer: {
+          nama: input.customerName,
+          ...(input.customerEmail ? { email: input.customerEmail } : {}),
+        },
       }),
     });
+    // Kasugai mengembalikan 201 saat order dibuat; 200 juga diterima.
     if (!orderRes.ok) {
       const text = await orderRes.text();
       throw new Error(`Kasugai order gagal: ${orderRes.status} ${text}`);
     }
-    const orderData = (await orderRes.json().catch(() => ({}))) as {
-      snapToken?: string;
-      token?: string;
-      redirectUrl?: string;
-      clientKey?: string;
-    };
-
-    // Step 2: inisiasi bayar (mengembalikan redirectUrl + token untuk Snap).
-    // /methods tidak menandai metode mana yang aktif, jadi metode yang dikirim
-    // bisa kena METHOD_INACTIVE. Karena widget Snap tetap menampilkan SEMUA
-    // channel (Kasugai tak kirim enabled_payments), metode di sini hanya untuk
-    // mencetak token — coba beberapa kandidat sampai ada yang aktif.
-    const candidates = [input.method, ...FALLBACK_PAY_METHODS].filter(
-      (m, i, arr) => m && arr.indexOf(m) === i,
-    );
-
-    // ⚠️ field token-nya 'token'/'snapToken', BUKAN 'snapToken' lama
-    type PayData = {
-      redirectUrl?: string;
-      token?: string;
-      snapToken?: string;
-      clientKey?: string;
-    };
-    let payData: PayData | null = null;
-    let lastErr = '';
-    for (const method of candidates) {
-      const payRes = await fetch(`${this.baseUrl}/v1/payment/pay`, {
-        method: 'POST',
-        headers: { ...this.authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: input.orderId, method }),
-      });
-      if (payRes.ok) {
-        payData = (await payRes.json().catch(() => ({}))) as PayData;
-        break;
-      }
-      lastErr = `${payRes.status} ${await payRes.text()}`;
-      // Hanya lanjut ke kandidat berikut bila metode nonaktif; error lain → stop.
-      if (!lastErr.includes('METHOD_INACTIVE')) {
-        throw new Error(`Kasugai pay gagal: ${lastErr}`);
-      }
-    }
-    if (!payData) {
-      throw new Error(
-        `Kasugai pay gagal: tidak ada metode aktif yang bisa dipakai. ${lastErr}`,
-      );
-    }
-
-    // Toleran terhadap dua bentuk respons (orders vs pay).
-    const token =
-      payData.token ??
-      payData.snapToken ??
-      orderData.snapToken ??
-      orderData.token ??
-      null;
-    const paymentUrl = payData.redirectUrl ?? orderData.redirectUrl ?? '';
-    const clientKey =
-      payData.clientKey ?? orderData.clientKey ?? (this.publishableKey || null);
-
-    if (!paymentUrl && !token) {
-      throw new Error('Kasugai: tidak ada redirectUrl maupun snapToken');
-    }
-    return { orderId: input.orderId, paymentUrl, token, clientKey };
+    return { orderId: input.orderId };
   }
 
   async getStatus(orderId: string): Promise<{ status: OrderStatusValue }> {

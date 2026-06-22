@@ -176,6 +176,8 @@ export function buildApp(config: AppConfig): FastifyInstance {
       config.KASUGAI_PUBLISHABLE_KEY,
     ),
     idGen,
+    config.KASUGAI_PUBLISHABLE_KEY,
+    config.KASUGAI_BASE_URL,
   );
   const batchService = new DefaultBatchService(
     new PgBatchRepository(pool),

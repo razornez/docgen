@@ -64,7 +64,7 @@ export type {
   IdGenerator,
   StoragePort,
   PaymentGatewayPort,
-  CreateTxInput,
+  CreateOrderInput,
   PaymentMethod,
   WebhookVerification,
   OrderStatusValue,

@@ -3,7 +3,7 @@ export type { IdGenerator } from './id-generator.js';
 export type { StoragePort } from './storage.js';
 export type {
   PaymentGatewayPort,
-  CreateTxInput,
+  CreateOrderInput,
   PaymentMethod,
   WebhookVerification,
   OrderStatusValue,
