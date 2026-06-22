@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ownerLogin, setOwnerToken, getOwnerToken } from '../../api/client.js';
 
 function Flower({ className = 'w-8 h-8' }: { className?: string }) {
@@ -31,6 +31,8 @@ function Flower({ className = 'w-8 h-8' }: { className?: string }) {
 
 export default function OwnerLogin() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const expired = searchParams.get('expired');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -75,6 +77,12 @@ export default function OwnerLogin() {
         <p className="text-[12.5px] text-mut mt-1 mb-5">
           Panel platform lintas-tenant. Khusus pemilik platform.
         </p>
+
+        {expired && (
+          <div className="mb-4 text-[12.5px] text-amber-700 bg-amber-100/60 rounded-xl px-3 py-2.5">
+            Sesi owner sudah berakhir. Silakan masuk lagi.
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 flex items-center gap-2 text-[12.5px] text-rose-700 bg-rose-100/60 rounded-xl px-3 py-2.5">

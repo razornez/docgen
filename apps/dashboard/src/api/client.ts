@@ -22,6 +22,49 @@ class ApiError extends Error {
   }
 }
 
+/**
+ * Endpoint di mana 401 BUKAN berarti sesi kedaluwarsa, melainkan kredensial
+ * salah (form login/registrasi). Jangan auto-logout/redirect untuk ini —
+ * biarkan form menampilkan pesan errornya sendiri.
+ */
+const AUTH_ENDPOINTS = new Set([
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/google/exchange',
+  '/owner/login',
+]);
+
+// Cegah redirect berulang bila beberapa request 401 bersamaan.
+let sessionExpiredHandled = false;
+
+/**
+ * Sesi tenant/owner sudah kedaluwarsa atau token tidak valid: bersihkan token
+ * yang sesuai lalu paksa kembali ke halaman login. Pakai full reload
+ * (window.location) supaya state React & cache query benar-benar bersih —
+ * sekaligus memuat ulang bundle terbaru.
+ */
+function handleSessionExpired(path: string): void {
+  if (sessionExpiredHandled) return;
+
+  const isOwner = path.startsWith('/owner');
+  const here = window.location.pathname;
+  if (isOwner) {
+    clearOwnerToken();
+    if (!here.startsWith('/owner/login')) {
+      sessionExpiredHandled = true;
+      window.location.replace('/owner/login?expired=1');
+    }
+  } else {
+    clearStoredToken();
+    if (here !== '/login' && here !== '/') {
+      sessionExpiredHandled = true;
+      window.location.replace('/login?expired=1');
+    }
+  }
+}
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
@@ -47,6 +90,10 @@ async function request<T>(
       message = body.error?.message ?? message;
     } catch {
       // ignore parse error
+    }
+    // Sesi kedaluwarsa → auto-logout + redirect ke login (kecuali form auth).
+    if (res.status === 401 && !AUTH_ENDPOINTS.has(path)) {
+      handleSessionExpired(path);
     }
     throw new ApiError(res.status, code, message);
   }

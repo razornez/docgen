@@ -85,6 +85,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const verified = searchParams.get('verified');
   const oauthError = searchParams.get('error');
+  const expired = searchParams.get('expired');
   const pricing = useQuery({
     queryKey: ['public-pricing'],
     queryFn: getPublicPricing,
@@ -331,6 +332,15 @@ export default function LoginPage() {
                 {t('atau', 'or')}
               </span>
             </div>
+
+            {expired && tab === 'login' && (
+              <div className="mb-3 text-[12.5px] rounded-xl px-3 py-2.5 border text-amber-700 bg-amber-50/80 border-amber-200">
+                {t(
+                  'Sesi kamu sudah berakhir. Silakan masuk lagi.',
+                  'Your session has expired. Please sign in again.',
+                )}
+              </div>
+            )}
 
             {oauthError === 'oauth_failed' && (
               <div className="mb-3 text-[12.5px] rounded-xl px-3 py-2.5 border text-rose-700 bg-rose-50/80 border-rose-200">
