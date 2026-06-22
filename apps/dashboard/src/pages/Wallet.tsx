@@ -4,7 +4,6 @@ import {
   getWallet,
   getTransactions,
   getPackages,
-  getPaymentMethods,
   getBatches,
   getMe,
   createTopup,
@@ -68,13 +67,8 @@ function filters(t: Translate): { key: FilterKey; label: string }[] {
   ];
 }
 
-// Fallback bila endpoint metode bayar belum tersedia (mis. Midtrans belum
-// dikonfigurasi di lingkungan ini) — agar segmented tetap tampil.
-const FALLBACK_METHODS = [
-  { code: 'midtrans_qris', name: 'QRIS' },
-  { code: 'midtrans_va', name: 'Virtual Account' },
-  { code: 'midtrans_ewallet', name: 'E-Wallet' },
-];
+// Metode bayar dipilih di popup Snap, jadi cukup kirim default ke gateway.
+const DEFAULT_METHOD = 'midtrans_qris';
 
 /* ── Snap (Kasugai/Midtrans) — JANGAN diubah ───────────────────────── */
 interface SnapCallbacks {
@@ -132,15 +126,10 @@ export default function WalletPage() {
     queryFn: () => getTransactions(),
   });
   const packages = useQuery({ queryKey: ['packages'], queryFn: getPackages });
-  const methods = useQuery({
-    queryKey: ['payment-methods'],
-    queryFn: getPaymentMethods,
-  });
   const batchesQ = useQuery({ queryKey: ['batches'], queryFn: getBatches });
   const me = useQuery({ queryKey: ['me'], queryFn: getMe });
 
   const [selectedPkg, setSelectedPkg] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [topupError, setTopupError] = useState('');
   const [confirmMsg, setConfirmMsg] = useState('');
@@ -154,14 +143,8 @@ export default function WalletPage() {
   }, []);
 
   const pkgList = packages.data?.data ?? [];
-  const methodList = methods.data?.data?.length
-    ? methods.data.data
-    : FALLBACK_METHODS;
   const effPkgId = selectedPkg || pkgList[0]?.id || '';
-  const effMethod = selectedMethod || methodList[0]?.code || '';
   const selPkg = pkgList.find((p) => p.id === effPkgId);
-  const selMethodName =
-    methodList.find((m) => m.code === effMethod)?.name ?? 'QRIS';
   const filterList = filters(t);
 
   const balance = wallet.data?.balance ?? null;
@@ -260,7 +243,7 @@ export default function WalletPage() {
     if (!effPkgId) return;
     setTopupError('');
     setConfirmMsg('');
-    topup.mutate({ packageId: effPkgId, method: effMethod || 'midtrans_qris' });
+    topup.mutate({ packageId: effPkgId, method: DEFAULT_METHOD });
   }
 
   const allTx = txs.data?.data ?? [];
@@ -354,31 +337,26 @@ export default function WalletPage() {
           )}
         </div>
 
-        {/* Metode bayar */}
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <div className="flex items-center p-0.5 rounded-full glass-soft">
-            {methodList.map((m) => (
-              <button
-                key={m.code}
-                type="button"
-                onClick={() => setSelectedMethod(m.code)}
-                className={`px-3.5 py-1.5 text-[12px] font-semibold rounded-full transition-all ${
-                  m.code === effMethod
-                    ? 'bg-grad text-white shadow-sm'
-                    : 'text-mut hover:text-ink'
-                }`}
-              >
-                {m.name}
-              </button>
-            ))}
-          </div>
-          <p className="text-[12px] text-mut">
-            {t(
-              'Scan sekali — semua bank & e-wallet',
-              'Scan once — all banks & e-wallets',
-            )}
-          </p>
-        </div>
+        {/* Metode bayar dipilih di popup pembayaran (Snap) */}
+        <p className="mt-4 flex items-center gap-1.5 text-[12px] text-mut">
+          <svg
+            className="w-4 h-4 flex-shrink-0 text-brand-purple"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.85}
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+            />
+          </svg>
+          {t(
+            'Pilih metode bayar (QRIS, VA, e-wallet, kartu) saat pembayaran.',
+            'Choose your payment method (QRIS, VA, e-wallet, card) at checkout.',
+          )}
+        </p>
 
         {topupError && (
           <div className="mt-4 flex items-center gap-2 text-[12.5px] text-rose-700 bg-rose-100/60 rounded-xl px-3 py-2">
@@ -408,8 +386,7 @@ export default function WalletPage() {
               Rp {fmtNum(selPkg?.price_idr ?? 0)}
             </p>
             <p className="num text-[12px] text-mut mt-1.5">
-              {fmtNum(selPkg?.credits ?? 0)} {t('kredit', 'credits')} ·{' '}
-              {t('via', 'via')} {selMethodName}
+              {fmtNum(selPkg?.credits ?? 0)} {t('kredit', 'credits')}
             </p>
           </div>
           <button
