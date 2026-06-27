@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getTemplates,
@@ -13,6 +13,7 @@ import {
   CATEGORY_THUMB,
   extractVars,
 } from '../lib/templateData.js';
+import { renderTemplate } from '../lib/renderTemplate.js';
 import { ApiGuideModal } from '../components/ApiGuideModal.js';
 import { TemplateEditor } from '../components/TemplateEditor.js';
 import { TemplateCreator } from '../components/TemplateCreator.js';
@@ -24,6 +25,106 @@ type Panel =
   | { type: 'create' }
   | { type: 'edit'; template: TemplateItem }
   | { type: 'preview'; template: TemplateItem };
+
+const A4_W = 794;
+const A4_H = 1123;
+
+/**
+ * Thumbnail dokumen ASLI: render body template (Handlebars) dengan data contoh
+ * tersimpan ke dalam iframe ter-skala, terpotong di bagian atas (kop/judul)
+ * agar langsung dikenali jenis dokumennya. Iframe disandbox penuh (tanpa skrip).
+ */
+function TemplateThumb({
+  template,
+  bg,
+}: {
+  template: TemplateItem;
+  bg: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (cr) setW(cr.width);
+    });
+    ro.observe(el);
+    // Render thumbnail hanya saat masuk viewport (hemat: 19 kartu tak sekaligus).
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setSeen(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    io.observe(el);
+    return () => {
+      ro.disconnect();
+      io.disconnect();
+    };
+  }, []);
+
+  const q = useQuery({
+    queryKey: ['template-thumb', template.id, template.current_version],
+    queryFn: () => getTemplateBody(template.id),
+    staleTime: 5 * 60 * 1000,
+    enabled: seen,
+  });
+  const html = useMemo(
+    () =>
+      q.data
+        ? renderTemplate(q.data.version.body, q.data.version.schema ?? {})
+        : '',
+    [q.data],
+  );
+  const scale = w > 0 ? w / A4_W : 0;
+
+  return (
+    <div
+      ref={ref}
+      className="absolute inset-0 overflow-hidden"
+      style={{ background: bg }}
+    >
+      {q.data && scale > 0 ? (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: A4_W,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+          }}
+        >
+          <iframe
+            title={template.name}
+            srcDoc={html}
+            sandbox=""
+            scrolling="no"
+            tabIndex={-1}
+            aria-hidden="true"
+            style={{
+              width: A4_W,
+              height: A4_H,
+              border: 0,
+              background: '#fff',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-white/60 border-t-brand-purple rounded-full animate-spin" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DocIcon({ cls }: { cls?: string }) {
   return (
@@ -403,20 +504,9 @@ export default function TemplatesPage() {
                 key={tpl.id}
                 className="group glass rounded-glass overflow-hidden flex flex-col"
               >
-                <div
-                  className="relative h-[150px] flex items-center justify-center"
-                  style={{ background: thumb.bg }}
-                >
-                  <div className="w-[88px] h-[112px] bg-white rounded-md shadow-[0_8px_20px_rgba(80,40,140,0.14)] p-3 flex flex-col gap-1.5">
-                    <div
-                      className="h-1.5 w-9 rounded-full"
-                      style={{ background: thumb.bar }}
-                    />
-                    <div className="h-1 w-full rounded-full bg-slate-200 mt-1" />
-                    <div className="h-1 w-full rounded-full bg-slate-200" />
-                    <div className="h-1 w-2/3 rounded-full bg-slate-200" />
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-ink/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="relative h-[150px] overflow-hidden border-b border-white/40">
+                  <TemplateThumb template={tpl} bg={thumb.bg} />
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-ink/30 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={() =>

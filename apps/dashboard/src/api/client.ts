@@ -721,7 +721,13 @@ export function getBatchDocuments(
 
 export function getTemplateBody(id: string): Promise<{
   template: TemplateItem;
-  version: { body: string; version: number };
+  version: {
+    body: string;
+    version: number;
+    engine?: string;
+    /** Data contoh tersimpan (dipakai untuk preview & thumbnail). */
+    schema?: Record<string, unknown>;
+  };
 }> {
   return request(`/templates/${id}`);
 }
@@ -729,10 +735,11 @@ export function getTemplateBody(id: string): Promise<{
 export function createTemplateVersion(
   id: string,
   body: string,
+  schema?: Record<string, unknown>,
 ): Promise<{ version: { body: string; version: number } }> {
   return request(`/templates/${id}/versions`, {
     method: 'POST',
-    body: JSON.stringify({ body }),
+    body: JSON.stringify(schema !== undefined ? { body, schema } : { body }),
   });
 }
 

@@ -8,17 +8,8 @@ import {
   type TemplateItem,
 } from '../api/client.js';
 import { extractVars, buildDummyJson } from '../lib/templateData.js';
+import { renderTemplate } from '../lib/renderTemplate.js';
 import { useLang } from '../i18n/index.js';
-
-/** Render klien sederhana (mesin polos {{ }} / {{{ }}}) untuk preview instan. */
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-function renderClient(body: string, data: Record<string, string>): string {
-  return body
-    .replace(/\{\{\{(\w+)\}\}\}/g, (_, k: string) => data[k] ?? '')
-    .replace(/\{\{(\w+)\}\}/g, (_, k: string) => esc(data[k] ?? ''));
-}
 
 const A4_W = 794;
 const SCALE = 0.6;
@@ -36,9 +27,12 @@ export function TemplateEditor({
 }) {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
-  const [tab, setTab] = useState<'html' | 'data'>('data');
+  // Edit → buka langsung di editor kode HTML; preview read-only → ringkasan data.
+  const [tab, setTab] = useState<'html' | 'data'>(readOnly ? 'data' : 'html');
   const [body, setBody] = useState('');
   const [data, setData] = useState<Record<string, string>>({});
+  // Data contoh tersimpan (bisa berisi array/objek, mis. {{#each items}}).
+  const [schemaData, setSchemaData] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>(
@@ -76,7 +70,12 @@ export function TemplateEditor({
   }
 
   const vars = useMemo(() => extractVars(body), [body]);
-  const preview = useMemo(() => renderClient(body, data), [body, data]);
+  // Preview pakai Handlebars asli (dukung {{#each}}/{{#if}}); data contoh
+  // tersimpan jadi basis, ditimpa nilai yang diedit di tab Data.
+  const preview = useMemo(
+    () => renderTemplate(body, { ...schemaData, ...data }),
+    [body, schemaData, data],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -86,8 +85,18 @@ export function TemplateEditor({
         const res = await getTemplateBody(template.id);
         if (!alive) return;
         setBody(res.version.body);
+        const schema = res.version.schema ?? {};
+        setSchemaData(schema);
+        // Tab Data hanya mengedit nilai string sederhana; ambil dari data contoh
+        // bila ada, sisanya isi dummy. Array/objek tetap dirender dari schema.
         const v = extractVars(res.version.body);
-        setData(JSON.parse(buildDummyJson(v)) as Record<string, string>);
+        const dummy = JSON.parse(buildDummyJson(v)) as Record<string, string>;
+        const flat: Record<string, string> = {};
+        for (const key of v) {
+          const sv = (schema as Record<string, unknown>)[key];
+          flat[key] = typeof sv === 'string' ? sv : (dummy[key] ?? '');
+        }
+        setData(flat);
       } catch {
         if (alive)
           setError(
@@ -118,7 +127,12 @@ export function TemplateEditor({
     setSaveState('saving');
     setError('');
     try {
-      await createTemplateVersion(template.id, body.trim());
+      // Simpan body + data contoh (gabungan schema tersimpan & nilai yang
+      // diedit) agar preview & thumbnail tetap akurat di versi baru.
+      await createTemplateVersion(template.id, body.trim(), {
+        ...schemaData,
+        ...data,
+      });
       setSaveState('saved');
       onSaved();
       window.setTimeout(() => setSaveState('idle'), 2500);
@@ -137,7 +151,7 @@ export function TemplateEditor({
     try {
       let b = await createBatch({
         template: template.id,
-        items: [{ ref: 'editor-preview', data }],
+        items: [{ ref: 'editor-preview', data: { ...schemaData, ...data } }],
       });
       for (
         let i = 0;
