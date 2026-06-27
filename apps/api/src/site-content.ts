@@ -63,6 +63,9 @@ export const DEFAULT_CONTENT: SiteContent = {
       items: [
         { label: L('Syarat & Ketentuan', 'Terms'), href: '/p/terms' },
         { label: L('Privasi', 'Privacy'), href: '/p/privacy' },
+        { label: L('Penggunaan Wajar', 'Acceptable Use'), href: '/p/aup' },
+        { label: L('Kebijakan Cookie', 'Cookie Policy'), href: '/p/cookies' },
+        { label: L('FAQ', 'FAQ'), href: '/p/faq' },
       ],
     },
   ],
@@ -2327,6 +2330,165 @@ These Terms are governed by the laws of the Republic of Indonesia. Disputes will
 
 ### 14. Contact
 Questions about these Terms? Reach us at [support@docgen.id](mailto:support@docgen.id) or see the [Contact](/p/contact) page.`,
+      },
+    },
+    {
+      slug: 'faq',
+      title: { id: 'FAQ', en: 'FAQ' },
+      body: {
+        id: `## Pertanyaan yang Sering Diajukan
+
+### Apa itu DocGen?
+DocGen adalah mesin pembuat dokumen: Anda kirim template HTML + data (JSON), kami kembalikan PDF rapi. Bisa lewat dashboard maupun API.
+
+### Bagaimana cara kerjanya?
+Buat template (atau pakai template bawaan), isi datanya, lalu render. Setiap dokumen menjadi PDF yang bisa diunduh atau diambil lewat API.
+
+### Apa itu kredit?
+**1 kredit = 1 dokumen** (hingga 5 halaman). Dokumen lebih panjang memakai kredit tambahan per kelipatan 5 halaman.
+
+### Berapa harganya?
+Model **prabayar** — isi saldo, pakai sesuai kebutuhan, tanpa langganan. Untuk penawaran atau kebutuhan volume, lihat [Harga](/p/pricing) atau hubungi tim kami.
+
+### Bagaimana cara isi saldo (top up)?
+Lewat dashboard: pilih paket, lalu bayar dengan **QRIS, Virtual Account, atau e-wallet**. Saldo bertambah otomatis setelah pembayaran terkonfirmasi.
+
+### Apakah saldo bisa hangus?
+Tidak. **Saldo kredit tidak pernah kedaluwarsa.**
+
+### Apakah ada pengembalian dana (refund)?
+**Tidak.** Kredit yang sudah dibeli tidak dapat dikembalikan. Anda dapat mencoba lebih dulu dengan kredit gratis saat mendaftar.
+
+### Apakah data saya aman?
+Data dokumen hanya dipakai untuk merender PDF yang Anda minta. PDF disimpan sementara di penyimpanan terenkripsi di balik tautan bertanda tangan, lalu dihapus otomatis. Selengkapnya di [Privasi](/p/privacy).
+
+### Apakah ada API?
+Ya. Kirim template + data, terima PDF. Lihat [Dokumentasi](/p/docs) dan [API](/p/api).
+
+### Bagaimana jika butuh bantuan?
+Hubungi [support@docgen.id](mailto:support@docgen.id) atau lihat halaman [Kontak](/p/contact). Target balasan 1 hari kerja.`,
+        en: `## Frequently Asked Questions
+
+### What is DocGen?
+DocGen is a document generation engine: you send an HTML template + data (JSON), we return a clean PDF. Available via the dashboard or API.
+
+### How does it work?
+Create a template (or use a built-in one), fill in the data, then render. Each document becomes a PDF you can download or fetch via the API.
+
+### What is a credit?
+**1 credit = 1 document** (up to 5 pages). Longer documents use additional credits per block of 5 pages.
+
+### How much does it cost?
+A **prepaid** model — top up, use as needed, no subscription. For quotes or volume needs, see [Pricing](/p/pricing) or contact our team.
+
+### How do I top up?
+In the dashboard: pick a package, then pay with **QRIS, Virtual Account, or e-wallet**. Your balance is added automatically once payment is confirmed.
+
+### Do credits expire?
+No. **Your credit balance never expires.**
+
+### Are there refunds?
+**No.** Purchased credits are non-refundable. You can try first with the free credits you get on sign-up.
+
+### Is my data safe?
+Document data is used only to render the PDFs you request. PDFs are stored temporarily in encrypted storage behind signed links, then deleted automatically. See [Privacy](/p/privacy).
+
+### Is there an API?
+Yes. Send a template + data, receive a PDF. See the [Documentation](/p/docs) and [API](/p/api).
+
+### How do I get help?
+Reach us at [support@docgen.id](mailto:support@docgen.id) or see the [Contact](/p/contact) page. We aim to reply within 1 business day.`,
+      },
+    },
+    {
+      slug: 'aup',
+      title: {
+        id: 'Kebijakan Penggunaan Wajar',
+        en: 'Acceptable Use Policy',
+      },
+      body: {
+        id: `## Kebijakan Penggunaan Wajar
+
+Kebijakan ini memastikan DocGen dipakai secara aman, sah, dan adil bagi semua pengguna. Dengan memakai Layanan, Anda setuju untuk tidak melakukan hal-hal berikut.
+
+### Konten dan dokumen yang dilarang
+- Membuat dokumen palsu atau menyesatkan untuk **penipuan**, pemalsuan identitas, atau memalsukan dokumen resmi/legal.
+- Konten yang melanggar hukum atau melanggar hak kekayaan intelektual maupun privasi pihak ketiga.
+- Materi yang mengandung kebencian, kekerasan, pelecehan, atau yang mengeksploitasi anak.
+- Memproses data pribadi orang lain tanpa dasar yang sah.
+
+### Penyalahgunaan teknis
+- Membebani secara berlebihan, mengganggu, atau mencoba menembus keamanan sistem kami.
+- Menghindari batas penggunaan, kuota, atau mekanisme penagihan.
+- Mengakses akun atau data pihak lain tanpa izin.
+- Menggunakan Layanan untuk spam atau pesan massal yang tidak diminta.
+
+### Konsekuensi
+Pelanggaran dapat berakibat **penangguhan atau penghentian Akun tanpa pengembalian dana**, dan bila perlu pelaporan ke pihak berwenang. Kami dapat menghapus konten yang melanggar.
+
+### Melaporkan penyalahgunaan
+Menemukan penyalahgunaan? Laporkan ke [support@docgen.id](mailto:support@docgen.id).`,
+        en: `## Acceptable Use Policy
+
+This policy keeps DocGen safe, lawful, and fair for everyone. By using the Service, you agree not to do the following.
+
+### Prohibited content and documents
+- Creating fake or misleading documents for **fraud**, identity forgery, or falsifying official/legal documents.
+- Content that is unlawful or infringes third-party intellectual property or privacy rights.
+- Material that is hateful, violent, harassing, or that exploits minors.
+- Processing other people's personal data without a lawful basis.
+
+### Technical abuse
+- Overloading, disrupting, or attempting to breach the security of our systems.
+- Circumventing usage limits, quotas, or billing mechanisms.
+- Accessing other parties' accounts or data without permission.
+- Using the Service for spam or unsolicited bulk messages.
+
+### Consequences
+Violations may result in **suspension or termination of your Account without a refund**, and where necessary, reporting to the authorities. We may remove infringing content.
+
+### Reporting abuse
+Found abuse? Report it to [support@docgen.id](mailto:support@docgen.id).`,
+      },
+    },
+    {
+      slug: 'cookies',
+      title: { id: 'Kebijakan Cookie', en: 'Cookie Policy' },
+      body: {
+        id: `## Kebijakan Cookie
+
+Halaman ini menjelaskan bagaimana DocGen menggunakan cookie dan penyimpanan serupa di peramban Anda.
+
+### Apa yang kami simpan
+- **Sesi & otentikasi** — kami menyimpan token sesi di penyimpanan peramban (local storage) agar Anda tetap masuk. Ini wajib agar layanan berjalan.
+- **Preferensi** — misalnya pilihan bahasa (ID/EN).
+
+### Yang TIDAK kami lakukan
+- Kami **tidak** memakai cookie iklan atau pelacakan lintas situs untuk menargetkan iklan.
+- Kami tidak menjual data Anda.
+
+### Mengelola cookie
+Anda dapat menghapus penyimpanan peramban kapan saja lewat pengaturan peramban. Menghapus token sesi akan membuat Anda keluar dan perlu masuk kembali.
+
+### Pertanyaan
+Soal data atau privasi? Lihat [Privasi](/p/privacy) atau hubungi [support@docgen.id](mailto:support@docgen.id).`,
+        en: `## Cookie Policy
+
+This page explains how DocGen uses cookies and similar browser storage.
+
+### What we store
+- **Session & authentication** — we store a session token in browser storage (local storage) to keep you signed in. This is required for the service to work.
+- **Preferences** — such as your language choice (ID/EN).
+
+### What we do NOT do
+- We do **not** use advertising cookies or cross-site tracking to target ads.
+- We do not sell your data.
+
+### Managing cookies
+You can clear browser storage at any time via your browser settings. Removing the session token will sign you out and require signing in again.
+
+### Questions
+Questions about data or privacy? See [Privacy](/p/privacy) or reach us at [support@docgen.id](mailto:support@docgen.id).`,
       },
     },
   ],
