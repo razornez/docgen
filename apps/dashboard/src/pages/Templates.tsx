@@ -126,6 +126,68 @@ function TemplateThumb({
   );
 }
 
+/**
+ * Template "lanjutan" = HTML mentah (punya <style>, <!doctype>, atau block
+ * Handlebars {{#each}}/{{#if}}). WYSIWYG (TipTap) tak bisa round-trip aman untuk
+ * ini → diarahkan ke editor kode. Dokumen sederhana → editor visual seperti Create.
+ */
+function isAdvancedTemplate(body: string): boolean {
+  return /<\s*style|<!doctype|<html|<head|\{\{[#/]/i.test(body);
+}
+
+/**
+ * Saat "Ubah": muat body lalu pilih editor yang tepat — visual (WYSIWYG) untuk
+ * dokumen sederhana, editor kode untuk template HTML lanjutan.
+ */
+function EditPanel({
+  template,
+  categories,
+  onClose,
+  onSaved,
+}: {
+  template: TemplateItem;
+  categories: string[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const q = useQuery({
+    queryKey: ['template-thumb', template.id, template.current_version],
+    queryFn: () => getTemplateBody(template.id),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (q.isLoading || !q.data) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div
+          className="fixed inset-0 bg-[#2a1c4a]/40 backdrop-blur-sm"
+          onClick={onClose}
+        />
+        <div className="relative z-10 w-14 h-14 rounded-2xl glass flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-white/60 border-t-brand-purple rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isAdvancedTemplate(q.data.version.body)) {
+    return (
+      <TemplateEditor template={template} onClose={onClose} onSaved={onSaved} />
+    );
+  }
+  return (
+    <TemplateCreator
+      categories={categories}
+      editTemplate={template}
+      initialBody={q.data.version.body}
+      initialCategory={template.category}
+      initialSchema={q.data.version.schema ?? {}}
+      onClose={onClose}
+      onCreated={onSaved}
+    />
+  );
+}
+
 function DocIcon({ cls }: { cls?: string }) {
   return (
     <svg
@@ -423,12 +485,17 @@ export default function TemplatesPage() {
         />
       )}
 
-      {/* Edit — editor premium 2-panel (HTML/Data + preview langsung) */}
+      {/* Edit — visual (WYSIWYG) untuk dokumen sederhana, editor kode untuk
+          template HTML lanjutan. */}
       {panel.type === 'edit' && (
-        <TemplateEditor
+        <EditPanel
           template={panel.template}
+          categories={categories}
           onClose={closePanel}
-          onSaved={() => void qc.invalidateQueries({ queryKey: ['templates'] })}
+          onSaved={() => {
+            void qc.invalidateQueries({ queryKey: ['templates'] });
+            void qc.invalidateQueries({ queryKey: ['template-thumb'] });
+          }}
         />
       )}
 

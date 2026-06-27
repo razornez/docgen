@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { Editor } from '@tiptap/react';
-import { createTemplate } from '../api/client.js';
+import {
+  createTemplate,
+  createTemplateVersion,
+  type TemplateItem,
+} from '../api/client.js';
 import RichEditor from './RichEditor.js';
 import {
   CATEGORY_DOT,
@@ -16,20 +20,35 @@ const STARTER =
   '<p>Tanggal: {{tanggal}}</p>' +
   '<p>Tulis isi dokumenmu di sini, lalu sisipkan variabel dari panel kanan.</p>';
 
+/**
+ * Editor WYSIWYG untuk membuat ATAU mengubah template. Saat `editTemplate`
+ * diisi, panel menyimpan VERSI BARU (bukan template baru) dan nama/kategori
+ * dikunci. Dipakai untuk dokumen sederhana (yang diketik visual); template
+ * HTML lanjutan diarahkan ke editor kode (TemplateEditor).
+ */
 export function TemplateCreator({
   categories,
   onClose,
   onCreated,
+  editTemplate,
+  initialBody,
+  initialCategory,
+  initialSchema,
 }: {
   categories: string[];
   onClose: () => void;
   onCreated: () => void;
+  editTemplate?: TemplateItem;
+  initialBody?: string;
+  initialCategory?: string;
+  initialSchema?: Record<string, unknown>;
 }) {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('Umum');
-  const [body, setBody] = useState(STARTER);
+  const isEdit = !!editTemplate;
+  const [name, setName] = useState(editTemplate?.name ?? '');
+  const [category, setCategory] = useState(initialCategory ?? 'Umum');
+  const [body, setBody] = useState(initialBody ?? STARTER);
   const [search, setSearch] = useState('');
   const [customVars, setCustomVars] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -94,6 +113,23 @@ export function TemplateCreator({
     },
   });
 
+  // Edit → simpan versi baru (body + data contoh agar preview/thumbnail akurat).
+  const saveVersion = useMutation({
+    mutationFn: () =>
+      createTemplateVersion(editTemplate!.id, body.trim(), initialSchema),
+    onSuccess: () => {
+      onCreated();
+      onClose();
+    },
+    onError: (e) =>
+      setError(
+        e instanceof Error
+          ? e.message
+          : t('Gagal menyimpan versi. Coba lagi.', 'Failed to save version.'),
+      ),
+  });
+  const pending = create.isPending || saveVersion.isPending;
+
   function insertVar(v: string) {
     editorRef.current?.chain().focus().insertContent(`{{${v}}}`).run();
   }
@@ -104,6 +140,10 @@ export function TemplateCreator({
   }
   function save() {
     setError('');
+    if (isEdit) {
+      saveVersion.mutate();
+      return;
+    }
     if (!name.trim()) {
       setError(t('Nama template wajib diisi', 'Template name is required'));
       return;
@@ -157,43 +197,59 @@ export function TemplateCreator({
               />
             </svg>
           </div>
-          <input
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              if (error) setError('');
-            }}
-            placeholder={t('Nama template…', 'Template name…')}
-            className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl glass-soft text-[14px] text-ink placeholder:text-mut focus:outline-none ${
-              error ? 'ring-1 ring-rose-400' : ''
-            }`}
-          />
-          <div className="hidden md:flex items-center gap-1.5 flex-wrap justify-end max-w-[320px]">
-            {categories.map((cat) => {
-              const active = category === cat;
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategory(cat)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-semibold transition-all ${
-                    active
-                      ? 'bg-grad text-white shadow-sm'
-                      : 'glass-soft text-mut hover:text-ink'
-                  }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-white/90' : (CATEGORY_DOT[cat] ?? 'bg-slate-300')}`}
-                  />
-                  {cat}
-                </button>
-              );
-            })}
-          </div>
+          {isEdit ? (
+            <div className="flex-1 min-w-0 flex items-center gap-2">
+              <span className="text-[14px] font-bold text-ink truncate">
+                {name}
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold glass-soft text-mut flex-shrink-0">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${CATEGORY_DOT[category] ?? 'bg-slate-300'}`}
+                />
+                {category}
+              </span>
+            </div>
+          ) : (
+            <>
+              <input
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (error) setError('');
+                }}
+                placeholder={t('Nama template…', 'Template name…')}
+                className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl glass-soft text-[14px] text-ink placeholder:text-mut focus:outline-none ${
+                  error ? 'ring-1 ring-rose-400' : ''
+                }`}
+              />
+              <div className="hidden md:flex items-center gap-1.5 flex-wrap justify-end max-w-[320px]">
+                {categories.map((cat) => {
+                  const active = category === cat;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategory(cat)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-semibold transition-all ${
+                        active
+                          ? 'bg-grad text-white shadow-sm'
+                          : 'glass-soft text-mut hover:text-ink'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-white/90' : (CATEGORY_DOT[cat] ?? 'bg-slate-300')}`}
+                      />
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
           <button
             type="button"
             onClick={save}
-            disabled={create.isPending}
+            disabled={pending}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-grad text-white text-[12.5px] font-bold shadow-[0_4px_14px_rgba(155,93,229,0.4)] hover:opacity-90 active:scale-[0.98] disabled:opacity-50 transition-all flex-shrink-0"
           >
             <svg
@@ -209,9 +265,11 @@ export function TemplateCreator({
                 d="M5 13l4 4L19 7"
               />
             </svg>
-            {create.isPending
+            {pending
               ? t('Menyimpan…', 'Saving…')
-              : t('Simpan template', 'Save template')}
+              : isEdit
+                ? t('Simpan versi', 'Save version')
+                : t('Simpan template', 'Save template')}
           </button>
         </div>
 

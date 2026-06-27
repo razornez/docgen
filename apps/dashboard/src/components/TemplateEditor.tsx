@@ -27,8 +27,9 @@ export function TemplateEditor({
 }) {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
-  // Edit → buka langsung di editor kode HTML; preview read-only → ringkasan data.
-  const [tab, setTab] = useState<'html' | 'data'>(readOnly ? 'data' : 'html');
+  // Default ke tab Data (isi nilai + preview langsung) — ramah non-teknis;
+  // tab HTML tetap tersedia untuk edit lanjutan.
+  const [tab, setTab] = useState<'html' | 'data'>('data');
   const [body, setBody] = useState('');
   const [data, setData] = useState<Record<string, string>>({});
   // Data contoh tersimpan (bisa berisi array/objek, mis. {{#each items}}).
