@@ -7,6 +7,7 @@ import {
 } from '../../api/client.js';
 import { useLang } from '../../i18n/index.js';
 import ConfirmModal from '../../components/ConfirmModal.js';
+import { Markdown } from '../../lib/markdown.js';
 
 interface LocS {
   id: string;
@@ -78,6 +79,10 @@ export default function OwnerContent() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
+  // Bahasa yang ditampilkan di pratinjau per halaman, null = tertutup.
+  const [previewLang, setPreviewLang] = useState<Record<string, 'id' | 'en'>>(
+    {},
+  );
   const k = useRef(0);
   const nk = () => `k${k.current++}`;
 
@@ -325,6 +330,50 @@ export default function OwnerContent() {
                       />
                     ))}
                   </div>
+                </div>
+
+                {/* Pratinjau markdown (sama dengan render halaman publik) */}
+                <div className="border-t border-white/40 pt-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-mut">
+                      {t('Pratinjau', 'Preview')}
+                    </span>
+                    {(['id', 'en'] as const).map((l) => {
+                      const active = previewLang[p.key] === l;
+                      return (
+                        <button
+                          key={l}
+                          type="button"
+                          onClick={() =>
+                            setPreviewLang((s) => ({
+                              ...s,
+                              [p.key]: active ? (undefined as never) : l,
+                            }))
+                          }
+                          className={`px-2.5 py-1 text-[11px] font-bold uppercase rounded-full transition-all ${
+                            active
+                              ? 'bg-grad text-white shadow-sm'
+                              : 'glass-soft text-mut hover:text-ink'
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      );
+                    })}
+                    {previewLang[p.key] && (
+                      <span className="num text-[10.5px] text-mut ml-1">
+                        /p/{p.slug || '…'}
+                      </span>
+                    )}
+                  </div>
+                  {previewLang[p.key] && (
+                    <div className="mt-3 rounded-xl bg-white/70 border border-white/60 px-5 py-4 max-h-[420px] overflow-y-auto">
+                      <h1 className="text-[24px] font-extrabold tracking-tight text-grad mb-1">
+                        {p.title[previewLang[p.key]!]}
+                      </h1>
+                      <Markdown text={p.body[previewLang[p.key]!]} />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
