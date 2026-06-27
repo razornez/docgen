@@ -232,14 +232,14 @@ DocGen memakai model **kredit prabayar**. Tidak ada langganan bulanan, tidak ada
 
 **1 kredit = 1 dokumen** (hingga 5 halaman). Dokumen lebih dari 5 halaman akan menghitung kredit tambahan. Tidak ada biaya bulanan, tidak ada minimum, Anda hanya membayar dokumen yang benar-benar Anda buat.
 
-## Paket kredit
+## Harga & penawaran khusus
 
-Harga berikut bersifat indikatif dan dapat diperbarui dari dashboard. Semakin besar paket, semakin murah per dokumen.
+Daftar paket kredit dan harga terbaik kami sesuaikan dengan kebutuhan Anda. Untuk daftar harga terkini, penawaran khusus, atau kebutuhan volume besar, **hubungi tim kami** — kirim email singkat dan kami balas dengan penawaran (target 1 hari kerja):
 
-- **1.000 kredit** — Rp149.000 (sekitar Rp149 per dokumen)
-- **5.000 kredit + 250 bonus** — Rp649.000 (sekitar Rp130 per dokumen) — **Populer**
-- **20.000 kredit + 1.500 bonus** — Rp2.290.000 (sekitar Rp115 per dokumen)
-- **50.000 kredit + 5.000 bonus** — Rp4.990.000 (sekitar Rp100 per dokumen) — **Paling hemat**
+- **Penjualan & penawaran volume** — [hello@docgen.id](mailto:hello@docgen.id?subject=Permintaan%20Penawaran%20DocGen)
+- **Tagihan & pembayaran** — [support@docgen.id](mailto:support@docgen.id?subject=Pertanyaan%20Tagihan%20DocGen)
+
+Sebutkan estimasi jumlah dokumen per bulan dan kebutuhan Anda agar kami dapat memberi harga terbaik.
 
 ## Metode pembayaran
 
@@ -282,14 +282,14 @@ DocGen runs on a **prepaid credit** model. No monthly subscription, no hidden fe
 
 **1 credit = 1 document** (up to 5 pages). Documents longer than 5 pages count additional credits. No monthly fee, no minimums, you only pay for the documents you actually create.
 
-## Credit packages
+## Pricing & custom quotes
 
-The prices below are indicative and may be updated from the dashboard. The bigger the package, the cheaper your per-document cost.
+We tailor credit packages and our best rates to your needs. For current pricing, special offers, or high-volume requirements, **contact our team** — send a short email and we'll reply with a quote (within 1 business day):
 
-- **1,000 credits** — Rp149,000 (about Rp149 per document)
-- **5,000 credits + 250 bonus** — Rp649,000 (about Rp130 per document) — **Popular**
-- **20,000 credits + 1,500 bonus** — Rp2,290,000 (about Rp115 per document)
-- **50,000 credits + 5,000 bonus** — Rp4,990,000 (about Rp100 per document) — **Best value**
+- **Sales & volume quotes** — [hello@docgen.id](mailto:hello@docgen.id?subject=DocGen%20Quote%20Request)
+- **Billing & payments** — [support@docgen.id](mailto:support@docgen.id?subject=DocGen%20Billing%20Question)
+
+Tell us your estimated monthly document volume and requirements so we can offer the best price.
 
 ## Payment methods
 
