@@ -1,4 +1,12 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  lazy,
+  Suspense,
+} from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getTemplates,
@@ -17,6 +25,8 @@ import { renderTemplate } from '../lib/renderTemplate.js';
 import { ApiGuideModal } from '../components/ApiGuideModal.js';
 import { TemplateEditor } from '../components/TemplateEditor.js';
 import { TemplateCreator } from '../components/TemplateCreator.js';
+// Editor visual berat (GrapesJS) — dimuat hanya saat dibutuhkan.
+const GrapesEditor = lazy(() => import('../components/GrapesEditor.js'));
 import { formatDate } from '../lib/format.js';
 import { useLang } from '../i18n/index.js';
 
@@ -156,23 +166,26 @@ function EditPanel({
     staleTime: 5 * 60 * 1000,
   });
 
-  if (q.isLoading || !q.data) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div
-          className="fixed inset-0 bg-[#2a1c4a]/40 backdrop-blur-sm"
-          onClick={onClose}
-        />
-        <div className="relative z-10 w-14 h-14 rounded-2xl glass flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-white/60 border-t-brand-purple rounded-full animate-spin" />
-        </div>
+  const loadingModal = (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="fixed inset-0 bg-[#2a1c4a]/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative z-10 w-14 h-14 rounded-2xl glass flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-white/60 border-t-brand-purple rounded-full animate-spin" />
       </div>
-    );
-  }
+    </div>
+  );
+
+  if (q.isLoading || !q.data) return loadingModal;
 
   if (isAdvancedTemplate(q.data.version.body)) {
+    // Template HTML lanjutan → editor LAYOUT visual (GrapesJS).
     return (
-      <TemplateEditor template={template} onClose={onClose} onSaved={onSaved} />
+      <Suspense fallback={loadingModal}>
+        <GrapesEditor template={template} onClose={onClose} onSaved={onSaved} />
+      </Suspense>
     );
   }
   return (
