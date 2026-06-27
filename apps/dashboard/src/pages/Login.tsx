@@ -76,6 +76,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(true);
+  const [agree, setAgree] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
@@ -120,6 +121,15 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (tab === 'register' && !agree) {
+      setError(
+        t(
+          'Anda harus menyetujui Syarat & Ketentuan dan Kebijakan Privasi.',
+          'You must agree to the Terms and Privacy Policy.',
+        ),
+      );
+      return;
+    }
     setLoading(true);
     try {
       const res =
@@ -525,9 +535,44 @@ export default function LoginPage() {
                 </label>
               )}
 
+              {tab === 'register' && (
+                <label className="flex items-start gap-2 text-[12px] text-mut cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={agree}
+                    onChange={(e) => {
+                      setAgree(e.target.checked);
+                      if (error) setError('');
+                    }}
+                    className="w-4 h-4 mt-0.5 rounded accent-[#9b5de5] flex-shrink-0"
+                  />
+                  <span className="leading-snug">
+                    {t('Saya menyetujui ', 'I agree to the ')}
+                    <a
+                      href="/p/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-brand-purple hover:opacity-80"
+                    >
+                      {t('Syarat & Ketentuan', 'Terms & Conditions')}
+                    </a>
+                    {t(' dan ', ' and ')}
+                    <a
+                      href="/p/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-brand-purple hover:opacity-80"
+                    >
+                      {t('Kebijakan Privasi', 'Privacy Policy')}
+                    </a>
+                    .
+                  </span>
+                </label>
+              )}
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (tab === 'register' && !agree)}
                 className="w-full flex items-center justify-center gap-2 py-3 text-[14px] font-bold rounded-full text-white bg-grad shadow-[0_6px_18px_rgba(155,93,229,0.4)] disabled:opacity-60 hover:opacity-90 transition-all"
               >
                 {loading
