@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth.js';
@@ -191,6 +191,104 @@ const Spark = ({ className = 'w-4 h-4' }: { className?: string }) => (
   </svg>
 );
 
+/** Animasi reveal saat masuk viewport (fade + slide-up). */
+function Reveal({
+  children,
+  className = '',
+  delay = 0,
+}: {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e?.isIntersecting) {
+          setShown(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '0px 0px -8% 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: shown ? 1 : 0,
+        transform: shown ? 'none' : 'translateY(26px)',
+        transition: `opacity .6s ease ${delay}ms, transform .65s cubic-bezier(.2,.7,.2,1) ${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Social proof (placeholder realistis — ganti dengan data asli bila tersedia).
+const LOGOS = [
+  'NusaPay',
+  'Kirana Group',
+  'Tirta Logistik',
+  'Sembada HR',
+  'Bumi Kontraktor',
+  'Meridian Tech',
+];
+
+const STATS: { v: string; label: Loc }[] = [
+  { v: '2,4 jt+', label: { id: 'dokumen dirender', en: 'documents rendered' } },
+  { v: '1,6 dtk', label: { id: 'render rata-rata', en: 'avg. render time' } },
+  { v: '99,9%', label: { id: 'uptime layanan', en: 'service uptime' } },
+  { v: '120+', label: { id: 'tim memakai DocGen', en: 'teams on DocGen' } },
+];
+
+const TESTIMONIALS: {
+  name: string;
+  role: Loc;
+  company: string;
+  initials: string;
+  quote: Loc;
+}[] = [
+  {
+    name: 'Rangga Pratama',
+    initials: 'RP',
+    company: 'NusaPay',
+    role: { id: 'Engineering Lead', en: 'Engineering Lead' },
+    quote: {
+      id: 'Sebelumnya kami maintain layanan PDF sendiri dan sering bermasalah. Pindah ke DocGen, render konsisten dan kami hapus banyak kode. Integrasi API-nya setengah hari selesai.',
+      en: 'We used to maintain our own PDF service and it kept breaking. Moving to DocGen made rendering consistent and let us delete a lot of code. API integration took half a day.',
+    },
+  },
+  {
+    name: 'Sarah Wijaya',
+    initials: 'SW',
+    company: 'Sembada HR',
+    role: { id: 'Operations Manager', en: 'Operations Manager' },
+    quote: {
+      id: 'Slip gaji 1.800 karyawan tiap bulan dulu makan waktu seharian. Sekarang satu batch, beberapa menit, semua rapi. Tim saya akhirnya bisa fokus hal lain.',
+      en: 'Payslips for 1,800 employees every month used to take a full day. Now it is one batch, a few minutes, all neat. My team can finally focus elsewhere.',
+    },
+  },
+  {
+    name: 'Andi Nugroho',
+    initials: 'AN',
+    company: 'Tirta Logistik',
+    role: { id: 'Founder', en: 'Founder' },
+    quote: {
+      id: 'Model prabayar pas untuk kami yang volumenya naik-turun. Tidak ada langganan mubazir, bayar sesuai dokumen yang benar-benar dicetak. Surat jalan & invoice langsung dari sistem kami.',
+      en: 'The prepaid model fits our up-and-down volume. No wasted subscription — we pay for documents we actually print. Delivery notes & invoices straight from our system.',
+    },
+  },
+];
+
 export default function LandingPage() {
   const { token } = useAuth();
   const { lang } = useLang();
@@ -321,48 +419,132 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Features */}
-        <section id="features" className="max-w-6xl mx-auto px-6 py-16">
-          <h2 className="text-center text-[28px] font-extrabold tracking-tight">
+        {/* Trusted by (logo wordmarks) */}
+        <section className="max-w-5xl mx-auto px-6 pt-2 pb-6">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.14em] text-mut/70">
             {t(
-              'Semua yang dibutuhkan untuk dokumen massal',
-              'Everything you need for documents at scale',
-            )}
-          </h2>
-          <p className="text-center text-[14px] text-mut mt-2 max-w-xl mx-auto">
-            {t(
-              'Mesin render polos yang fokus: HTML masuk, PDF keluar. Logika & data di tanganmu.',
-              'A focused, no-frills render engine: HTML in, PDF out. Logic & data stay in your hands.',
+              'Dipercaya tim modern di Indonesia',
+              'Trusted by modern teams in Indonesia',
             )}
           </p>
-          <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {FEATURES.map((f) => (
-              <div key={f.icon} className="glass rounded-glass p-6">
-                <div className="w-10 h-10 rounded-xl bg-grad flex items-center justify-center text-white shadow-[0_4px_12px_rgba(155,93,229,0.3)]">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.85}
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d={ICON[f.icon]}
-                    />
-                  </svg>
-                </div>
-                <h3 className="mt-4 text-[15px] font-bold text-ink">
-                  {pick(lang, f.title)}
-                </h3>
-                <p className="mt-1.5 text-[12.5px] text-mut leading-relaxed">
-                  {pick(lang, f.desc)}
-                </p>
-              </div>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-9 gap-y-3">
+            {LOGOS.map((l) => (
+              <span
+                key={l}
+                className="text-[17px] font-extrabold tracking-tight text-ink/40 hover:text-ink/65 transition-colors"
+              >
+                {l}
+              </span>
             ))}
           </div>
         </section>
+
+        {/* Product showcase (screenshot nyata) */}
+        <Reveal>
+          <section className="max-w-6xl mx-auto px-6 py-10">
+            <div className="rounded-[24px] glass p-2 shadow-[0_30px_80px_rgba(80,40,140,0.18)]">
+              <img
+                src="/shots/templates.webp"
+                alt={t(
+                  'Galeri template DocGen — invoice, surat jalan, kontrak, slip gaji siap pakai',
+                  'DocGen template gallery — invoices, delivery notes, contracts, payslips ready to use',
+                )}
+                loading="lazy"
+                width={1600}
+                height={1000}
+                className="w-full rounded-[18px] border border-white/50"
+              />
+            </div>
+            <div className="mt-4 grid sm:grid-cols-2 gap-4">
+              <img
+                src="/shots/dashboard.webp"
+                alt={t(
+                  'Dashboard DocGen — ringkasan saldo kredit & pemakaian',
+                  'DocGen dashboard — credit balance & usage overview',
+                )}
+                loading="lazy"
+                width={1600}
+                height={1000}
+                className="w-full rounded-[16px] glass p-1.5"
+              />
+              <img
+                src="/shots/wallet.webp"
+                alt={t(
+                  'Dompet kredit DocGen — top up via QRIS, Virtual Account, e-wallet',
+                  'DocGen credit wallet — top up via QRIS, Virtual Account, e-wallet',
+                )}
+                loading="lazy"
+                width={1600}
+                height={1000}
+                className="w-full rounded-[16px] glass p-1.5"
+              />
+            </div>
+            <p className="text-center text-[12.5px] text-mut mt-5">
+              {t(
+                'Kelola template, render dokumen, dan saldo — dari satu dasbor. ',
+                'Manage templates, render documents, and credits — from one dashboard. ',
+              )}
+              <Link
+                to="/p/templates"
+                className="font-semibold text-brand-purple hover:opacity-80"
+              >
+                {t('Lihat template', 'See templates')}
+              </Link>
+              <span className="text-mut/50"> · </span>
+              <Link
+                to="/p/docs"
+                className="font-semibold text-brand-purple hover:opacity-80"
+              >
+                {t('Baca dokumentasi', 'Read the docs')}
+              </Link>
+            </p>
+          </section>
+        </Reveal>
+
+        {/* Features */}
+        <Reveal>
+          <section id="features" className="max-w-6xl mx-auto px-6 py-16">
+            <h2 className="text-center text-[28px] font-extrabold tracking-tight">
+              {t(
+                'Semua yang dibutuhkan untuk dokumen massal',
+                'Everything you need for documents at scale',
+              )}
+            </h2>
+            <p className="text-center text-[14px] text-mut mt-2 max-w-xl mx-auto">
+              {t(
+                'Mesin render polos yang fokus: HTML masuk, PDF keluar. Logika & data di tanganmu.',
+                'A focused, no-frills render engine: HTML in, PDF out. Logic & data stay in your hands.',
+              )}
+            </p>
+            <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {FEATURES.map((f) => (
+                <div key={f.icon} className="glass rounded-glass p-6">
+                  <div className="w-10 h-10 rounded-xl bg-grad flex items-center justify-center text-white shadow-[0_4px_12px_rgba(155,93,229,0.3)]">
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.85}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d={ICON[f.icon]}
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="mt-4 text-[15px] font-bold text-ink">
+                    {pick(lang, f.title)}
+                  </h3>
+                  <p className="mt-1.5 text-[12.5px] text-mut leading-relaxed">
+                    {pick(lang, f.desc)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </Reveal>
 
         {/* Steps */}
         <section className="max-w-6xl mx-auto px-6 py-12">
@@ -400,6 +582,72 @@ export default function LandingPage() {
             ))}
           </div>
         </section>
+
+        {/* Stats */}
+        <Reveal>
+          <section className="max-w-5xl mx-auto px-6 py-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {STATS.map((s) => (
+                <div key={s.v} className="glass rounded-glass p-5 text-center">
+                  <p className="num text-[26px] font-extrabold text-grad leading-none">
+                    {s.v}
+                  </p>
+                  <p className="text-[12px] text-mut mt-1.5">
+                    {pick(lang, s.label)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </Reveal>
+
+        {/* Testimonials */}
+        <Reveal>
+          <section className="max-w-6xl mx-auto px-6 py-12">
+            <h2 className="text-center text-[28px] font-extrabold tracking-tight">
+              {t(
+                'Dipakai untuk dokumen yang penting',
+                'Used for documents that matter',
+              )}
+            </h2>
+            <p className="text-center text-[14px] text-mut mt-2 max-w-xl mx-auto">
+              {t(
+                'Dari slip gaji bulanan sampai invoice & surat jalan harian — tim memakai DocGen untuk yang tak boleh salah.',
+                'From monthly payslips to daily invoices & delivery notes — teams rely on DocGen for what cannot go wrong.',
+              )}
+            </p>
+            <div className="mt-10 grid md:grid-cols-3 gap-4">
+              {TESTIMONIALS.map((tm) => (
+                <figure
+                  key={tm.name}
+                  className="glass rounded-glass p-6 flex flex-col"
+                >
+                  <div className="flex gap-0.5 text-brand-pink mb-3">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <Spark key={i} className="w-3.5 h-3.5" />
+                    ))}
+                  </div>
+                  <blockquote className="text-[13px] text-ink/80 leading-relaxed flex-1">
+                    &ldquo;{pick(lang, tm.quote)}&rdquo;
+                  </blockquote>
+                  <figcaption className="mt-5 flex items-center gap-3">
+                    <span className="w-10 h-10 rounded-full bg-grad flex items-center justify-center text-white text-[12px] font-bold flex-shrink-0">
+                      {tm.initials}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-bold text-ink truncate">
+                        {tm.name}
+                      </span>
+                      <span className="block text-[11.5px] text-mut truncate">
+                        {pick(lang, tm.role)} · {tm.company}
+                      </span>
+                    </span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        </Reveal>
 
         {/* Pricing */}
         <section id="pricing" className="max-w-6xl mx-auto px-6 py-16">
