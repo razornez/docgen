@@ -56,6 +56,12 @@ export const DEFAULT_CONTENT: SiteContent = {
       items: [
         { label: L('Tentang', 'About'), href: '/p/about' },
         { label: L('Kontak', 'Contact'), href: '/p/contact' },
+      ],
+    },
+    {
+      head: L('Legal', 'Legal'),
+      items: [
+        { label: L('Syarat & Ketentuan', 'Terms'), href: '/p/terms' },
         { label: L('Privasi', 'Privacy'), href: '/p/privacy' },
       ],
     },
@@ -2215,6 +2221,112 @@ We may update this policy from time to time. If a change is significant, we will
 ### Contact
 
 Questions about your privacy or your data? Reach us at [support@docgen.id](mailto:support@docgen.id) or see the [Contact](/p/contact) page.`,
+      },
+    },
+    {
+      slug: 'terms',
+      title: { id: 'Syarat & Ketentuan', en: 'Terms & Conditions' },
+      body: {
+        id: `## Syarat & Ketentuan
+
+Dengan membuat akun atau menggunakan DocGen, Anda menyetujui Syarat & Ketentuan ini. Mohon dibaca dengan saksama. Bila Anda tidak setuju, mohon untuk tidak menggunakan layanan.
+
+### 1. Definisi
+- **Layanan** — platform DocGen untuk membuat dokumen (PDF) dari template HTML dan data, melalui dashboard maupun API.
+- **Akun** — akun terdaftar yang Anda gunakan untuk mengakses Layanan.
+- **Kredit** — satuan prabayar untuk menghasilkan dokumen. 1 kredit = 1 dokumen (hingga 5 halaman).
+
+### 2. Akun
+Anda bertanggung jawab menjaga kerahasiaan kredensial dan API key Anda, serta atas seluruh aktivitas pada Akun Anda. Beri tahu kami segera bila ada penggunaan tanpa izin. Anda wajib memberikan informasi yang benar dan menjaganya tetap mutakhir.
+
+### 3. Layanan
+DocGen mengubah template dan data yang Anda kirim menjadi dokumen. Anda bertanggung jawab penuh atas isi template dan data yang Anda proses. Kami dapat memperbarui, menambah, atau menghentikan fitur dari waktu ke waktu.
+
+### 4. Kredit, pembayaran, dan tanpa pengembalian dana
+- Layanan memakai model **kredit prabayar**: Anda membeli kredit di muka, lalu memakainya untuk menghasilkan dokumen.
+- Pembayaran diproses lewat penyedia pembayaran pihak ketiga (mis. QRIS, Virtual Account, e-wallet). Saldo bertambah setelah pembayaran terkonfirmasi.
+- **Kredit yang sudah dibeli tidak dapat dikembalikan (non-refundable)** dan tidak dapat ditukar dengan uang tunai, kecuali diwajibkan oleh hukum yang berlaku.
+- Kami dapat mengubah harga sewaktu-waktu. Perubahan harga tidak memengaruhi kredit yang sudah Anda beli, dan **saldo kredit tidak pernah kedaluwarsa**.
+
+### 5. Penggunaan yang wajar
+Anda setuju untuk tidak menyalahgunakan Layanan. Ketentuan selengkapnya diatur dalam [Kebijakan Penggunaan Wajar](/p/aup). Pelanggaran dapat berakibat penangguhan atau penghentian Akun.
+
+### 6. Kekayaan intelektual
+Template, data, dan dokumen yang Anda buat tetap menjadi milik Anda. Merek, perangkat lunak, dan materi DocGen tetap menjadi milik kami. Anda memberi kami lisensi terbatas untuk memproses konten Anda semata-mata untuk menjalankan Layanan.
+
+### 7. Data dan privasi
+Pemrosesan data pribadi tunduk pada [Kebijakan Privasi](/p/privacy) kami, yang disusun selaras dengan peraturan perlindungan data pribadi yang berlaku di Indonesia. Dokumen yang dihasilkan disimpan sementara dan dihapus otomatis sesuai kebijakan retensi kami.
+
+### 8. Ketersediaan layanan
+Kami berupaya menjaga Layanan tetap tersedia, tetapi tidak menjamin bebas gangguan atau bebas kesalahan. Pemeliharaan, pembaruan, atau faktor di luar kendali kami dapat memengaruhi ketersediaan. Pantau di halaman [Status](/p/status).
+
+### 9. Batasan tanggung jawab
+Sejauh diizinkan hukum, DocGen tidak bertanggung jawab atas kerugian tidak langsung, insidental, atau konsekuensial — termasuk kehilangan data, kehilangan keuntungan, atau gangguan usaha. Total tanggung jawab kami atas klaim apa pun dibatasi maksimal sebesar jumlah yang Anda bayarkan untuk Layanan dalam 3 bulan terakhir. Layanan disediakan "sebagaimana adanya" tanpa jaminan apa pun.
+
+### 10. Tanggung jawab atas konten Anda
+Anda menjamin bahwa Anda berhak menggunakan template dan data yang Anda proses, dan dokumen yang Anda hasilkan tidak melanggar hukum atau hak pihak ketiga. Anda membebaskan DocGen dari klaim yang timbul akibat penggunaan Layanan oleh Anda.
+
+### 11. Penangguhan dan pengakhiran
+Kami dapat menangguhkan atau menghentikan Akun yang melanggar Syarat ini atau hukum yang berlaku. Anda dapat berhenti menggunakan Layanan kapan saja. Kredit yang tersisa saat pengakhiran karena pelanggaran tidak dikembalikan.
+
+### 12. Perubahan ketentuan
+Kami dapat memperbarui Syarat ini dari waktu ke waktu. Versi terbaru selalu tersedia di halaman ini. Penggunaan Layanan setelah perubahan berarti Anda menerima ketentuan yang diperbarui.
+
+### 13. Hukum yang berlaku
+Syarat ini diatur oleh hukum Republik Indonesia. Sengketa yang timbul diupayakan diselesaikan secara musyawarah; bila tidak tercapai, melalui forum yang berwenang di Indonesia.
+
+### 14. Kontak
+Pertanyaan tentang Syarat ini? Hubungi [support@docgen.id](mailto:support@docgen.id) atau lihat halaman [Kontak](/p/contact).`,
+        en: `## Terms & Conditions
+
+By creating an account or using DocGen, you agree to these Terms & Conditions. Please read them carefully. If you do not agree, please do not use the service.
+
+### 1. Definitions
+- **Service** — the DocGen platform for generating documents (PDFs) from HTML templates and data, via the dashboard or API.
+- **Account** — the registered account you use to access the Service.
+- **Credit** — the prepaid unit for generating documents. 1 credit = 1 document (up to 5 pages).
+
+### 2. Account
+You are responsible for keeping your credentials and API keys confidential, and for all activity on your Account. Notify us immediately of any unauthorized use. You must provide accurate information and keep it up to date.
+
+### 3. The Service
+DocGen turns the templates and data you send into documents. You are fully responsible for the content of the templates and data you process. We may update, add, or discontinue features from time to time.
+
+### 4. Credits, payment, and no refunds
+- The Service uses a **prepaid credit** model: you buy credits in advance, then use them to generate documents.
+- Payments are processed through third-party payment providers (e.g. QRIS, Virtual Account, e-wallet). Your balance is added once payment is confirmed.
+- **Purchased credits are non-refundable** and cannot be exchanged for cash, except where required by applicable law.
+- We may change prices at any time. Price changes do not affect credits you have already purchased, and your **credit balance never expires**.
+
+### 5. Acceptable use
+You agree not to misuse the Service. Full terms are set out in the [Acceptable Use Policy](/p/aup). Violations may result in suspension or termination of your Account.
+
+### 6. Intellectual property
+The templates, data, and documents you create remain yours. DocGen's brand, software, and materials remain ours. You grant us a limited license to process your content solely to operate the Service.
+
+### 7. Data and privacy
+Processing of personal data is governed by our [Privacy Policy](/p/privacy), written in line with applicable Indonesian personal data protection regulations. Generated documents are stored temporarily and deleted automatically per our retention policy.
+
+### 8. Service availability
+We strive to keep the Service available but do not guarantee it will be uninterrupted or error-free. Maintenance, updates, or factors beyond our control may affect availability. Check the [Status](/p/status) page.
+
+### 9. Limitation of liability
+To the extent permitted by law, DocGen is not liable for indirect, incidental, or consequential damages — including loss of data, lost profits, or business interruption. Our total liability for any claim is limited to the amount you paid for the Service in the preceding 3 months. The Service is provided "as is" without warranties of any kind.
+
+### 10. Responsibility for your content
+You warrant that you have the right to use the templates and data you process, and that the documents you generate do not violate any law or third-party rights. You indemnify DocGen against claims arising from your use of the Service.
+
+### 11. Suspension and termination
+We may suspend or terminate Accounts that violate these Terms or applicable law. You may stop using the Service at any time. Credits remaining upon termination for a violation are not refunded.
+
+### 12. Changes to these terms
+We may update these Terms from time to time. The latest version is always available on this page. Continued use after a change means you accept the updated terms.
+
+### 13. Governing law
+These Terms are governed by the laws of the Republic of Indonesia. Disputes will first be resolved amicably; failing that, through the competent forum in Indonesia.
+
+### 14. Contact
+Questions about these Terms? Reach us at [support@docgen.id](mailto:support@docgen.id) or see the [Contact](/p/contact) page.`,
       },
     },
   ],
