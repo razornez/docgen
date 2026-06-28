@@ -1,10 +1,33 @@
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useLang } from '../i18n/index.js';
+import { getPublicContent } from '../api/client.js';
 import type { Loc, PublicContent } from '../api/client.js';
 
 export type Lang = 'id' | 'en';
 export const pick = (lang: Lang, loc?: Loc): string =>
   loc ? (loc[lang] ?? loc.id) : '';
+
+/** Logo brand: gambar unggahan owner bila ada, jika tidak bunga + wordmark. */
+function BrandMark({ logo }: { logo?: string }) {
+  if (logo) {
+    return (
+      <img
+        src={logo}
+        alt="DocGen"
+        className="h-7 w-auto max-h-7 object-contain"
+      />
+    );
+  }
+  return (
+    <>
+      <Flower className="w-7 h-7" />
+      <span className="text-[18px] font-extrabold tracking-tight lowercase">
+        docgen
+      </span>
+    </>
+  );
+}
 
 export function Flower({ className = 'w-8 h-8' }: { className?: string }) {
   return (
@@ -236,14 +259,15 @@ const NAV_LINKS: { to: string; label: Loc }[] = [
 
 export function PublicNav() {
   const { lang } = useLang();
+  const { data: content } = useQuery({
+    queryKey: ['public-content'],
+    queryFn: getPublicContent,
+  });
   return (
     <nav className="sticky top-0 z-40 backdrop-blur-xl bg-white/30 border-b border-white/40">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <Flower className="w-7 h-7" />
-          <span className="text-[18px] font-extrabold tracking-tight lowercase">
-            docgen
-          </span>
+          <BrandMark logo={content?.brand_logo} />
         </Link>
         <div className="hidden md:flex items-center gap-7 text-[13.5px] font-medium text-mut">
           {NAV_LINKS.map((l) => (
@@ -318,10 +342,7 @@ export function PublicFooter({ content }: { content?: PublicContent }) {
       <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-4 gap-8">
         <div className="col-span-2 md:col-span-1">
           <div className="flex items-center gap-2">
-            <Flower className="w-7 h-7" />
-            <span className="text-[17px] font-extrabold tracking-tight lowercase">
-              docgen
-            </span>
+            <BrandMark logo={content?.brand_logo} />
           </div>
           <p className="text-[12px] text-mut mt-3 max-w-[200px]">{tagline}</p>
         </div>

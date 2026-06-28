@@ -407,6 +407,8 @@ export interface PublicContent {
   footer_tagline: Loc;
   footer_columns: FooterColumn[];
   logos?: LogoItem[];
+  /** Logo brand DocGen (data URI). Kosong → bunga + wordmark bawaan. */
+  brand_logo?: string;
 }
 export interface OwnerSiteContent extends PublicContent {
   pages: CmsPage[];

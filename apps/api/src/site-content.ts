@@ -28,6 +28,8 @@ export interface SiteContent {
   footer_columns: FooterColumn[];
   pages: CmsPage[];
   logos: LogoItem[];
+  /** Logo brand DocGen (data URI). Kosong → pakai bunga + wordmark bawaan. */
+  brand_logo: string;
 }
 
 const L = (id: string, en: string): Loc => ({ id, en });
@@ -2506,6 +2508,7 @@ Questions about data or privacy? See [Privacy](/p/privacy) or reach us at [suppo
     { name: 'Bumi Kontraktor', image: '' },
     { name: 'Meridian Tech', image: '' },
   ],
+  brand_logo: '',
 };
 
 /** Baca konten situs (key 'site') dari app_settings, fallback ke default. */
@@ -2522,5 +2525,9 @@ export async function readSiteContent(pool: Pool): Promise<SiteContent> {
       : DEFAULT_CONTENT.footer_columns,
     pages: Array.isArray(v.pages) ? v.pages : DEFAULT_CONTENT.pages,
     logos: Array.isArray(v.logos) ? v.logos : DEFAULT_CONTENT.logos,
+    brand_logo:
+      typeof v.brand_logo === 'string'
+        ? v.brand_logo
+        : DEFAULT_CONTENT.brand_logo,
   };
 }

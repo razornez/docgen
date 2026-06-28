@@ -83,6 +83,7 @@ export default function OwnerContent() {
   const [cols, setCols] = useState<ColS[]>([]);
   const [pages, setPages] = useState<PageS[]>([]);
   const [logos, setLogos] = useState<LogoS[]>([]);
+  const [brandLogo, setBrandLogo] = useState('');
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
@@ -121,6 +122,7 @@ export default function OwnerContent() {
         image: l.image,
       })),
     );
+    setBrandLogo(d.brand_logo ?? '');
     setError('');
   };
 
@@ -146,6 +148,7 @@ export default function OwnerContent() {
         logos: logos
           .filter((l) => l.name.trim())
           .map((l) => ({ name: l.name.trim(), image: l.image })),
+        brand_logo: brandLogo,
       }),
     onSuccess: () => {
       setSaved(true);
@@ -520,11 +523,76 @@ export default function OwnerContent() {
         {/* ── Logo "dipercaya oleh" ──────────────────────────────────── */}
         {tab === 'logos' && (
           <div className="space-y-4">
+            {/* Logo brand DocGen */}
             <div className="glass rounded-glass p-5">
-              <p className="text-[12.5px] text-mut leading-relaxed">
+              <h2 className="text-[14px] font-bold text-ink">
+                {t('Logo DocGen (brand)', 'DocGen logo (brand)')}
+              </h2>
+              <p className="text-[12px] text-mut mt-1 leading-relaxed">
                 {t(
-                  'Logo "Dipercaya oleh" di landing. Unggah PNG/SVG transparan (paling rapi di latar terang). Tanpa logo, nama tampil sebagai teks wordmark.',
-                  'The "Trusted by" logos on the landing page. Upload a transparent PNG/SVG (looks best on light backgrounds). Without a logo, the name shows as a text wordmark.',
+                  'Mengganti logo di navbar & footer situs publik. Unggah PNG/SVG transparan (tinggi ideal ~56px). Kosongkan untuk pakai logo bunga + "docgen" bawaan.',
+                  'Replaces the logo in the public site navbar & footer. Upload a transparent PNG/SVG (ideal height ~56px). Leave empty to use the default flower + "docgen".',
+                )}
+              </p>
+              <div className="mt-3 flex items-center gap-4">
+                <div className="h-14 min-w-[120px] px-4 rounded-xl bg-white/70 border border-white/60 flex items-center justify-center overflow-hidden">
+                  {brandLogo ? (
+                    <img
+                      src={brandLogo}
+                      alt="logo"
+                      className="max-h-10 w-auto object-contain"
+                    />
+                  ) : (
+                    <span className="text-[12px] font-bold text-mut/60 lowercase">
+                      🌸 docgen
+                    </span>
+                  )}
+                </div>
+                <label className="cursor-pointer px-3.5 py-2 text-[12.5px] font-semibold rounded-full bg-grad text-white hover:opacity-90 transition-all">
+                  {brandLogo
+                    ? t('Ganti logo', 'Replace logo')
+                    : t('Unggah logo', 'Upload logo')}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!f) return;
+                      void compressImageToDataUrl(f)
+                        .then((uri) => setBrandLogo(uri))
+                        .catch(() =>
+                          setError(
+                            t(
+                              'Gagal memproses gambar',
+                              'Failed to process image',
+                            ),
+                          ),
+                        );
+                    }}
+                  />
+                </label>
+                {brandLogo && (
+                  <button
+                    type="button"
+                    onClick={() => setBrandLogo('')}
+                    className="text-[12px] text-mut hover:text-rose-600"
+                  >
+                    {t('Hapus (pakai bawaan)', 'Clear (use default)')}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="glass rounded-glass p-5">
+              <h2 className="text-[14px] font-bold text-ink">
+                {t('Logo "Dipercaya oleh"', '"Trusted by" logos')}
+              </h2>
+              <p className="text-[12px] text-mut mt-1 leading-relaxed">
+                {t(
+                  'Logo klien di landing. Unggah PNG/SVG transparan (paling rapi di latar terang). Tanpa logo, nama tampil sebagai teks wordmark.',
+                  'Client logos on the landing page. Upload a transparent PNG/SVG (looks best on light backgrounds). Without a logo, the name shows as a text wordmark.',
                 )}
               </p>
             </div>

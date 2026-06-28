@@ -81,6 +81,8 @@ const ContentSchema = z.object({
     .max(12)
     .optional()
     .default([]),
+  // Logo brand DocGen (data URI ≤ ~375KB) atau kosong.
+  brand_logo: z.string().max(500000).optional().default(''),
 });
 const EmailSubject = z.object({
   id: z.string().trim().max(300),

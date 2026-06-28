@@ -46,6 +46,7 @@ export function registerPublicRoutes(app: FastifyInstance, pool: Pool): void {
       footer_tagline: c.footer_tagline,
       footer_columns: c.footer_columns,
       logos: c.logos,
+      brand_logo: c.brand_logo,
     };
   });
 
