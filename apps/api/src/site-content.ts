@@ -18,10 +18,16 @@ export interface CmsPage {
   title: Loc;
   body: Loc;
 }
+/** Logo "dipercaya oleh" — image = data URI (kosong → tampilkan nama teks). */
+export interface LogoItem {
+  name: string;
+  image: string;
+}
 export interface SiteContent {
   footer_tagline: Loc;
   footer_columns: FooterColumn[];
   pages: CmsPage[];
+  logos: LogoItem[];
 }
 
 const L = (id: string, en: string): Loc => ({ id, en });
@@ -2492,6 +2498,14 @@ Questions about data or privacy? See [Privacy](/p/privacy) or reach us at [suppo
       },
     },
   ],
+  logos: [
+    { name: 'NusaPay', image: '' },
+    { name: 'Kirana Group', image: '' },
+    { name: 'Tirta Logistik', image: '' },
+    { name: 'Sembada HR', image: '' },
+    { name: 'Bumi Kontraktor', image: '' },
+    { name: 'Meridian Tech', image: '' },
+  ],
 };
 
 /** Baca konten situs (key 'site') dari app_settings, fallback ke default. */
@@ -2507,5 +2521,6 @@ export async function readSiteContent(pool: Pool): Promise<SiteContent> {
       ? v.footer_columns
       : DEFAULT_CONTENT.footer_columns,
     pages: Array.isArray(v.pages) ? v.pages : DEFAULT_CONTENT.pages,
+    logos: Array.isArray(v.logos) ? v.logos : DEFAULT_CONTENT.logos,
   };
 }

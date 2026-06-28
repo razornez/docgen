@@ -70,6 +70,17 @@ const ContentSchema = z.object({
       }),
     )
     .max(40),
+  // Logo "dipercaya oleh" — image = data URI (≤ ~250KB) atau kosong.
+  logos: z
+    .array(
+      z.object({
+        name: z.string().trim().max(60),
+        image: z.string().max(350000),
+      }),
+    )
+    .max(12)
+    .optional()
+    .default([]),
 });
 const EmailSubject = z.object({
   id: z.string().trim().max(300),

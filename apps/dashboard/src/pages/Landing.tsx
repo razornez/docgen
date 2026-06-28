@@ -309,6 +309,10 @@ export default function LandingPage() {
   const bonus = pricing.data?.signup_bonus_credits ?? 100;
   const packages = pricing.data?.packages ?? [];
   const dok = t('dokumen', 'documents');
+  // Logo "dipercaya" dari CMS owner; fallback ke wordmark default.
+  const logos = content.data?.logos?.length
+    ? content.data.logos
+    : LOGOS.map((name) => ({ name, image: '' }));
 
   return (
     <div className="relative min-h-screen text-ink overflow-x-hidden">
@@ -427,15 +431,25 @@ export default function LandingPage() {
               'Trusted by modern teams in Indonesia',
             )}
           </p>
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-9 gap-y-3">
-            {LOGOS.map((l) => (
-              <span
-                key={l}
-                className="text-[17px] font-extrabold tracking-tight text-ink/40 hover:text-ink/65 transition-colors"
-              >
-                {l}
-              </span>
-            ))}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-9 gap-y-4">
+            {logos.map((l) =>
+              l.image ? (
+                <img
+                  key={l.name}
+                  src={l.image}
+                  alt={l.name}
+                  loading="lazy"
+                  className="h-7 w-auto max-w-[140px] object-contain opacity-55 grayscale hover:opacity-90 hover:grayscale-0 transition-all"
+                />
+              ) : (
+                <span
+                  key={l.name}
+                  className="text-[17px] font-extrabold tracking-tight text-ink/40 hover:text-ink/65 transition-colors"
+                >
+                  {l.name}
+                </span>
+              ),
+            )}
           </div>
         </section>
 

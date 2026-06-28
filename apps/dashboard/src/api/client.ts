@@ -398,9 +398,15 @@ export interface CmsPage {
   title: Loc;
   body: Loc;
 }
+/** Logo "dipercaya oleh" — image = data URI (kosong → tampilkan nama teks). */
+export interface LogoItem {
+  name: string;
+  image: string;
+}
 export interface PublicContent {
   footer_tagline: Loc;
   footer_columns: FooterColumn[];
+  logos?: LogoItem[];
 }
 export interface OwnerSiteContent extends PublicContent {
   pages: CmsPage[];

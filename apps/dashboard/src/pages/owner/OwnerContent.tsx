@@ -8,6 +8,7 @@ import {
 import { useLang } from '../../i18n/index.js';
 import ConfirmModal from '../../components/ConfirmModal.js';
 import { Markdown } from '../../lib/markdown.js';
+import { compressImageToDataUrl } from '../../lib/image.js';
 
 interface LocS {
   id: string;
@@ -29,7 +30,12 @@ interface PageS {
   title: LocS;
   body: LocS;
 }
-type Tab = 'pages' | 'footer';
+interface LogoS {
+  key: string;
+  name: string;
+  image: string;
+}
+type Tab = 'pages' | 'footer' | 'logos';
 
 const inputCls =
   'w-full bg-white/70 border border-white/60 rounded-lg px-3 py-2 text-[13px] text-ink placeholder:text-mut/60 focus:outline-none focus:ring-2 focus:ring-brand-purple/30';
@@ -76,6 +82,7 @@ export default function OwnerContent() {
   const [tagline, setTagline] = useState<LocS>({ id: '', en: '' });
   const [cols, setCols] = useState<ColS[]>([]);
   const [pages, setPages] = useState<PageS[]>([]);
+  const [logos, setLogos] = useState<LogoS[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
@@ -107,6 +114,13 @@ export default function OwnerContent() {
         body: p.body,
       })),
     );
+    setLogos(
+      (d.logos ?? []).map((l) => ({
+        key: nk(),
+        name: l.name,
+        image: l.image,
+      })),
+    );
     setError('');
   };
 
@@ -129,6 +143,9 @@ export default function OwnerContent() {
           title: p.title,
           body: p.body,
         })),
+        logos: logos
+          .filter((l) => l.name.trim())
+          .map((l) => ({ name: l.name.trim(), image: l.image })),
       }),
     onSuccess: () => {
       setSaved(true);
@@ -246,6 +263,7 @@ export default function OwnerContent() {
               [
                 ['pages', t('Halaman', 'Pages')],
                 ['footer', t('Footer', 'Footer')],
+                ['logos', t('Logo', 'Logos')],
               ] as const
             ).map(([v, l]) => (
               <button
@@ -495,6 +513,124 @@ export default function OwnerContent() {
               className="text-[13px] font-semibold text-brand-purple hover:opacity-80"
             >
               {t('+ Tambah kolom', '+ Add column')}
+            </button>
+          </div>
+        )}
+
+        {/* ── Logo "dipercaya oleh" ──────────────────────────────────── */}
+        {tab === 'logos' && (
+          <div className="space-y-4">
+            <div className="glass rounded-glass p-5">
+              <p className="text-[12.5px] text-mut leading-relaxed">
+                {t(
+                  'Logo "Dipercaya oleh" di landing. Unggah PNG/SVG transparan (paling rapi di latar terang). Tanpa logo, nama tampil sebagai teks wordmark.',
+                  'The "Trusted by" logos on the landing page. Upload a transparent PNG/SVG (looks best on light backgrounds). Without a logo, the name shows as a text wordmark.',
+                )}
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {logos.map((l) => (
+                <div
+                  key={l.key}
+                  className="glass rounded-glass p-4 flex items-center gap-3"
+                >
+                  <div className="w-20 h-12 rounded-lg bg-white/70 border border-white/60 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {l.image ? (
+                      <img
+                        src={l.image}
+                        alt={l.name}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-[10px] font-bold text-mut/60 uppercase">
+                        {t('teks', 'text')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <input
+                      value={l.name}
+                      onChange={(e) =>
+                        setLogos((ls) =>
+                          ls.map((x) =>
+                            x.key === l.key
+                              ? { ...x, name: e.target.value }
+                              : x,
+                          ),
+                        )
+                      }
+                      placeholder={t('Nama perusahaan', 'Company name')}
+                      className={inputCls}
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="cursor-pointer text-[11.5px] font-semibold text-brand-purple hover:opacity-80">
+                        {l.image
+                          ? t('Ganti logo', 'Replace')
+                          : t('Unggah logo', 'Upload logo')}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (!f) return;
+                            void compressImageToDataUrl(f)
+                              .then((uri) =>
+                                setLogos((ls) =>
+                                  ls.map((x) =>
+                                    x.key === l.key ? { ...x, image: uri } : x,
+                                  ),
+                                ),
+                              )
+                              .catch(() =>
+                                setError(
+                                  t(
+                                    'Gagal memproses gambar',
+                                    'Failed to process image',
+                                  ),
+                                ),
+                              );
+                          }}
+                        />
+                      </label>
+                      {l.image && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setLogos((ls) =>
+                              ls.map((x) =>
+                                x.key === l.key ? { ...x, image: '' } : x,
+                              ),
+                            )
+                          }
+                          className="text-[11.5px] text-mut hover:text-ink"
+                        >
+                          {t('hapus gambar', 'clear image')}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setLogos((ls) => ls.filter((x) => x.key !== l.key))
+                        }
+                        className="ml-auto text-[11.5px] text-mut hover:text-rose-600"
+                      >
+                        {t('hapus', 'remove')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setLogos((ls) => [...ls, { key: nk(), name: '', image: '' }])
+              }
+              className="text-[13px] font-semibold text-brand-purple hover:opacity-80"
+            >
+              {t('+ Tambah logo', '+ Add logo')}
             </button>
           </div>
         )}
