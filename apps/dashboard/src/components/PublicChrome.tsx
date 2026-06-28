@@ -265,7 +265,7 @@ export function PublicNav() {
             {lang === 'en' ? 'Sign in' : 'Masuk'}
           </Link>
           <Link
-            to="/login"
+            to="/login?tab=register"
             className="flex items-center gap-1.5 px-4 py-1.5 text-[13px] font-bold rounded-full text-white bg-grad shadow-[0_4px_14px_rgba(155,93,229,0.35)] hover:opacity-90 transition-all"
           >
             <svg
@@ -278,10 +278,10 @@ export function PublicNav() {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M5 3l14 9-14 9V3z"
+                d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 7a4 4 0 108 0 4 4 0 00-8 0M19 8v6M22 11h-6"
               />
             </svg>
-            {lang === 'en' ? 'Start free' : 'Mulai gratis'}
+            {lang === 'en' ? 'Sign up free' : 'Daftar gratis'}
           </Link>
         </div>
       </div>

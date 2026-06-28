@@ -70,7 +70,11 @@ export default function LoginPage() {
   const { lang } = useLang();
   const navigate = useNavigate();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
-  const [tab, setTab] = useState<Tab>('login');
+  const [tab, setTab] = useState<Tab>(
+    new URLSearchParams(window.location.search).get('tab') === 'register'
+      ? 'register'
+      : 'login',
+  );
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

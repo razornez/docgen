@@ -53,6 +53,32 @@ export default function PublicPage() {
           </div>
         )}
         {page.data && (
+          <script
+            type="application/ld+json"
+            // Breadcrumb structured data → rich snippet di SERP.
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                '@context': 'https://schema.org',
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                  {
+                    '@type': 'ListItem',
+                    position: 1,
+                    name: lang === 'en' ? 'Home' : 'Beranda',
+                    item: 'https://docgen.razornez.net/',
+                  },
+                  {
+                    '@type': 'ListItem',
+                    position: 2,
+                    name: title,
+                    item: `https://docgen.razornez.net/p/${slug}`,
+                  },
+                ],
+              }),
+            }}
+          />
+        )}
+        {page.data && (
           <article className="glass rounded-glass px-8 py-10">
             <Link
               to="/"
