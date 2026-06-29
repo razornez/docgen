@@ -57,7 +57,8 @@ jobs:
 
       - name: Notify on failure
         if: failure()
-        uses: dawidd6/action-send-mail@v3
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v4
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -80,7 +81,8 @@ jobs:
             https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Notify on success
         if: success()
-        uses: dawidd6/action-send-mail@v3
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v4
         with:
           server_address: smtp.gmail.com
           server_port: 465
