@@ -54,3 +54,27 @@ jobs:
 
             pm2 reload ecosystem.config.cjs --update-env
             echo "Deploy selesai: $(date)"
+
+      - name: Notify on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "[GAGAL] Deploy docgen - ${{ github.sha }}"
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          from: GitHub Actions <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Deploy GAGAL!
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Commit message: ${{ github.event.head_commit.message }}
+            Triggered by: ${{ github.actor }}
+
+            Cek detail error di:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
