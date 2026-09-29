@@ -14,7 +14,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc && cp -r src/locales dist/"
+    "build": "tsc && node scripts/copy-locales.mjs"
   },
   "dependencies": {
     "@docgen/shared": "workspace:*"

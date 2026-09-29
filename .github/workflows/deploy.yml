@@ -5,7 +5,32 @@ on:
     branches: [main]
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @docgen/renderer exec playwright install --with-deps chromium
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm lint
+      - name: Check formatting of changed files
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: git diff --name-only -z "$BEFORE" "$GITHUB_SHA" -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.json' '*.yml' '*.yaml' | xargs -0 -r pnpm exec prettier --check
+      - run: pnpm build:all
+      - run: node scripts/check-renderer.mjs
   deploy:
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
@@ -19,9 +44,24 @@ jobs:
           script: |
             set -e
             cd /var/www/docgen
-            git pull origin main
+            test -d .git
+            if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+              echo "Checkout VPS memiliki perubahan lokal; deploy dihentikan"
+              exit 1
+            fi
+            available_kb=$(df -Pk . | awk 'NR==2 {print $4}')
+            if [ "$available_kb" -lt 2097152 ]; then
+              echo "Ruang kosong VPS kurang dari 2 GB; deploy dihentikan"
+              exit 1
+            fi
+            pm2 describe docgen-api >/dev/null
+            pm2 describe docgen-worker >/dev/null
+            git pull --ff-only origin main
             pnpm install --frozen-lockfile
+            # Playwright browser binaries live outside the repo and may be absent after deploy.
+            pnpm --filter @docgen/renderer exec playwright install chromium
             pnpm build:all          # dashboard di-build dgn base '/' (root)
+            node scripts/check-renderer.mjs # local-only PDF smoke, no credits used
             pnpm db:migrate          # terapkan migrasi (mis. 0012_owner_settings)
 
             # root bisa langsung; non-root pakai sudo (butuh NOPASSWD).
@@ -53,6 +93,17 @@ jobs:
             fi
 
             pm2 reload ecosystem.config.cjs --update-env
+            for attempt in $(seq 1 12); do
+              if curl --fail --silent --show-error https://docgen.razornez.net/health >/dev/null; then
+                echo "API, Redis, database, dan render worker sehat"
+                break
+              fi
+              if [ "$attempt" -eq 12 ]; then
+                echo "Health check gagal setelah reload PM2"
+                exit 1
+              fi
+              sleep 5
+            done
             echo "Deploy selesai: $(date)"
 
       - name: Notify on failure

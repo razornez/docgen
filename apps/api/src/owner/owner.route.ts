@@ -4,8 +4,18 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { randomBase62 } from '@docgen/shared';
+import { RENDER_WORKER_HEARTBEAT_KEY } from '@docgen/shared';
 import type { AppConfig } from '@docgen/config';
 import { readSiteContent } from '../site-content.js';
+import { getRedis } from '../infra/redis.js';
+
+async function renderWorkerReady(): Promise<boolean> {
+  try {
+    return (await getRedis().exists(RENDER_WORKER_HEARTBEAT_KEY)) === 1;
+  } catch {
+    return false;
+  }
+}
 import {
   readEmailTemplates,
   renderEmail,
@@ -223,7 +233,7 @@ export function registerOwnerRoutes(
     const denied = ownerGuard(request, reply, config.SESSION_SECRET);
     if (denied) return denied;
 
-    const [agg, top, recent, days, queue] = await Promise.all([
+    const [agg, top, recent, days, queue, workerReady] = await Promise.all([
       pool.query<{
         tenants_active: string;
         revenue_month: string;
@@ -273,6 +283,7 @@ export function registerOwnerRoutes(
            (SELECT count(*) FROM batches WHERE status='processing') AS running,
            (SELECT count(*) FROM batches WHERE status='queued') AS queued`,
       ),
+      renderWorkerReady(),
     ]);
 
     const a = agg.rows[0]!;
@@ -286,10 +297,9 @@ export function registerOwnerRoutes(
       tenants_active: Number(a.tenants_active),
       revenue_month_idr: Number(a.revenue_month),
       documents_30d: Number(a.docs_30d),
-      uptime: 99.98,
       revenue: { week_idr: week, delta_pct: delta, days14: series },
       queue: {
-        workers: 8,
+        workers: workerReady ? 1 : 0,
         running: Number(q.running),
         queued: Number(q.queued),
         p95: null,
@@ -405,7 +415,7 @@ export function registerOwnerRoutes(
     const denied = ownerGuard(request, reply, config.SESSION_SECRET);
     if (denied) return denied;
 
-    const [queue, jobs, days, p95res] = await Promise.all([
+    const [queue, jobs, days, p95res, workerReady] = await Promise.all([
       pool.query<{ running: string; queued: string }>(
         `SELECT (SELECT count(*) FROM batches WHERE status='processing') AS running,
                 (SELECT count(*) FROM batches WHERE status='queued') AS queued`,
@@ -445,6 +455,7 @@ export function registerOwnerRoutes(
                     AND extract(epoch from (completed_at - created_at))
                         BETWEEN 0 AND 60) x`,
       ),
+      renderWorkerReady(),
     ]);
     const q = queue.rows[0]!;
     const days14 = days.rows.map((r) => Number(r.cnt));
@@ -454,9 +465,9 @@ export function registerOwnerRoutes(
     const running = Number(q.running);
     const queued = Number(q.queued);
     return {
-      status_ok: !(queued > 0 && running === 0),
+      status_ok: workerReady,
       stats: {
-        workers: 8,
+        workers: workerReady ? 1 : 0,
         running,
         queued,
         p95,
@@ -646,22 +657,29 @@ export function registerOwnerRoutes(
     );
     const running = Number(queue.rows[0]?.running ?? 0);
     const queued = Number(queue.rows[0]?.queued ?? 0);
-
-    const bullmqOk = !(queued > 0 && running === 0);
+    const workerReady = await renderWorkerReady();
+    const redisOk = await getRedis()
+      .ping()
+      .then((result) => result === 'PONG')
+      .catch(() => false);
     const systems = [
       {
         label: 'Render engine',
-        ok: bullmqOk,
-        meta: `8 worker · ${running} jalan`,
+        ok: workerReady,
+        meta: workerReady
+          ? `1 worker siap · ${running} batch berjalan`
+          : 'Worker tidak siap',
       },
-      { label: 'API gateway', ok: true, meta: '99.98% · 12k req/mnt' },
+      {
+        label: 'API gateway',
+        ok: true,
+        meta: 'Permintaan halaman ini berhasil',
+      },
       {
         label: 'Antrian (BullMQ)',
-        ok: bullmqOk,
+        ok: redisOk && workerReady,
         meta: `${queued} antri · ${running} jalan`,
       },
-      { label: 'Penyimpanan R2', ok: true, meta: '1.2 TB · 30 hari' },
-      { label: 'Gateway bayar', ok: true, meta: 'Kasugai · oke' },
     ];
     return {
       status_ok: systems.every((s) => s.ok),

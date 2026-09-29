@@ -26,6 +26,21 @@ Pisahkan ketiganya; jangan pernah menguji di data prod. Untuk awal dengan anggar
 
 ## CI/CD (Rilis Otomatis)
 
+Deploy VPS saat ini dijalankan oleh `.github/workflows/deploy.yml` pada push ke `main`.
+Workflow memeriksa tes, tipe, lint, format berkas yang berubah, build, dan render PDF
+lokal tanpa API/kredit sebelum SSH. Di VPS, deploy berhenti bila checkout kotor,
+PM2 tidak tersedia, atau ruang kosong kurang dari 2 GB. Setelah pull fast-forward,
+Chromium Playwright dipasang eksplisit dan `node scripts/check-renderer.mjs`
+harus berhasil sebelum PM2 di-reload. `/health` baru sehat bila worker dapat
+mencetak PDF uji berkala; status database/Redis saja tidak cukup.
+
+Worker merekonsiliasi batch berusia 10 menit sampai 24 jam yang kehilangan job
+BullMQ: item tanpa job ditandai gagal dan kredit live dikembalikan sekali saat
+batch selesai. Batch lebih lama dari 24 jam tidak diubah otomatis; periksa
+ledger dan dokumen secara manual sebelum tindakan pemulihan. Bila health gagal
+setelah deploy, periksa log `docgen-worker`, Chromium, Redis, dan disk. Pulihkan
+kode lewat commit pembalik pada `main`, bukan force-push atau reset checkout VPS.
+
 Karena kode di git, pakai alat seperti GitHub Actions:
 
 1. Tiap kode berubah → **jalankan pengujian otomatis** (dokumen 14).

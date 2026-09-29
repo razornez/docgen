@@ -80,7 +80,7 @@ function RevenueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
 function QueueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const q = s.queue;
-  const bullmqStuck = q.queued > 0 && q.running === 0;
+  const bullmqStuck = q.workers === 0;
   const p95Label = q.p95 != null ? `${q.p95}s` : '–';
   const stats = [
     { label: t('Worker', 'Workers'), value: String(q.workers) },
@@ -96,7 +96,7 @@ function QueueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
     },
     {
       name: 'API gateway',
-      meta: `${s.uptime}% · 12k ${t('req/mnt', 'req/min')}`,
+      meta: t('Halaman ini aktif', 'This page is active'),
       dot: 'bg-emerald-500',
     },
     {
@@ -111,8 +111,15 @@ function QueueCard({ s, lang }: { s: OwnerSummary; lang: 'id' | 'en' }) {
         <h2 className="text-[14.5px] font-bold text-ink">
           {t('Antrian render', 'Render queue')}
         </h2>
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> live
+        <span
+          className={`flex items-center gap-1.5 text-[11px] font-semibold ${bullmqStuck ? 'text-rose-600' : 'text-emerald-600'}`}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${bullmqStuck ? 'bg-rose-500' : 'bg-emerald-500'}`}
+          />
+          {bullmqStuck
+            ? t('Perlu diperiksa', 'Needs attention')
+            : t('Siap', 'Ready')}
         </span>
       </div>
       <div className="grid grid-cols-4 border-y border-white/40 divide-x divide-white/40">
@@ -162,7 +169,10 @@ export default function OwnerConsole() {
           label: t('Dokumen (30 hr)', 'Documents (30d)'),
           value: `${rb(s.documents_30d)} ${t('rb', 'k')}`,
         },
-        { label: 'Uptime', value: `${s.uptime}%` },
+        {
+          label: t('Worker siap', 'Ready workers'),
+          value: String(s.queue.workers),
+        },
       ]
     : [];
 

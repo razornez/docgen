@@ -2,6 +2,7 @@ import type { BatchId, DocumentId, TemplateId, TenantId } from './ids.js';
 
 /** Nama antrian BullMQ untuk job render dokumen tunggal (dipakai api & worker). */
 export const RENDER_QUEUE = 'render';
+export const RENDER_WORKER_HEARTBEAT_KEY = 'docgen:render-worker:heartbeat';
 
 /**
  * Opsi cetak PDF (docs/08). Satu sumber kebenaran dipakai bersama oleh API

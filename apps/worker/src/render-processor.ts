@@ -12,6 +12,7 @@ import { deliverWebhook } from './webhook-delivery.js';
 
 export interface RenderProcessorDeps {
   readonly db: Queryable;
+  readonly transaction: <T>(fn: (tx: Queryable) => Promise<T>) => Promise<T>;
   readonly renderer: PdfRenderer;
   readonly storage: StoragePort;
 }
@@ -38,25 +39,28 @@ async function markCompleted(
   tenantId: string,
   storageKey: string,
   pageCount: number,
-): Promise<void> {
-  await db.query(
+): Promise<boolean> {
+  const result = await db.query(
     `UPDATE documents
         SET status = 'completed', storage_key = $3, page_count = $4, completed_at = now()
-      WHERE id = $1 AND tenant_id = $2`,
+      WHERE id = $1 AND tenant_id = $2 AND status IN ('queued', 'processing')`,
     [id, tenantId, storageKey, pageCount],
   );
+  return (result.rowCount ?? 0) === 1;
 }
 
-async function markFailed(
+export async function markFailed(
   db: Queryable,
   id: string,
   tenantId: string,
   error: string,
-): Promise<void> {
-  await db.query(
-    `UPDATE documents SET status = 'failed', error = $3 WHERE id = $1 AND tenant_id = $2`,
+): Promise<boolean> {
+  const result = await db.query(
+    `UPDATE documents SET status = 'failed', error = $3
+      WHERE id = $1 AND tenant_id = $2 AND status IN ('queued', 'processing')`,
     [id, tenantId, error],
   );
+  return (result.rowCount ?? 0) === 1;
 }
 
 /**
@@ -64,20 +68,22 @@ async function markFailed(
  * juga menentukan status akhir batch (completed/partially_failed/failed).
  * Refund kredit untuk item gagal dilakukan di sini bila batch sudah selesai.
  */
-async function updateBatchProgress(
+export async function updateBatchProgress(
   db: Queryable,
   batchId: BatchId,
   tenantId: string,
-  succeeded: boolean,
-): Promise<void> {
-  const completedDelta = succeeded ? 1 : 0;
-  const failedDelta = succeeded ? 0 : 1;
-
+  completedDelta: number,
+  failedDelta: number,
+): Promise<{
+  event: string;
+  data: { batch_id: BatchId; total: number; completed: number; failed: number };
+} | null> {
   const { rows } = await db.query<{
     completed: number;
     failed: number;
     total: number;
     done: boolean;
+    credits_reserved: string;
   }>(
     `UPDATE batches
         SET completed = completed + $1,
@@ -97,13 +103,14 @@ async function updateBatchProgress(
             END
       WHERE id = $3 AND tenant_id = $4
         AND status NOT IN ('completed', 'failed', 'partially_failed')
-      RETURNING completed, failed, total,
-                ((completed + $1 + failed + $2) >= total) AS done`,
+        AND completed + failed + $1 + $2 <= total
+      RETURNING completed, failed, total, credits_reserved,
+                (completed + failed >= total) AS done`,
     [completedDelta, failedDelta, batchId, tenantId],
   );
 
   const row = rows[0];
-  if (!row || !row.done) return;
+  if (!row || !row.done) return null;
 
   // Trigger webhook batch.* saat batch selesai.
   const webhookEvent =
@@ -113,28 +120,46 @@ async function updateBatchProgress(
         ? 'batch.failed'
         : 'batch.partially_failed';
 
-  await deliverWebhook(db, tenantId, webhookEvent, {
-    batch_id: batchId,
-    total: row.total,
-    completed: row.completed,
-    failed: row.failed,
-  }).catch(() => undefined);
+  const refundable = Math.min(row.failed, Number(row.credits_reserved));
+  if (refundable > 0) {
+    // This runs in the same transaction as the batch status change.
+    const txnId =
+      'txn_' + createHash('md5').update(`${batchId}:refund`).digest('hex');
+    await applyWalletCredit(db, {
+      id: txnId,
+      tenantId,
+      type: 'refund',
+      amount: refundable,
+      refType: 'document',
+      refId: batchId,
+    });
+  }
+  return {
+    event: webhookEvent,
+    data: {
+      batch_id: batchId,
+      total: row.total,
+      completed: row.completed,
+      failed: row.failed,
+    },
+  };
+}
 
-  if (row.failed === 0) return;
-
-  // Batch selesai dan ada item gagal → refund kredit untuk item gagal.
-  // id deterministik (worker tanpa IdGenerator); idempotensi tetap dijamin
-  // UNIQUE(refund, batchId) di ledger + guard status batch terminal di atas.
-  const txnId =
-    'txn_' + createHash('md5').update(`${batchId}:refund`).digest('hex');
-  await applyWalletCredit(db, {
-    id: txnId,
-    tenantId,
-    type: 'refund',
-    amount: row.failed,
-    refType: 'document',
-    refId: batchId,
-  });
+export async function notifyBatch(
+  db: Queryable,
+  tenantId: string,
+  result: Awaited<ReturnType<typeof updateBatchProgress>>,
+) {
+  if (result)
+    await deliverWebhook(
+      db,
+      tenantId,
+      result.event as
+        | 'batch.completed'
+        | 'batch.failed'
+        | 'batch.partially_failed',
+      result.data,
+    ).catch(() => undefined);
 }
 
 /**
@@ -144,8 +169,13 @@ async function updateBatchProgress(
  */
 export function createRenderProcessor(
   deps: RenderProcessorDeps,
-): (data: RenderJobData) => Promise<RenderJobResult> {
-  return async function handle(data: RenderJobData): Promise<RenderJobResult> {
+): (data: RenderJobData, finalAttempt?: boolean) => Promise<RenderJobResult> {
+  return async function handle(
+    data: RenderJobData,
+    finalAttempt = true,
+  ): Promise<RenderJobResult> {
+    let pdf: Buffer;
+    let pageCount: number;
     try {
       const body = await loadTemplateBody(
         deps.db,
@@ -158,26 +188,8 @@ export function createRenderProcessor(
       }
 
       const html = renderHtml(body, data.data);
-      const { pdf, pageCount } = await deps.renderer.render(html, data.options);
+      ({ pdf, pageCount } = await deps.renderer.render(html, data.options));
       await deps.storage.put(data.storageKey, pdf, 'application/pdf');
-      await markCompleted(
-        deps.db,
-        data.documentId,
-        data.tenantId,
-        data.storageKey,
-        pageCount,
-      );
-
-      if (data.batchId) {
-        await updateBatchProgress(
-          deps.db,
-          data.batchId,
-          data.tenantId,
-          true,
-        ).catch(() => undefined);
-      }
-
-      return { storageKey: data.storageKey, pageCount };
     } catch (err) {
       const message =
         err instanceof TemplateRenderError
@@ -186,20 +198,36 @@ export function createRenderProcessor(
             ? err.message
             : String(err);
 
-      await markFailed(deps.db, data.documentId, data.tenantId, message).catch(
-        () => undefined,
-      );
-
-      if (data.batchId) {
-        await updateBatchProgress(
-          deps.db,
-          data.batchId,
-          data.tenantId,
-          false,
-        ).catch(() => undefined);
+      if (finalAttempt) {
+        const notification = await deps.transaction(async (tx) => {
+          const failed = await markFailed(
+            tx,
+            data.documentId,
+            data.tenantId,
+            message,
+          );
+          return data.batchId && failed
+            ? updateBatchProgress(tx, data.batchId, data.tenantId, 0, 1)
+            : null;
+        });
+        await notifyBatch(deps.db, data.tenantId, notification);
       }
 
       throw new Error(message);
     }
+    const notification = await deps.transaction(async (tx) => {
+      const completed = await markCompleted(
+        tx,
+        data.documentId,
+        data.tenantId,
+        data.storageKey,
+        pageCount,
+      );
+      return data.batchId && completed
+        ? updateBatchProgress(tx, data.batchId, data.tenantId, 1, 0)
+        : null;
+    });
+    await notifyBatch(deps.db, data.tenantId, notification);
+    return { storageKey: data.storageKey, pageCount };
   };
 }

@@ -28,7 +28,11 @@ export type { AppErrorOptions } from './errors.js';
 export { randomBase62 } from './random.js';
 
 // Render (job & opsi PDF — dipakai bersama api/worker/renderer)
-export { RENDER_QUEUE, buildStorageKey } from './render.js';
+export {
+  RENDER_QUEUE,
+  RENDER_WORKER_HEARTBEAT_KEY,
+  buildStorageKey,
+} from './render.js';
 export type {
   RenderOptions,
   RenderJobData,

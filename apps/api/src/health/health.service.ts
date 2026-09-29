@@ -10,12 +10,13 @@ export class HealthService {
   constructor(private readonly repo: HealthRepository) {}
 
   async getHealth(): Promise<HealthReport> {
-    const [postgres, redis] = await Promise.all([
+    const [postgres, redis, worker] = await Promise.all([
       this.repo.checkPostgres(),
       this.repo.checkRedis(),
+      this.repo.checkWorker(),
     ]);
 
-    const status = postgres.ok && redis.ok ? 'ok' : 'degraded';
-    return { status, checks: { postgres, redis } };
+    const status = postgres.ok && redis.ok && worker.ok ? 'ok' : 'degraded';
+    return { status, checks: { postgres, redis, worker } };
   }
 }

@@ -219,7 +219,6 @@ export interface OwnerSummary {
   tenants_active: number;
   revenue_month_idr: number;
   documents_30d: number;
-  uptime: number;
   revenue: { week_idr: number; delta_pct: number; days14: number[] };
   queue: {
     workers: number;
@@ -295,7 +294,12 @@ export function ownerAddCredit(
 
 export interface OwnerRender {
   status_ok: boolean;
-  stats: { workers: number; running: number; queued: number; p95: number };
+  stats: {
+    workers: number;
+    running: number;
+    queued: number;
+    p95: number | null;
+  };
   throughput: { per_day: number; days14: number[] };
   recent_jobs: {
     id: string;

@@ -14,5 +14,6 @@ export interface HealthReport {
   readonly checks: {
     readonly postgres: DependencyCheck;
     readonly redis: DependencyCheck;
+    readonly worker: DependencyCheck;
   };
 }

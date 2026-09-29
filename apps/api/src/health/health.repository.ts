@@ -1,5 +1,7 @@
 import { pingDatabase } from '@docgen/db';
 import { pingRedis } from '../infra/redis.js';
+import { getRedis } from '../infra/redis.js';
+import { RENDER_WORKER_HEARTBEAT_KEY } from '@docgen/shared';
 import type { Clock } from '@docgen/shared';
 import type { DependencyCheck } from './health.types.js';
 
@@ -17,6 +19,14 @@ export class HealthRepository {
 
   async checkRedis(): Promise<DependencyCheck> {
     return this.timed(() => pingRedis());
+  }
+
+  async checkWorker(): Promise<DependencyCheck> {
+    return this.timed(async () => {
+      const heartbeat = await getRedis().get(RENDER_WORKER_HEARTBEAT_KEY);
+      if (!heartbeat)
+        throw new Error('Worker render tidak aktif atau Chromium belum siap');
+    });
   }
 
   private async timed(probe: () => Promise<void>): Promise<DependencyCheck> {
