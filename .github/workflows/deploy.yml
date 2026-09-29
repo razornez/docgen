@@ -20,6 +20,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @docgen/renderer exec playwright install --with-deps chromium
+      - run: pnpm build:all
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm lint
@@ -27,7 +28,6 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
         run: git diff --name-only -z "$BEFORE" "$GITHUB_SHA" -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.json' '*.yml' '*.yaml' | xargs -0 -r pnpm exec prettier --check
-      - run: pnpm build:all
       - run: node scripts/check-renderer.mjs
   deploy:
     needs: validate
@@ -116,7 +116,7 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "[GAGAL] Deploy docgen - ${{ github.sha }}"
+          subject: '[GAGAL] Deploy docgen - ${{ github.sha }}'
           to: ${{ secrets.NOTIFY_EMAIL }}
           from: GitHub Actions <${{ secrets.MAIL_USERNAME }}>
           body: |
@@ -140,7 +140,7 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "[SUKSES] Deploy docgen - ${{ github.sha }}"
+          subject: '[SUKSES] Deploy docgen - ${{ github.sha }}'
           to: ${{ secrets.NOTIFY_EMAIL }}
           from: GitHub Actions <${{ secrets.MAIL_USERNAME }}>
           body: |
